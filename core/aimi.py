@@ -50,8 +50,6 @@ class Aimi:
     ) -> Generator[dict, None, None]:
 
         link_think = self.make_link_think(question)
-        yield link_think
-        '''
         answer = self.__post_question(link_think, memory.openai_conversation_id)   
         
         # get yield last val
@@ -65,7 +63,7 @@ class Aimi:
             if message['conversation_id'] and message['conversation_id'] != memory.openai_conversation_id:
                 memory.openai_conversation_id = message['conversation_id']
                 log_info('set new con_id: ' + str(memory.openai_conversation_id))
-        '''
+        
     def __post_question(
         self, 
         question: str,
