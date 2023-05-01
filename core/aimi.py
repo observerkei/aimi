@@ -1,6 +1,7 @@
 import atexit
 import signal
-from typing import Generator, List, Tuple, Union, Set
+import asyncio
+from typing import Generator, List, Tuple, Union, Set, Any
 
 from tool.config import config
 from tool.openai_api import openai_api
@@ -15,6 +16,7 @@ class Aimi:
     aimi_name: str = 'Aimi'
     preset_facts: str = ''
     max_link_think: int = 1024
+    running: bool = True
 
     def __init__(self):
         'void'
@@ -23,19 +25,23 @@ class Aimi:
         # 注册意外退出保护记忆
         atexit.register(self.__when_exit)
         signal.signal(signal.SIGTERM, self.__when_exit)
+        signal.signal(signal.SIGINT, self.__when_exit)
 
     def make_link_think(
         self,
-        question: str
+        question: str,
+        nickname: str = None
     ) -> str:
 
+        nickname = nickname if len(nickname) else self.master_name
+        
         # append setting
         link_think = '设定: {{\n“{}”\n}}.\n\n'.format(self.preset_facts)
         link_think += '请只关注最新消息,历史如下: {\n'
 
         # cul question
         question_item = '}}.\n\n请根据设定和对话历史,不用“{}:”开头,回答如下问题: {{\n{}说: “{}”\n}}.'.format(
-            self.aimi_name, self.master_name, question)
+            self.aimi_name, nickname, question)
 
         # append history
         link_think += memory.search(question, self.max_link_think)
@@ -43,15 +49,72 @@ class Aimi:
         link_think += question_item
 
         return link_think
-    
+
+    def run(self):
+        
+        task1 = asyncio.ensure_future(chat_qq.listen())
+        task2 = asyncio.ensure_future(self.read())
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(asyncio.gather(task1, task2))
+        
+    async def test(self):
+        while self.running:
+            question = await asyncio.to_thread(input)
+            if 'exit()' in question:
+                break
+            answer = {}
+            for msg in aimi.ask(question):
+                answer = msg
+                log_dbg(str(answer))
+            if not self.running:
+                break
+            log_info('loop.....')
+
+    async def read(self):
+        while self.running:
+            if chat_qq.has_message():
+                for msg in chat_qq:
+                    nickname = chat_qq.get_name(msg)
+                    message = chat_qq.get_message(msg)
+                    user_id = chat_qq.get_user_id(msg)
+                    reply = ''
+                    for answer in self.ask(message, nickname):
+                        reply = answer['message']
+                    log_info('{}: {}'.format(nickname, message))
+                    log_info('{}: {}'.format(self.aimi_name, str(reply)))
+                    chat_qq.reply_private(user_id, reply)
+            else:
+                await asyncio.sleep(1)
+
     def ask(
         self,
-        question: str
+        question: str,
+        nickname: str = None
     ) -> Generator[dict, None, None]:
 
-        link_think = self.make_link_think(question)
-        answer = self.__post_question(link_think, memory.openai_conversation_id)   
-        
+        link_think = self.make_link_think(question, nickname)    
+        answer = self.__post_question(link_think)
+        for message in answer:
+            yield from answer
+            
+            if (not message) or (message['code'] != 0):
+                continue
+            
+            memory.append(q = question, a = message['message'])
+            
+    
+    def __post_question(
+        self, 
+        link_think: str
+    )-> Generator[dict, None, None]:
+        yield from self.__post_openai(link_think, memory.openai_conversation_id)
+
+    def __post_openai(
+        self, 
+        question: str,
+        openai_conversation_id: str = None
+    )-> Generator[dict, None, None]:
+        answer = openai_api.ask(question, openai_conversation_id)
         # get yield last val
         for message in answer:
             yield from answer
@@ -59,18 +122,10 @@ class Aimi:
             if (not message) or (message['code'] != 0):
                 continue
             
-            memory.append(q = question, a = message['message'])
             if message['conversation_id'] and message['conversation_id'] != memory.openai_conversation_id:
                 memory.openai_conversation_id = message['conversation_id']
                 log_info('set new con_id: ' + str(memory.openai_conversation_id))
         
-    def __post_question(
-        self, 
-        question: str,
-        openai_conversation_id: str = None
-    )-> Generator[dict, None, None]:
-        yield from openai_api.ask(question, openai_conversation_id)
-
     def __load_setting(self):
         try:
             self.aimi_name = config.setting['aimi']['name']
@@ -105,6 +160,7 @@ class Aimi:
         return False
     
     def __when_exit(self):
+        self.running = False
         bye_string = 'server unknow error. sweven-box ready to go offline\n'
         if memory.save_memory():
             log_info('exit: save memory done.')
