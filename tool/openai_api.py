@@ -33,15 +33,16 @@ class OpenAIAPI:
         conversation_id: str = '',
         timeout: int = 360,
     ) -> Generator[dict, None, None]:
-        answer = { 
-           "message": '',
-           "conversation_id": conversation_id,
-           "code": 1
-        }
 
         req_cnt = 0
         
         while req_cnt < self.max_repeat_times:
+            answer = { 
+               "message": '',
+               "conversation_id": conversation_id,
+               "code": 1
+            }
+            
             req_cnt += 1
             
             try:
