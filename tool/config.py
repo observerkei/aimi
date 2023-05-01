@@ -61,13 +61,16 @@ class Config:
     meme: Meme
 
     def __init__(self) -> None:
-        setting_config = read_yaml(self.setting_config)
-        self.setting = self.__load_setting(setting_config)
+        try:
+            setting_config = read_yaml(self.setting_config)
+            self.setting = self.__load_setting(setting_config)
+        except:
+            self.setting = {}
         self.meme = Meme()
         
     def load_memory(self) -> dict:
-        obj = read_yaml(self.memory_config)
         try:
+            obj = read_yaml(self.memory_config)
             mem = {}
             mem['openai_conversation_id'] = obj.get('openai_conversation_id', '')
             mem['idx'] = obj.get('idx', 0)

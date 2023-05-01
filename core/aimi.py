@@ -59,8 +59,20 @@ class Aimi:
         threading.Thread(target = self.read).start()
         threading.Thread(target = chat_qq.server).start()
 
+        cnt = 0
         while self.running:
-            time.sleep(1)
+            cnt = cnt + 1
+            if cnt < 60:
+                time.sleep(1)
+            cnt = 0;
+            
+            try:
+                memory.save_memory()
+                log_info('save memory done')
+            except Exception as e:
+                log_err('fail to save memory: ' + str(e))
+                
+            
 
     def read(self):
         while self.running:
