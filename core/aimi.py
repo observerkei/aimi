@@ -64,7 +64,9 @@ class Aimi:
             cnt = cnt + 1
             if cnt < 60:
                 time.sleep(1)
-            cnt = 0;
+                continue
+            else:
+                cnt = 0;
             
             try:
                 memory.save_memory()
