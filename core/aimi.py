@@ -81,8 +81,10 @@ class Aimi:
                 continue
             
             for msg in chat_qq:
+                log_info('recv msg, try analyse')
                 nickname = chat_qq.get_name(msg)
                 question = chat_qq.get_question(msg)
+                log_info('{}: {}'.format(nickname, question))
                 reply = ''
                 code = 0
                 for answer in self.ask(question, nickname):

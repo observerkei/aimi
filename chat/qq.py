@@ -1,5 +1,6 @@
 import abc
 import requests
+import re
 from typing import List, Tuple, Union, Set, Any, Generator
 from flask import Flask, request
 from urllib import parse
@@ -77,8 +78,14 @@ class GoCQHttp:
     def is_at_self(self, msg) -> bool:
         if not self.is_message:
             return False
-        
-        message = self.get_message(msg)            
+
+        # get_message 屏蔽了at 自身
+        message = ''
+        try:
+            message = msg['message']
+        except:
+            message = ''
+           
         at_self = self.make_at(self.account_uin)
         if at_self in message:
             return True
@@ -99,8 +106,10 @@ class GoCQHttp:
 
         # del group at self.
         if self.is_group(msg):
-            at_self = self.make_at(self.account_uin)
-            message.replace(at_self, "")
+            # del cq.
+            log_dbg('message: ' + str(message))
+            message = re.sub('\[CQ:.*?\]', '', message)
+            log_dbg('del done: ' + str(message))
             return message
 
         return message
@@ -109,13 +118,13 @@ class GoCQHttp:
         try:
             return msg['user_id']
         except:
-            return ''
+            return 0
     
     def get_group_id(self, msg) -> int:
         try:
             return msg['group_id']
         except:
-            return ''
+            return 0
     
     def get_image_cq(self, file) -> str:
         return '[CQ:image,file=file://{}]'.format(file)
