@@ -143,6 +143,13 @@ class GoCQHttp:
         log_info('send get: ' + str(api_group_reply))
         response = requests.get(api_group_reply, proxies={})            
         log_info('res code: {} data: {}'.format(str(response), str(response.text)))
+
+    def reply_online(self, user, msg):
+        self.reply_private(user, msg)
+        
+    def reply_offline(self, user, msg):
+        self.reply_private(user, msg)    
+
     
 class ChatQQ:
     response_user_ids: Set[int] = {}
@@ -240,6 +247,13 @@ class ChatQQ:
         chat_qq.reply_question(msg, '非服务对象 :(')
         chat_qq.reply_question(msg, img_meme_com)
 
+    def reply_online(self):
+        if self.type == GoCQHttp.name:
+            self.go_cqhttp.reply_online(self.master_id, 'server init complate :)')
+
+    def reply_offline(self):
+        if self.type == GoCQHttp.name:
+            self.go_cqhttp.reply_offline(self.master_id, 'Server unknown error :(')
             
     # notify permission denied
     def is_permission_denied(self, msg) -> bool:

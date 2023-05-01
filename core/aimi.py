@@ -54,6 +54,8 @@ class Aimi:
 
     def run(self):
 
+        self.notify_online()
+
         threading.Thread(target = self.read).start()
         threading.Thread(target = chat_qq.server).start()
 
@@ -177,6 +179,12 @@ class Aimi:
             return True
         return False
 
+    def notify_online(self):
+        chat_qq.reply_online()
+
+    def notify_offline(self):
+        chat_qq.reply_offline()
+    
     def __signal_exit(self, sig, e):
         log_info('recv exit sig.')
         self.running = False
@@ -186,6 +194,7 @@ class Aimi:
         self.running = False
         
         log_info('now exit aimi.')
+        self.notify_offline()
         
         bye_string = 'server unknow error. sweven-box ready to go offline\n'
         if memory.save_memory():
