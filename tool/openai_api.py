@@ -45,7 +45,7 @@ class OpenAIAPI:
             req_cnt += 1
             
             try:
-                log_dbg('try ask: ' + question)
+                log_dbg('try ask: ' + str(question))
                 
                 if len(conversation_id):
                     for data in self.chatbot.ask(
@@ -59,7 +59,8 @@ class OpenAIAPI:
                         answer['message'] = data["message"]
                         yield answer
                         
-                    answer['conversation_id'] = self.chatbot.get_conversations(0, 1);
+                    answer['conversation_id'] = self.get_revChatGPT_conversation_id()
+       
 
                 answer['code'] = 0
                 yield answer
@@ -89,7 +90,13 @@ class OpenAIAPI:
            "conversation_id": conversation_id,
            "code": -1
         }
-    
+        
+    def get_revChatGPT_conversation_id(self) -> str:
+        conv_li = self.chatbot.get_conversations(0, 1);
+        try:
+            return conv_li[0]['id']
+        except:
+            return ''
     # chatgpt输入
     def make_chatgpt_input_item(type: InputType, content: str) -> dict:
         return {'role': type, 'content': content}
