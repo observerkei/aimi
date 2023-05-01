@@ -1,6 +1,7 @@
 import atexit
 import signal
-import asyncio
+import threading
+import time
 from typing import Generator, List, Tuple, Union, Set, Any
 
 from tool.config import config
@@ -8,6 +9,7 @@ from tool.openai_api import openai_api
 from tool.util import log_dbg, log_err, log_info
 from chat.qq import chat_qq
 
+from core.md2img import md
 from core.memory import memory
 
 class Aimi:
@@ -24,8 +26,8 @@ class Aimi:
 
         # 注册意外退出保护记忆
         atexit.register(self.__when_exit)
-        signal.signal(signal.SIGTERM, self.__when_exit)
-        signal.signal(signal.SIGINT, self.__when_exit)
+        signal.signal(signal.SIGTERM, self.__signal_exit)
+        signal.signal(signal.SIGINT, self.__signal_exit)
 
     def make_link_think(
         self,
@@ -51,33 +53,51 @@ class Aimi:
         return link_think
 
     def run(self):
-        qq_server = asyncio.ensure_future(chat_qq.listen())
-        aimi_read = asyncio.ensure_future(self.read())
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(asyncio.gather(qq_server, aimi_read))
 
-    async def read(self):
+        threading.Thread(target = self.read).start()
+        threading.Thread(target = chat_qq.server).start()
+
         while self.running:
-            if chat_qq.has_message():
-                for msg in chat_qq:
-                    nickname = chat_qq.get_name(msg)
-                    message = chat_qq.get_message(msg)
-                    user_id = chat_qq.get_user_id(msg)
-                    reply = ''
-                    for answer in self.ask(message, nickname):
-                        reply = answer['message']
-                    log_info('{}: {}'.format(nickname, message))
-                    log_info('{}: {}'.format(self.aimi_name, str(reply)))
+            time.sleep(1)
 
-                    if chat_qq.is_private(msg):
-                        chat_qq.reply_private(user_id, reply)
-                    elif chat_qq.is_group(msg):
-                        group_id = chat_qq.get_group_id(msg)
-                        chat_qq.reply_group(group_id, user_id, reply)
-                        
-            else:
-                await asyncio.sleep(1)
+    def read(self):
+        while self.running:
+            if not chat_qq.has_message():
+                time.sleep(1)
+                continue
+            
+            for msg in chat_qq:
+                nickname = chat_qq.get_name(msg)
+                question = chat_qq.get_question(msg)
+                reply = ''
+                code = 0
+                for answer in self.ask(question, nickname):
+                    reply = answer['message']
+                    code = answer['code']
+                    log_dbg('msg: ' + str(reply))
+                log_info('{}: {}'.format(nickname, question))
+                log_info('{}: {}'.format(self.aimi_name, str(reply)))
 
+
+                if code == 0:
+                    chat_qq.reply_question(msg, reply)
+
+                # server failed
+                if code == -1:
+                    meme_err = config.meme.error
+                    img_meme_err = chat_qq.get_image_message(meme_err)
+                    chat_qq.reply_question(msg, 'server unknow error :(')
+                    chat_qq.reply_question(msg, img_meme_err)
+                    
+                
+                # trans text to img  
+                if md.need_set_img(reply):
+                    log_info('msg need set img')
+                    img_file = md.message_to_img(reply)
+                    cq_img = chat_qq.get_image_message(img_file)
+                    
+                    chat_qq.reply_question(msg, cq_img)
+        
     def ask(
         self,
         question: str,
@@ -100,12 +120,18 @@ class Aimi:
         link_think: str
     )-> Generator[dict, None, None]:
         yield from self.__post_openai(link_think, memory.openai_conversation_id)
-
+        
     def __post_openai(
         self, 
         question: str,
         openai_conversation_id: str = None
     )-> Generator[dict, None, None]:
+        req_cnt = 0
+        try:
+            try_limit = config.setting['openai_config']['max_repeat_times']
+        except:
+            try_limit = 3
+            
         answer = openai_api.ask(question, openai_conversation_id)
         # get yield last val
         for message in answer:
@@ -150,14 +176,23 @@ class Aimi:
         if user['chat'] == 'qq' and chat_qq.need_reply(user):
             return True
         return False
-    
+
+    def __signal_exit(self, sig, e):
+        log_info('recv exit sig.')
+        self.running = False
+        chat_qq.stop()
+
     def __when_exit(self):
         self.running = False
+        
+        log_info('now exit aimi.')
+        
         bye_string = 'server unknow error. sweven-box ready to go offline\n'
         if memory.save_memory():
             log_info('exit: save memory done.')
         else:
             log_err('exit: fail to save memory.')
+
 
 
 aimi = Aimi()

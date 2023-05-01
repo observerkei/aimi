@@ -1,14 +1,69 @@
-from tool.util import read_yaml, write_yaml, log_dbg, log_err
+from typing import Dict, List
+import random
+import os
+
+from tool.util import read_yaml, write_yaml, log_dbg, log_err, log_info
+
+class Meme:
+    meme_error_path: str = './run/meme/error/'
+    meme_common_path: str = './run/meme/common/'
+    meme: Dict[str, List]
+
+    def __init__(self):
+        try:
+            self.meme = {}
+            self.meme['error'] = self.get_file_paths(self.meme_error_path)
+            self.meme['common'] = self.get_file_paths(self.meme_common_path)
+            '''
+            for iter in self.meme['error']:
+                log_info('load meme err: ' + str(iter))
+            for iter in self.meme['common']:
+                log_info('load meme com: ' + str(iter))
+            '''
+            
+        except Exception as e:
+            log_err('fail to load meme:' + str(e))
+
+    def get_file_paths(self, folder_path):
+        """
+        将指定文件夹下的所有文件的绝对路径读取到一个 list 中。
+        """
+        file_paths = []
+        for root, dirs, files in os.walk(folder_path):
+            for filename in files:
+                # 拼接文件的绝对路径
+                filepath = os.path.join(root, filename)
+                # set to abs path
+                filepath = os.path.abspath(filepath)
+                file_paths.append(filepath)
+        return file_paths
+
+    @property
+    def error(self):
+        try:
+            return random.choice(self.meme['error'])
+        except:
+            return ''
+    
+    @property
+    def common(self):
+        try:
+            return random.choice(self.meme['common'])
+        except:
+            return ''
+    
 
 class Config:
     go_cqhttp_config: str = './run/config.yml'
     setting_config: str = './run/setting.yml'
     memory_config: str = './run/memory.yml'
     setting: dict = {}
+    meme: Meme
 
     def __init__(self) -> None:
         setting_config = read_yaml(self.setting_config)
         self.setting = self.__load_setting(setting_config)
+        self.meme = Meme()
         
     def load_memory(self) -> dict:
         obj = read_yaml(self.memory_config)

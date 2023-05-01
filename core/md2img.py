@@ -1,7 +1,9 @@
 import subprocess
 import re
- 
-from qq_server.util import take_off_cq_code, parse_cq_code, color_report, ReportType, read_yaml
+import os
+import random
+
+from tool.util import log_dbg, log_info, log_err
 
 # 将 Markdown 源码转换成 HTML
 
@@ -66,20 +68,20 @@ class Md:
 希望这个回答可以帮助到你，Master~🤗  
 """
 
-    out_prefix: str = '/data/data/com.termux/files/home/project/aimi/md/'
+    out_prefix: str = './run/md/'
 
-    def has_latex(self, text):
+    def __init__(self):
+        self.out_prefix = os.path.abspath(self.out_prefix) + '/'
+
+    def has_latex(self, text) -> bool:
         #r'\$\$.*?\$\$|\$.*?\$'
         #r'\$.*?\$|\$\$.*?\$\$|\\\(.*?\\\)|\\\[.*?\\\]'
-        pattern = r'\$.*?\$|\$\$.*?\$\$|\\\((.|\s)*?\\\)|\\\[([\s\S]*?)\\\]|\{\\frac\{.*?\}\{.*?\s*\}\}' 
+        pattern = r'\$.*?\$|\$\$.*?\$\$|\\\((.|\s)*?\\\)|\\\[([\s\S]*?)\\\]|LaTeX|\{\\frac\{.*?\}\{.*?\s*\}\}' 
         return re.search(pattern, text) is not None
     
-    def has_html(self, text):
+    def has_html(self, text) -> bool:
         pattern = r'<.*?>'
         return re.search(pattern, text) is not None
-
-    def get_cq_file(self, file: str) -> str:
-        return '[CQ:image,file=file://{}]'.format(file)
 
     def __html_to_img(self, img_id: str) -> str:
 
@@ -106,7 +108,7 @@ class Md:
             return self.__html_to_img(img_id)
 
         except Exception as e:
-            color_report('create md to img failed: ' + str(img_id) + 'err: '+ str(e), ReportType.Error)
+            log_err('create md to img failed: ' + str(img_id) + ' err: '+ str(e))
             return None
 
     def html_to_img(self, img_id: str, html_source: str) -> str:
@@ -124,8 +126,28 @@ class Md:
             return self.__html_to_img(img_id)
 
         except Exception as e:
-            color_report('create html to img failed: ' + str(img_id) + 'err: '+ str(e), ReportType.Error)
+            log_err('create html to img failed: ' + str(img_id) + ' err: '+ str(e))
             return None
+
+    def need_set_img(self, message: str) -> bool:
+        if self.has_latex(message):
+            return True
+        if self.has_html(message):
+            return True
+
+        return False
+           
+    def message_to_img(self, message: str) -> str:
+        msg_id = random.randint(1, 1000000)
+        msg_id = str(msg_id)
+        
+        log_dbg('new id:' + msg_id)
+        if self.has_latex(message):
+            return self.md_to_img(msg_id, message)
+        if self.has_html(message):
+            return self.html_to_img(msg_id, message)
+
+        return ''
 
 md = Md()
 

@@ -1,10 +1,11 @@
 openai_config:
   access_token: 
   max_requestion: 608
+  max_repeat_times: 3
 
 qq:
   type: go-cqhttp
-  config_file: ./run/config.yml
+  config: ./run/config.yml
   master_id: 
   response_user_ids:
     - null

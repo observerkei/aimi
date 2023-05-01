@@ -1,7 +1,7 @@
 import abc
 import requests
 from typing import List, Tuple, Union, Set, Any, Generator
-from quart import Quart, request
+from flask import Flask, request
 from urllib import parse
 
 from tool.util import log_dbg, log_err, log_info, read_yaml, write_yaml
@@ -47,35 +47,29 @@ class GoCQHttp:
 
     def is_message(self, msg) -> bool:
         try:
-            if msg['post_type'] == 'message':
-                return True
+            return msg['post_type'] == 'message'
         except:
             log_err('fail to check msg type')
             return False
-        return False
     
     def is_private(self, msg) -> bool:    
         if not self.is_message(msg):
             return False
         
         try:
-            if msg['message_type'] == 'private':
-                return True
+            return msg['message_type'] == 'private'
         except:
             log_err('fail to check private type')
             return False
-        return False
 
     def is_group(self, msg) -> bool:
         if not self.is_message(msg):
             return False
         try:
-            if msg['message_type'] == 'group':
-                return True
+            return msg['message_type'] == 'group'
         except:
-            log_err('fail to check group type')
+            log_err('failt to check is_group')
             return False
-        return False
 
     def make_at(self, id: int) -> str:
         return '[CQ:at,qq={}]'.format(id)
@@ -97,10 +91,19 @@ class GoCQHttp:
             return ''
 
     def get_message(self, msg) -> str:
+        message = ''
         try:
-            return msg['message']
+            message = msg['message']
         except:
             return ''
+
+        # del group at self.
+        if self.is_group(msg):
+            at_self = self.make_at(self.account_uin)
+            message.replace(at_self, "")
+            return message
+
+        return message
 
     def get_user_id(self, msg) -> int:
         try:
@@ -114,13 +117,17 @@ class GoCQHttp:
         except:
             return ''
     
+    def get_image_cq(self, file) -> str:
+        return '[CQ:image,file=file://{}]'.format(file)
+    
     def reply_private(self, user_id: int, reply: str):
         reply_quote = parse.quote(reply)
         
         api_private_reply = "http://{}:{}/send_private_msg?user_id={}&message={}".format(
             self.post_host, self.post_port, user_id, reply_quote)
+
         log_info('send get: ' + str(api_private_reply))
-        response = requests.get(api_private_reply)
+        response = requests.get(api_private_reply, proxies={})
         log_info('res code: {} data: {}'.format(str(response), str(response.text)))
 
     def reply_group(self, group_id: int, user_id: int, reply):
@@ -132,21 +139,23 @@ class GoCQHttp:
         
         api_group_reply = "http://{}:{}/send_group_msg?group_id={}&message={}".format(
                 self.post_host, self.post_port, group_id, at_reply_quote)
+
         log_info('send get: ' + str(api_group_reply))
-        response = requests.get(api_group_reply)            
+        response = requests.get(api_group_reply, proxies={})            
         log_info('res code: {} data: {}'.format(str(response), str(response.text)))
     
 class ChatQQ:
     response_user_ids: Set[int] = {}
     response_group_ids: Set[int] = {}
     master_id: int = 0
-    port: int = 5701
+    port: int = 5700
     host: str = '127.0.0.1'
     type: str = 'go-cqhttp'
     go_cqhttp: GoCQHttp
     app: Any
+    http_server: Any
     message: Set[dict] = []
-    message_size: int = 1024
+    message_size: int = 1024    
     
     
     def append_message(self, msg):
@@ -179,7 +188,7 @@ class ChatQQ:
             return self.go_cqhttp.get_name(msg)
         return ''
         
-    def get_message(self, msg):
+    def get_question(self, msg):
         if self.type == GoCQHttp.name:
             return self.go_cqhttp.get_message(msg)
         return ''
@@ -204,8 +213,63 @@ class ChatQQ:
             return self.go_cqhttp.reply_group(group_id, user_id, reply)
         return ''
 
+    def get_image_message(self, file) -> str:
+        if self.type == GoCQHttp.name:
+            return self.go_cqhttp.get_image_cq(file)
+        return ''            
+
+    def reply_question(self, msg, reply):
+        user_id = self.get_user_id(msg)
+        
+        if self.is_private(msg):
+            self.reply_private(user_id, reply)
+        elif self.is_group(msg):
+            group_id = chat_qq.get_group_id(msg)
+            self.reply_group(group_id, user_id, reply) 
+
     def has_message(self):
         return len(self.message)
+
+    def reply_permission_denied(self, msg):
+        if not self.is_permission_denied(msg):
+            return
+        
+        meme_com = config.meme.common
+        img_meme_com = self.get_image_message(meme_com)
+        
+        chat_qq.reply_question(msg, '非服务对象 :(')
+        chat_qq.reply_question(msg, img_meme_com)
+
+            
+    # notify permission denied
+    def is_permission_denied(self, msg) -> bool:
+        if self.is_private(msg):
+            uid = self.get_user_id(msg)
+            if uid == self.master_id:
+                return False
+            if uid in self.response_user_ids:
+                return False
+            
+            return True
+        
+        elif self.is_group(msg):
+
+            # only use at on group.
+            if not self.go_cqhttp.is_at_self(msg):
+                return False
+            
+            uid = self.get_user_id(msg)
+            gid = self.get_group_id(msg)
+
+            if uid in self.response_user_ids and gid in self.response_group_ids:
+                return False
+
+            return True
+
+        else:
+            return False
+        
+        return False
     
     def need_reply(self, msg) -> bool:
         if self.is_private(msg):
@@ -242,22 +306,34 @@ class ChatQQ:
 
     def __listen_init(self):
 
-        self.app = Quart(__name__)
+        self.app = Flask(__name__)
         
         @self.app.route('/', methods = ['POST'])
-        async def listen():
-            msg = await request.get_json()
+        def listen():
+            msg = request.get_json()
             log_info('recv msg: ' + str(msg))
             if self.need_reply(msg):
                 log_info('need reply append msg.')
                 self.append_message(msg)
+            elif self.is_permission_denied(msg):
+                log_info('user permission_denied')
+                self.reply_permission_denied(msg)
             else:
                 log_info('no need reply')
             
             return 'ok'
         
-    async def listen(self):
-        await self.app.run_task(self.host, self.port)
+    def server(self):
+        from gevent import pywsgi
+        self.http_server = pywsgi.WSGIServer(
+            listener = (self.host, self.port),
+            application = self.app,
+            log = None 
+        )
+        self.http_server.serve_forever()
+
+    def stop(self):
+        self.http_server.stop()
  
     def __load_setting(self):
         try:

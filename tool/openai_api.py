@@ -9,6 +9,7 @@ class OpenAIAPI:
     use_web_ask: bool = True
     max_requestion: int = 1024
     access_token: str = ''
+    max_repeat_times: int = 3
 
     class InputType:
         SYSTEM = 'system'
@@ -37,33 +38,42 @@ class OpenAIAPI:
            "conversation_id": conversation_id,
            "code": 1
         }
+
+        req_cnt = 0
         
-        try:
-            log_dbg('try ask: ' + question)
+        while req_cnt < self.max_repeat_times:
+            req_cnt += 1
             
-            if len(conversation_id):
-                for data in self.chatbot.ask(
-                    question,
-                    conversation_id
-                ):
-                    answer['message'] = data["message"]
-                    yield answer
-            else:
-                for data in self.chatbot.ask(question):
-                    answer['message'] = data["message"]
-                    yield answer
-                    
-                answer['conversation_id'] = self.chatbot.get_conversations(0, 1);
+            try:
+                log_dbg('try ask: ' + question)
+                
+                if len(conversation_id):
+                    for data in self.chatbot.ask(
+                        question,
+                        conversation_id
+                    ):
+                        answer['message'] = data["message"]
+                        yield answer
+                else:
+                    for data in self.chatbot.ask(question):
+                        answer['message'] = data["message"]
+                        yield answer
+                        
+                    answer['conversation_id'] = self.chatbot.get_conversations(0, 1);
 
-            answer['code'] = 0
-            yield answer
-         
-        except Exception as e:
-            log_err('fail to ask: ' + str(e))
+                answer['code'] = 0
+                yield answer
+             
+            except Exception as e:
+                log_err('fail to ask: ' + str(e))
 
-            answer['message'] = str(e)
-            answer['code'] = -1
-            yield answer
+                answer['message'] = str(e)
+                answer['code'] = -1
+                yield answer
+
+            # request complate.
+            if answer['code'] == 0:
+                break
 
     def api_ask(
         self,
@@ -104,6 +114,9 @@ class OpenAIAPI:
             self.access_token = config.setting['openai_config']['access_token']
         except:
             self.access_token = ''
-        
+        try:
+            self.max_repeat_times = config.setting['openai_config']['max_repeat_times']
+        except:
+            self.max_repeat_times = 3
 
 openai_api = OpenAIAPI()
