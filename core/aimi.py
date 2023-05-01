@@ -51,24 +51,10 @@ class Aimi:
         return link_think
 
     def run(self):
-        
-        task1 = asyncio.ensure_future(chat_qq.listen())
-        task2 = asyncio.ensure_future(self.read())
+        qq_server = asyncio.ensure_future(chat_qq.listen())
+        aimi_read = asyncio.ensure_future(self.read())
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(asyncio.gather(task1, task2))
-        
-    async def test(self):
-        while self.running:
-            question = await asyncio.to_thread(input)
-            if 'exit()' in question:
-                break
-            answer = {}
-            for msg in aimi.ask(question):
-                answer = msg
-                log_dbg(str(answer))
-            if not self.running:
-                break
-            log_info('loop.....')
+        loop.run_until_complete(asyncio.gather(qq_server, aimi_read))
 
     async def read(self):
         while self.running:
@@ -82,7 +68,13 @@ class Aimi:
                         reply = answer['message']
                     log_info('{}: {}'.format(nickname, message))
                     log_info('{}: {}'.format(self.aimi_name, str(reply)))
-                    chat_qq.reply_private(user_id, reply)
+
+                    if chat_qq.is_private(msg):
+                        chat_qq.reply_private(user_id, reply)
+                    elif chat_qq.is_group(msg):
+                        group_id = chat_qq.get_group_id(msg)
+                        chat_qq.reply_group(group_id, user_id, reply)
+                        
             else:
                 await asyncio.sleep(1)
 
