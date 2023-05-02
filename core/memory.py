@@ -111,12 +111,12 @@ class Memory:
                     log_dbg('replay over limit. now openai_input len: ' + str(append_len))
                     append_len = len(str(talk_history)) + len(q) + len(talk_prefix) + len(question)
                     if append_len > max_size:
-                        log_dbg('replay over limit. skip history.')
+                        log_dbg('replay over limit. skip history. len: ' + str(append_len))
                         break
-                    else:
-                        log_dbg('replay over limit, append pre question.')
-                        talk_history.insert(0, '我说:“{}”\n'.format(q))
-                        continue
+
+                    log_dbg('replay over limit, append pre question.')
+                    talk_history.insert(0, '我说:“{}”\n'.format(q))
+                    continue
                 # 0 是设定 先放回答再放提问，这样顺序反过来
                 talk_history.insert(0, '你说:“{}”\n'.format(a))
                 talk_history.insert(0, '我说:“{}”\n'.format(q))
@@ -129,6 +129,10 @@ class Memory:
         return history
     
     def append(self, q: str, a: str):
+        if not self.need_memory(a):
+            log_info('no need save memory.')
+            return
+
         talk_item = {
             'q': q,
             'a': a
@@ -136,7 +140,19 @@ class Memory:
         log_dbg('append: ' + str(talk_item))
         self.pool[self.idx] = talk_item
         self.idx = self.__get_next_idx()
-        
+
+    def need_memory(self, a: str) -> bool:
+        if 'OpenAI' in a:
+            if '使用政策' in a:
+                return False
+            if '道德准则' in a:
+                return False
+            if '法律限制' in a:
+                return False
+            if '技术限制' in a:
+                return False
+        return True
+
     def __get_next_idx(self) -> int:
         return (self.idx + 1) % self.size
     

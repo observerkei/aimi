@@ -50,12 +50,16 @@ class OpenAIAPI:
                 if len(conversation_id):
                     for data in self.chatbot.ask(
                         question,
-                        conversation_id
+                        conversation_id, None, None,
+                        timeout = 480
                     ):
                         answer['message'] = data["message"]
                         yield answer
                 else:
-                    for data in self.chatbot.ask(question):
+                    for data in self.chatbot.ask(
+                        question, None, None, None, 
+                        timeout = 480
+                    ):
                         answer['message'] = data["message"]
                         yield answer
                         
