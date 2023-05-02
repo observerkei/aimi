@@ -5,6 +5,7 @@
 1. catgirl
 2. Chat AI developed based on OpenAI
 3. Support qq individual or group chat permission
+4. mathematical expression(LaTex) / html converted to pictures
 
 # environmental requirement
 
@@ -12,6 +13,11 @@
 2. go-cqhttp bin download on https://github.com/Mrs4s/go-cqhttp/releases
 3. go-cqhttp link/put on ./run/
 4. An OpenAI account for your own use.
+
+If you want to use text-to-image, you'll need to add these
+
+1. pandoc
+2. wkhtmltopdf
 
 # running
 
@@ -56,6 +62,12 @@ https://chat.openai.com/api/auth/session
 
 ```bash
 pip3.9 install -r ./run/requirements.txt
+```
+
+If you want to use mathematical expression(LaTex) / html to turn images and you are a class ubuntu system
+
+```bash
+apt install -y pandoc wkhtmltopdf
 ```
 
   5.2 run aimi
