@@ -1,0 +1,8 @@
+colorlog==6.7.0
+Flask==2.3.2
+gevent==22.10.2
+PyYAML==6.0
+PyYAML==6.0
+Requests==2.29.0
+revChatGPT==5.0.0
+revChatGPT==5.0.0
