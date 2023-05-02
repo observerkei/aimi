@@ -17,7 +17,7 @@
 
 1. run go-cqhttp.
 
-1.1. open go-cqhttp http proxy mode
+  1.1. open go-cqhttp http proxy mode
 
 set go-cqhttp config.yml:
 ```yaml
@@ -29,7 +29,7 @@ server:
         - url: # you go-cqhttp post chat to chat/qq.py: listent http://host:port, eg: 'http://127.0.0.1:5701' 
 ```
 
-1.2 run go-cqhttp, Please make sure that he can receive qq messages. You need to solve login and authentication issues, see the official user feedback for details.
+  1.2 run go-cqhttp, Please make sure that he can receive qq messages. You need to solve login and authentication issues, see the official user feedback for details.
 
 ```bash
 cd run && ./go-cqhttp -faststart > go-cqhttp.log
@@ -52,13 +52,13 @@ https://chat.openai.com/api/auth/session
 
 5. if you use python3.9, then use:
 
-5.1 install dependent package
+  5.1 install dependent package
 
 ```bash
 pip3.9 install -r ./run/requirements.txt
 ```
 
-5.2 run aimi
+  5.2 run aimi
 
 ```bash
 cd ./ && python3.9 main.py > ./run/aimi.log
@@ -71,7 +71,9 @@ Have a good time!
 6. express gratitude
 
 https://github.com/acheong08/ChatGPT
+
 https://github.com/Mrs4s/go-cqhttp
+
 https://github.com/LSTM-Kirigaya/go-cqhttp-python-server
 
 
