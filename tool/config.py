@@ -5,7 +5,9 @@ import os
 from tool.util import read_yaml, write_yaml, log_dbg, log_err, log_info
 
 class Meme:
+    # 错误表情包路径
     meme_error_path: str = './run/meme/error/'
+    # 默认表情包路径
     meme_common_path: str = './run/meme/common/'
     meme: Dict[str, List]
 
@@ -14,12 +16,6 @@ class Meme:
             self.meme = {}
             self.meme['error'] = self.get_file_paths(self.meme_error_path)
             self.meme['common'] = self.get_file_paths(self.meme_common_path)
-            '''
-            for iter in self.meme['error']:
-                log_info('load meme err: ' + str(iter))
-            for iter in self.meme['common']:
-                log_info('load meme com: ' + str(iter))
-            '''
             
         except Exception as e:
             log_err('fail to load meme:' + str(e))

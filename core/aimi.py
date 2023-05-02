@@ -21,7 +21,6 @@ class Aimi:
     running: bool = True
 
     def __init__(self):
-        'void'
         self.__load_setting()
 
         # 注册意外退出保护记忆
@@ -87,12 +86,14 @@ class Aimi:
                 nickname = chat_qq.get_name(msg)
                 question = chat_qq.get_question(msg)
                 log_info('{}: {}'.format(nickname, question))
+
                 reply = ''
                 code = 0
                 for answer in self.ask(question, nickname):
                     reply = answer['message']
                     code = answer['code']
                     log_dbg('msg: ' + str(reply))
+                
                 log_info('{}: {}'.format(nickname, question))
                 log_info('{}: {}'.format(self.aimi_name, str(reply)))
 
@@ -144,12 +145,7 @@ class Aimi:
         question: str,
         openai_conversation_id: str = None
     )-> Generator[dict, None, None]:
-        req_cnt = 0
-        try:
-            try_limit = config.setting['openai_config']['max_repeat_times']
-        except:
-            try_limit = 3
-            
+        
         answer = openai_api.ask(question, openai_conversation_id)
         # get yield last val
         for message in answer:

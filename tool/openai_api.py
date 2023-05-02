@@ -101,9 +101,6 @@ class OpenAIAPI:
             return conv_li[0]['id']
         except:
             return ''
-    # chatgpt输入
-    def make_chatgpt_input_item(type: InputType, content: str) -> dict:
-        return {'role': type, 'content': content}
     
     def __init__(self) -> None:
 
