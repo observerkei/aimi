@@ -97,6 +97,29 @@ class GoCQHttp:
         except:
             return ''
 
+    def need_filter_message(self, message) -> bool:
+        if self.is_at_self(message):
+            return True
+        
+        del_msg = '请使用最新版手机QQ体验新功能'
+        if del_msg in message:
+            return True
+
+        return False
+
+    def filter_message(self, message) -> str:
+        if self.is_at_self(message):
+            log_dbg('message: ' + str(message))
+            message = re.sub('\[CQ:.*?\]', '', message)
+            log_dbg('del at self done: ' + str(message))
+
+        del_msg = '请使用最新版手机QQ体验新功能'
+        if del_msg in message:
+            message = message.replace(del_msg, ' ')
+            log_dbg('del: ' + str(del_msg))
+
+        return message
+
     def get_message(self, msg) -> str:
         message = ''
         try:
@@ -104,13 +127,9 @@ class GoCQHttp:
         except:
             return ''
 
-        # del group at self.
-        if self.is_group(msg):
-            # del cq.
-            log_dbg('message: ' + str(message))
-            message = re.sub('\[CQ:.*?\]', '', message)
-            log_dbg('del done: ' + str(message))
-            return message
+        # del qq function content.
+        if self.need_filter_message(message):
+            message = self.filter_message(message)
 
         return message
 

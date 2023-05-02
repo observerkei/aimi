@@ -41,7 +41,7 @@ class Aimi:
         link_think += '请只关注最新消息,历史如下: {\n'
 
         # cul question
-        question_item = '}}.\n\n请根据设定和对话历史,不用“{}:”开头,回答如下问题: {{\n{}说: “{}”\n}}.'.format(
+        question_item = '}}.\n\n请根据设定和最新对话历史和你的历史回答,不用“{}:”开头,回答如下问题: {{\n{}说: “{}”\n}}.'.format(
             self.aimi_name, nickname, question)
 
         # append history
