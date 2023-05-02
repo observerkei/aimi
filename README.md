@@ -56,6 +56,14 @@ qq:
 
 https://chat.openai.com/api/auth/session
 
+save to ./run/setting.yml
+
+```yaml
+openai_config:
+  access_token: # your access_token
+
+```
+
 5. if you use python3.9, then use:
 
   5.1 install dependent package
