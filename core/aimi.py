@@ -6,6 +6,7 @@ from typing import Generator, List, Tuple, Union, Set, Any
 
 from tool.config import config
 from tool.openai_api import openai_api
+from tool.bing_api import bing_api
 from tool.util import log_dbg, log_err, log_info
 from chat.qq import chat_qq
 
@@ -19,6 +20,7 @@ class Aimi:
     preset_facts: str = ''
     max_link_think: int = 1024
     running: bool = True
+    api: str = ''
 
     def __init__(self):
         self.__load_setting()
@@ -73,7 +75,6 @@ class Aimi:
             except Exception as e:
                 log_err('fail to save memory: ' + str(e))
                 
-            
 
     def read(self):
         while self.running:
@@ -123,24 +124,42 @@ class Aimi:
         nickname: str = None
     ) -> Generator[dict, None, None]:
 
-        link_think = self.make_link_think(question, nickname)
+        if self.api == bing_api.type:
+            link_think = question
+        else:
+            link_think = self.make_link_think(question, nickname)
+
         answer = self.__post_question(link_think)
 
         for message in answer:
+            if (not message):
+                continue
+            log_dbg('message: {} {} answer: {} {}'.format(
+            str(type(message)), str(message), str(type(answer)), str(answer)))
+
             yield from answer
             
-            if (not message) or (message['code'] != 0):
+            if (message['code'] != 0):
                 continue
             
             memory.append(q = question, a = message['message'])
-
     
     def __post_question(
         self, 
         link_think: str
     )-> Generator[dict, None, None]:
-        yield from self.__post_openai(link_think, memory.openai_conversation_id)
-        
+        if self.api == openai_api.type:
+            yield from self.__post_openai(link_think, memory.openai_conversation_id)
+        elif self.api == bing_api.type:
+            yield from self.__post_chatbing(link_think, memory.openai_conversation_id)
+     
+    def __post_chatbing(
+        self, 
+        question: str,
+        openai_conversation_id: str = None
+    )-> Generator[dict, None, None]:
+        yield from bing_api.ask(question)
+    
     def __post_openai(
         self, 
         question: str,
@@ -150,6 +169,7 @@ class Aimi:
         answer = openai_api.ask(question, openai_conversation_id)
         # get yield last val
         for message in answer:
+            log_dbg('now msg: ' + str(message))
             yield from answer
 
             if (not message) or (message['code'] != 0):
@@ -168,9 +188,17 @@ class Aimi:
             self.master_name = config.setting['aimi']['master_name']
         except:
             self.master_name = ''
+
         try:
-            self.max_link_think = openai_api.max_requestion
+            self.api = api = config.setting['aimi']['api']
         except:
+            self.api = openai_api.type
+            
+        if api == openai_api.type:
+            self.max_link_think = openai_api.max_requestion
+        elif api == bing_api.type:
+            self.max_link_think = bing_api.max_requestion
+        else:
             self.max_link_think = 1024
 
         try:

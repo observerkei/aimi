@@ -56,6 +56,7 @@ class Config:
     memory_model_file: str = './run/memory.pt'
     setting: dict = {}
     meme: Meme
+    max_requestion: int = 1024
 
     def __init__(self) -> None:
         try:
@@ -97,20 +98,31 @@ class Config:
     def __load_setting(self, obj) -> dict:
         if not obj:
             return {}
-        
+
+        s = {}
+
         try:
-            s = {}
             s['qq'] = obj.get('qq', [])
-            s['openai_config'] = obj.get('openai_config', [])
-            s['aimi'] = obj.get('aimi', [])
-            
-            log_dbg('cfg load setting done.')
-            
-            return s
         except Exception as e:
+            s['qq'] = []
             log_err('fail to load setting: ' + str(e))
-            return []
-    
+        try:
+            s['openai'] = obj.get('openai', [])
+        except Exception as e:
+            s['openai'] = []
+            log_err('fail to load setting: ' + str(e))
+        try:
+            s['bing'] = obj.get('bing', [])
+        except Exception as e:
+            s['bing'] = []
+            log_err('fail to load setting: ' + str(e))
+        try:
+            s['aimi'] = obj.get('aimi', [])
+        except Exception as e:
+            s['aimi'] = []
+            log_err('fail to load setting: ' + str(e))
+        
+        return s
         
     
 config = Config()

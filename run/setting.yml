@@ -1,6 +1,12 @@
-openai_config:
+openai:
   access_token: 
-  max_requestion: 750
+  max_requestion: 550
+  max_repeat_times: 3
+
+bing:
+  cookie_path: './run/bing_cookie.json'
+  wss_link: 'wss://sydney.bing.com/sydney/ChatHub'
+  max_requestion: 350
   max_repeat_times: 3
 
 qq:
@@ -8,15 +14,16 @@ qq:
   config: ./run/config.yml
   master_id: 
   response_user_ids:
-    - null
+    - 
   response_group_ids:
-    - null
+    - 
 
 web:
   port: 2464
 
 aimi:
   name: Aimi
+  api: openai
   master_name: Kei
   memory_size: 10240
   memory_model: transformers

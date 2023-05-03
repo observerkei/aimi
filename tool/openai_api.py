@@ -1,5 +1,6 @@
 from revChatGPT.V1 import Chatbot
 from typing import Generator
+import time
 
 from tool.util import log_dbg, log_err
 from tool.config import config
@@ -10,6 +11,7 @@ class OpenAIAPI:
     max_requestion: int = 1024
     access_token: str = ''
     max_repeat_times: int = 3
+    type: str = 'openai'
 
     class InputType:
         SYSTEM = 'system'
@@ -71,6 +73,8 @@ class OpenAIAPI:
              
             except Exception as e:
                 log_err('fail to ask: ' + str(e))
+                log_info('server fail, sleep 15')
+                time.sleep(15)
 
                 answer['message'] = str(e)
                 answer['code'] = -1
@@ -115,15 +119,15 @@ class OpenAIAPI:
 
     def __load_setting(self):
         try:
-            self.max_requestion = config.setting['openai_config']['max_requestion']
+            self.max_requestion = config.setting['openai']['max_requestion']
         except:
             self.max_requestion = 1024
         try:
-            self.access_token = config.setting['openai_config']['access_token']
+            self.access_token = config.setting['openai']['access_token']
         except:
             self.access_token = ''
         try:
-            self.max_repeat_times = config.setting['openai_config']['max_repeat_times']
+            self.max_repeat_times = config.setting['openai']['max_repeat_times']
         except:
             self.max_repeat_times = 3
 
