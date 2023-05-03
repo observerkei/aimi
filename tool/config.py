@@ -53,6 +53,7 @@ class Config:
     go_cqhttp_config: str = './run/config.yml'
     setting_config: str = './run/setting.yml'
     memory_config: str = './run/memory.yml'
+    memory_model_file: str = './run/memory.pt'
     setting: dict = {}
     meme: Meme
 
@@ -73,8 +74,21 @@ class Config:
             mem['pool'] = obj.get('pool', [])
 
             log_dbg('cfg load memory done.')
+
             #log_dbg('mem: ' + str(mem))
-            
+
+            try:
+                label = 0
+                for iter in mem['pool']:
+                    if not iter:
+                        continue
+                    iter['label'] = label
+                    label += 1
+            except Exception as e:
+                log_err('fail to set label: ' + str(e))
+                mem['pool'] = []
+            #log_dbg('mem: ' + str(mem))
+           
             return mem
         except Exception as e:
             log_err('fail to load memory: ' + str(e))

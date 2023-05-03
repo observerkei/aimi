@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification, AdamW
 import json
+from typing import Any, List
 
 class QAData(Dataset):
     def __init__(self, data, tokenizer, max_length=32):
@@ -77,17 +78,55 @@ def predict(model, query, train_data, tokenizer, device, top_k=3):
 
     return result
 
-def transformers_predict():
-    # 输入数据
-    input_data =  [
-        {'q': '摸摸头', 'a': '好的，请摸头', 'label': 0},
-        {'q': '我想摸摸头', 'a': 'Master请摸摸头', 'label': 1},
-        {'q': '我摸过你头吗?', 'a': '当然了.可以摸头', 'label': 2},
-        {'q': '摸摸耳朵', 'a': '请摸耳朵', 'label': 3},
-        {'q': '我摸摸耳朵', 'a': '摸摸耳朵真好', 'label': 4},
-        {'q': '我能摸摸你耳朵吗?', 'a': '随时可以摸耳朵', 'label': 5}
-    ]
+class Transformers:
+    name: str = 'transformers'
+    model: Any
+    device: Any
+    tokenizer: Any
+    input_data: List[dict]
+    
+    def __init__(self):     
+        self.tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+    def save_model(self, model_file: str):
+        return export_model(self.model, model_file)
+
+    def load_model(self, model_file: str):
+        self.model = load_model(model_file)
+        return self.model
+
+    def predict(self, query, predict_limit: int = 3):
+        return predict(self.model, query, self.input_data, self.tokenizer, self.device, top_k=predict_limit)
+        
+    def train(self, input_data):
+        
+        self.input_data = [x for x in input_data if x is not None]
+        
+        self.model = DistilBertForSequenceClassification.from_pretrained("distilbert-base-uncased", num_labels=len(input_data))
+        return train(self.model, self.input_data, epochs=5, batch_size=2, device=self.device)
+
+def transformers_predict(input_data):
+
+    print('input: ' + str(input_data))
+    
+    trans = Transformers()
+    trans.train(input_data)
+
+    # 示例1
+    query = "摸头"
+    print(query)
+    predictions = trans.predict(query)
+    print(json.dumps(predictions, indent=2, ensure_ascii=False))
+
+    # 示例1
+    query = "摸摸耳朵"
+    print(query)
+    predictions = trans.predict(query)
+    print(json.dumps(predictions, indent=2, ensure_ascii=False))
+    
+
+def test_predict(input_data):
     model = DistilBertForSequenceClassification.from_pretrained("distilbert-base-uncased", num_labels=len(input_data))
     tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
 
@@ -102,7 +141,7 @@ def transformers_predict():
     print(query)
     predictions = predict(loaded_model, query, input_data, tokenizer, device, top_k=4)
     print(json.dumps(predictions, indent=2, ensure_ascii=False))
-
+    
     # 示例2
     query = "摸摸耳朵"
     print(query)
@@ -113,5 +152,19 @@ def transformers_predict():
 # pip install transformers
 
 if __name__ == "__main__": 
-    transformers_predict()
+    # 输入数据
+    input_data =  [
+        {'q': '摸摸头', 'label': 0, 'a': '好的，请摸头'},
+        {'q': '我摸过你头吗?', 'a': '当然了.可以摸头', 'label': 2},
+        {'q': '我想摸摸头', 'a': 'Master请摸摸头', 'label': 1},
+        {'q': '摸摸耳朵', 'a': '请摸耳朵', 'label': 3},
+        {'q': '我摸摸耳朵', 'a': '摸摸耳朵真好', 'label': 4},
+        {'q': '我能摸摸你耳朵吗?', 'a': '随时可以摸耳朵', 'label': 5},
+        None,
+        None
+    ]
+
+    #test_predict(input_data)
+    
+    transformers_predict(input_data)
 '''

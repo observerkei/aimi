@@ -34,7 +34,7 @@ class Aimi:
         nickname: str = None
     ) -> str:
 
-        nickname = nickname if len(nickname) else self.master_name
+        nickname = nickname if nickname and len(nickname) else self.master_name
         
         # append setting
         link_think = '设定: {{\n“{}”\n}}.\n\n'.format(self.preset_facts)
@@ -123,8 +123,9 @@ class Aimi:
         nickname: str = None
     ) -> Generator[dict, None, None]:
 
-        link_think = self.make_link_think(question, nickname)    
+        link_think = self.make_link_think(question, nickname)
         answer = self.__post_question(link_think)
+
         for message in answer:
             yield from answer
             
@@ -132,7 +133,7 @@ class Aimi:
                 continue
             
             memory.append(q = question, a = message['message'])
-            
+
     
     def __post_question(
         self, 

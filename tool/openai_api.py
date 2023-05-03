@@ -47,7 +47,7 @@ class OpenAIAPI:
             try:
                 log_dbg('try ask: ' + str(question))
                 
-                if len(conversation_id):
+                if conversation_id and len(conversation_id):
                     for data in self.chatbot.ask(
                         question,
                         conversation_id, None, None,
