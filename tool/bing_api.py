@@ -21,7 +21,7 @@ class BingAPI:
         question: str,
         timeout: int = 360,
     ) -> Generator[dict, None, None]:
-        async def fuck_async(question: str, timeout: int = 360) -> dict:
+        async def fuck_async(question: str, timeout: int = 360) -> Generator[dict, None, None]:
             result: dict = {}
             async for res in self.web_ask(question, timeout):
                 log_dbg('out: ' + str(type(result)) + ' val: ' + str(res))

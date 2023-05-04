@@ -94,6 +94,8 @@ class Aimi:
                     reply = answer['message']
                     code = answer['code']
                     log_dbg('msg: ' + str(reply))
+
+                log_dbg('answer: ' + str(type(answer)) + ' ' + str(answer))
                 
                 log_info('{}: {}'.format(nickname, question))
                 log_info('{}: {}'.format(self.aimi_name, str(reply)))
@@ -137,7 +139,7 @@ class Aimi:
             log_dbg('message: {} {} answer: {} {}'.format(
             str(type(message)), str(message), str(type(answer)), str(answer)))
 
-            yield from answer
+            yield message 
             
             if (message['code'] != 0):
                 continue
