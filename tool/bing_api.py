@@ -1,7 +1,7 @@
 import asyncio
 from EdgeGPT import Chatbot, ConversationStyle
 from contextlib import suppress
-from typing import Generator, Dict, Any
+from typing import Generator, Dict, Any, List
 import time
 
 from tool.util import log_dbg, log_err, log_info
@@ -84,8 +84,8 @@ class BingAPI:
                     with suppress(KeyError):
                         raw_text = response["item"]["messages"][1]["adaptiveCards"][0]["body"][0]["text"]
 
-                    cd_idx = cur_messages if not ((1 <= cur_messages) and (cur_messages <= 20) else 0
-                    res_all = raw_text + '\n' + '[{}]'.format(self.countdown[countdown])
+                    cd_idx = 1 + max_messages - cur_messages 
+                    res_all = raw_text + '\n' + '[{}]'.format(self.countdown[cd_idx])
 
                     answer['message'] = res_all
 

@@ -92,6 +92,8 @@ class Aimi:
                 question = chat_qq.get_question(msg)
                 log_info('{}: {}'.format(nickname, question))
 
+                api_type = self.question_api_type(question) 
+
                 reply = ''
                 code = 0
                 for answer in self.ask(question, nickname):
@@ -100,7 +102,7 @@ class Aimi:
                     log_dbg('msg: ' + str(reply))
 
                 log_dbg('answer: ' + str(type(answer)) + ' ' + str(answer))
-                reply = self.reply_adjust(reply)
+                reply = self.reply_adjust(reply, api_type)
                 log_dbg('adjust: ' + str(reply))
                 
                 log_info('{}: {}'.format(nickname, question))
