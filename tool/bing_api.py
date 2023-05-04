@@ -15,6 +15,13 @@ class BingAPI:
     type: str = 'bing'
     cookie_path: str = ''
     wss_link: str = ''
+    countdown: List[str] = [
+        '?', 
+        'I',     'II',   'III',   'IV',  'V',
+        'VI',   'VII',  'VIII',  'VIV',  'X',
+        'XI',   'XII',  'XIII',  'XIV', 'XV',
+        'XVI', 'XVII', 'XVIII', 'XVIV', 'XX'
+    ]
 
     def ask(
         self,
@@ -77,8 +84,8 @@ class BingAPI:
                     with suppress(KeyError):
                         raw_text = response["item"]["messages"][1]["adaptiveCards"][0]["body"][0]["text"]
 
-
-                    res_all = raw_text + '\n' + '[{}/{}]'.format(cur_messages, max_messages)
+                    cd_idx = cur_messages if not ((1 <= cur_messages) and (cur_messages <= 20) else 0
+                    res_all = raw_text + '\n' + '[{}]'.format(self.countdown[countdown])
 
                     answer['message'] = res_all
 

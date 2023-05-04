@@ -20,7 +20,7 @@ class Aimi:
     preset_facts: str = ''
     max_link_think: int = 1024
     running: bool = True
-    api: str = ''
+    api: List = []
 
     def __init__(self):
         self.__load_setting()
@@ -74,7 +74,11 @@ class Aimi:
                 log_info('save memory done')
             except Exception as e:
                 log_err('fail to save memory: ' + str(e))
-                
+
+    def question_api_type(self, question: str) -> str:
+        if '用必应' in question:
+            return bing_api.type
+        return openai_api.type
 
     def read(self):
         while self.running:
@@ -96,6 +100,8 @@ class Aimi:
                     log_dbg('msg: ' + str(reply))
 
                 log_dbg('answer: ' + str(type(answer)) + ' ' + str(answer))
+                reply = self.reply_adjust(reply)
+                log_dbg('adjust: ' + str(reply))
                 
                 log_info('{}: {}'.format(nickname, question))
                 log_info('{}: {}'.format(self.aimi_name, str(reply)))
@@ -119,19 +125,29 @@ class Aimi:
                     cq_img = chat_qq.get_image_message(img_file)
                     
                     chat_qq.reply_question(msg, cq_img)
+
+    def reply_adjust(self, reply: str, res_api: str) -> str:
+        if res_api == bing_api.type:
+            reply = reply.replace('必应', ' {}通过必应得知: '.format(self.aimi_name))
+            reply = reply.replace('你好', ' Master你好 ')
+            reply = reply.replace('您好', ' Master您好 ')
         
+        return reply
+    
     def ask(
         self,
         question: str,
         nickname: str = None
     ) -> Generator[dict, None, None]:
 
-        if self.api == bing_api.type:
+        api_type = self.question_api_type(question) 
+
+        if api_type == bing_api.type:
             link_think = question
         else:
             link_think = self.make_link_think(question, nickname)
 
-        answer = self.__post_question(link_think)
+        answer = self.__post_question(link_think, api_type)
 
         for message in answer:
             if (not message):
@@ -148,14 +164,15 @@ class Aimi:
     
     def __post_question(
         self, 
-        link_think: str
+        link_think: str,
+        api_type: str
     )-> Generator[dict, None, None]:
-        if self.api == openai_api.type:
+        if api_type == openai_api.type:
             yield from self.__post_openai(link_think, memory.openai_conversation_id)
-        elif self.api == bing_api.type:
-            yield from self.__post_chatbing(link_think, memory.openai_conversation_id)
+        elif api_type == bing_api.type:
+            yield from self.__post_bing(link_think, memory.openai_conversation_id)
      
-    def __post_chatbing(
+    def __post_bing(
         self, 
         question: str,
         openai_conversation_id: str = None
@@ -192,13 +209,13 @@ class Aimi:
             self.master_name = ''
 
         try:
-            self.api = api = config.setting['aimi']['api']
+            self.api = config.setting['aimi']['api']
         except:
-            self.api = openai_api.type
+            self.api = [openai_api.type]
             
-        if api == openai_api.type:
+        if openai_api.type in self.api:
             self.max_link_think = openai_api.max_requestion
-        elif api == bing_api.type:
+        elif bing_api.type in self.api:
             self.max_link_think = bing_api.max_requestion
         else:
             self.max_link_think = 1024
