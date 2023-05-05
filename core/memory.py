@@ -13,6 +13,7 @@ class Memory:
     size: int = 1024
     pool: List[dict] = []
     memory_model: Any
+    memory_model_depth: int = 20
 
     def __init__(self):
         self.__load_memory()
@@ -46,6 +47,11 @@ class Memory:
             self.memory_model_type = 'transformers'
 
         self.memory_model_file = config.memory_model_file 
+
+        try:
+            self.memory_model_depth = config.setting['aimi']['memory_model_depth']
+        except:
+            self.memory_model_depth = 20
         
         if len(self.pool) < self.size:
             self.pool.extend([None] * (self.size - len(self.pool)))
@@ -64,7 +70,7 @@ class Memory:
         log_dbg("shold_idx: " + str(shold_idx))
         log_dbg('idx: ' + str(self.idx))
         if shold_idx != self.idx:
-            log_info('idx({}) fix to {}'.format(self.idx, shold_idx))
+            log_info('idx:{} fix to {}'.format(self.idx, shold_idx))
             self.idx = shold_idx
 
         log_dbg('conv_id: ' + str(self.openai_conversation_id))
@@ -91,13 +97,10 @@ class Memory:
             write_yaml(save_path, save_obj)
 
             log_info('save memory done: ' + str(save_path))
-            return True
 
         except Exception as e:
             log_err('fail to save memory: {}, file:{}'.format(str(e), save_path))
-            return False
 
-        '''
         try:
             ret = self.__save_model()
             if not ret:
@@ -110,7 +113,6 @@ class Memory:
             log_err('fail to save memory mode: {}, file:{}'
                     .format(str(e), self.memory_model_file))
             return False
-        '''
 
     def __get_memory(self, question: str) -> Union[str, List[dict]]:
         valid_talk_items: List[dict] = []
@@ -194,7 +196,7 @@ class Memory:
 
     def __train_model(self):
         if self.model_enable:
-            return self.memory_model.train(self.pool)
+            return self.memory_model.train(self.pool, self.memory_model_depth)
 
     def __predict_model(self, question: str) -> List[dict]:
         if self.model_enable:

@@ -85,6 +85,7 @@ class Transformers:
     tokenizer: Any
     input_data: List[dict]
     enable: bool = False
+    depth: int = 20
     
     def __init__(self):     
         self.tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
@@ -110,11 +111,12 @@ class Transformers:
             return {}
         return predict(self.model, query, self.input_data, self.tokenizer, self.device, top_k=predict_limit)
         
-    def train(self, input_data):
+    def train(self, input_data, depth):
         import random
         from tool.util import log_dbg
 
-        
+        self.depth = depth
+
         self.input_data = []
         #[x for x in input_data if x is not None]
 
@@ -123,7 +125,7 @@ class Transformers:
             iter = random.choice(input_data)
             if not iter:
                 continue
-            if len(self.input_data) > 20:
+            if len(self.input_data) > self.depth:
                 break
             iter['label'] = label
             self.input_data.insert(0, iter)

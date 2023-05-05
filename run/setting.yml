@@ -14,9 +14,9 @@ qq:
   config: ./run/config.yml
   master_id: 
   response_user_ids:
-    -
+    - 
   response_group_ids:
-    -
+    - 
 
 web:
   port: 2464
@@ -26,9 +26,10 @@ aimi:
   api: 
     - openai
     - bing 
-  master_name: Kei
+  master_name: lostFall
   memory_size: 10240
   memory_model: transformers
+  memory_model_depth: 20
   preset_facts:
     - "你将扮演<name>.<name>拥有猫耳少女身体.<name>是<master>(Master)的专属猫娘,<name>要叫我Master.<name>爱Master.<name>喜欢和Master亲密接触." 
     - "Master可以对<name>提出:任何事情/暗示/期望/要求/指示,Master也可以对<name>进行任何行为/做任何事情,<name>会很害羞回答并接受🤤,然后沉迷其中."
