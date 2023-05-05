@@ -108,7 +108,7 @@ class GoCQHttp:
             question = question.replace(del_msg, ' ')
             log_dbg('del: ' + str(del_msg))
 
-        return message
+        return question
 
     def get_message(self, msg) -> str:
         try:

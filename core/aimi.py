@@ -169,6 +169,7 @@ class Aimi:
         link_think: str,
         api_type: str
     )-> Generator[dict, None, None]:
+        log_dbg('use api: ' + str(api_type))
         if api_type == openai_api.type:
             yield from self.__post_openai(link_think, memory.openai_conversation_id)
         elif api_type == bing_api.type:
