@@ -22,7 +22,7 @@ class Memory:
             self.model_enable = True
             from tool.transformer import Transformers
             self.memory_model = Transformers()
-    
+
     def __load_memory(self):
         mem = config.load_memory()
         try:
@@ -97,22 +97,15 @@ class Memory:
             write_yaml(save_path, save_obj)
 
             log_info('save memory done: ' + str(save_path))
+            ret = True
 
         except Exception as e:
             log_err('fail to save memory: {}, file:{}'.format(str(e), save_path))
+            ret = False
 
-        try:
-            ret = self.__save_model()
-            if not ret:
-                log_err('fail to save memory: ' + str(self.memory_model_file))
-                return False
-            log_info('save memory model done: ' + str(self.memory_model_file))
+        # ret |= self.__save_model()
 
-            return True
-        except Exception as e:
-            log_err('fail to save memory mode: {}, file:{}'
-                    .format(str(e), self.memory_model_file))
-            return False
+        return ret
 
     def __get_memory(self, question: str) -> Union[str, List[dict]]:
         valid_talk_items: List[dict] = []
@@ -132,8 +125,8 @@ class Memory:
         return valid_talk_items
 
     def dream(self):
-        return self.__train_model()
-
+        ret = self.__train_model()
+        log_info('have a dream done')
 
     def search(
         self,
@@ -204,12 +197,38 @@ class Memory:
         return []
 
     def __load_model(self):
-        if self.model_enable:
-            return self.memory_model.load_model(self.memory_model_file)
+        try:
+            if self.model_enable:
+                ret = self.memory_model.load_model(self.memory_model_file)
+                if not ret:
+                    log_err('fail to laod memory: ' + str(self.memory_model_file))
+                    return False
+
+                log_info('load memory done: ' + str(self.memory_model_file))
+                return True
+
+        except Exception as e:
+            log_err('fail to load: ' + str(self.memory_model_file) + ' ' + str(e))
+            return False
+
+        return True
 
     def __save_model(self):
-        if self.model_enable:
-            return self.memory_model.save_model(self.memory_model_file)
+        try:
+            if self.model_enable:
+                ret = self.memory_model.save_model(self.memory_model_file)
+                if not ret:
+                    log_err('fail to save memory: ' + str(self.memory_model_file))
+                    return False
+
+                log_info('save memory done: ' + str(self.memory_model_file))
+                return True
+
+        except Exception as e:
+            log_err('fail to save: ' + str(self.memory_model_file) + ' ' + str(e))
+            return False
+
+        return True
  
     def append(self, q: str, a: str):
         if not self.need_memory(a):
