@@ -185,7 +185,7 @@ class Memory:
 
     def __predict_model(self, question: str) -> List[dict]:
         if self.model_enable:
-            return self.memory_model.predict(question, predict_limit=5)
+            return self.memory_model.predict(question, predict_limit=3)
         return []
 
     def __load_model(self):

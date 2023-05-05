@@ -100,8 +100,25 @@ class Transformers:
         return predict(self.model, query, self.input_data, self.tokenizer, self.device, top_k=predict_limit)
         
     def train(self, input_data):
+        import random
+        from tool.util import log_dbg
+
         
-        self.input_data = [x for x in input_data if x is not None]
+        self.input_data = []
+        #[x for x in input_data if x is not None]
+
+        label = 0
+        while True:
+            iter = random.choice(input_data)
+            if not iter:
+                continue
+            if len(self.input_data) > 20:
+                break
+            iter['label'] = label
+            self.input_data.insert(0, iter)
+            label += 1
+            log_dbg('ran ' + str(iter))
+
         
         self.model = DistilBertForSequenceClassification.from_pretrained("distilbert-base-uncased", num_labels=len(input_data))
         return train(self.model, self.input_data, epochs=5, batch_size=2, device=self.device)

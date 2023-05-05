@@ -117,7 +117,7 @@ class Md:
 
             # 转化为html的换行
             html_filter = html_source
-            html_filter = html_filter.replace('\n', ' <br> ')
+            #html_filter = html_filter.replace('\n', ' <br> ')
 
             # 打开文件，并以写入模式写入字符串
             with open(img_id + '.html', 'w') as f:

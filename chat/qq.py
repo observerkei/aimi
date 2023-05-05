@@ -75,17 +75,7 @@ class GoCQHttp:
     def make_at(self, id: int) -> str:
         return '[CQ:at,qq={}]'.format(id)
 
-    def is_at_self(self, msg) -> bool:
-        if not self.is_message:
-            return False
-
-        # get_message 屏蔽了at 自身
-        message = ''
-        try:
-            message = msg['message']
-        except:
-            message = ''
-           
+    def is_at_self(self, message) -> bool:
         at_self = self.make_at(self.account_uin)
         if at_self in message:
             return True
@@ -97,41 +87,45 @@ class GoCQHttp:
         except:
             return ''
 
-    def need_filter_message(self, message) -> bool:
-        if self.is_at_self(message):
+    def need_filter_question(self, question) -> bool:
+        if self.is_at_self(question):
             return True
         
         del_msg = '请使用最新版手机QQ体验新功能'
-        if del_msg in message:
+        if del_msg in question:
             return True
 
         return False
 
-    def filter_message(self, message) -> str:
-        if self.is_at_self(message):
-            log_dbg('message: ' + str(message))
-            message = re.sub('\[CQ:.*?\]', '', message)
-            log_dbg('del at self done: ' + str(message))
+    def filter_question(self, question) -> str:
+        if self.is_at_self(question):
+            log_dbg('question: ' + str(question))
+            question = re.sub('\[CQ:.*?\]', '', question)
+            log_dbg('del at self done: ' + str(question))
 
         del_msg = '请使用最新版手机QQ体验新功能'
-        if del_msg in message:
-            message = message.replace(del_msg, ' ')
+        if del_msg in question:
+            question = question.replace(del_msg, ' ')
             log_dbg('del: ' + str(del_msg))
 
         return message
 
     def get_message(self, msg) -> str:
-        message = ''
         try:
-            message = msg['message']
+            return msg['message']
         except:
             return ''
 
-        # del qq function content.
-        if self.need_filter_message(message):
-            message = self.filter_message(message)
+    def get_question(self, msg) -> str:
+        question = self.get_message(msg)
 
-        return message
+        # del qq function content.
+        if self.need_filter_question(question):
+            log_info('question need filter.')
+            question = self.filter_question(question)
+            log_dbg('question filter done: ' + str(question))
+
+        return question
 
     def get_user_id(self, msg) -> int:
         try:
@@ -154,9 +148,12 @@ class GoCQHttp:
         api_private_reply = "http://{}:{}/send_private_msg?user_id={}&message={}".format(
             self.post_host, self.post_port, user_id, reply_quote)
 
-        log_info('send get: ' + str(api_private_reply))
-        response = requests.get(api_private_reply, proxies={})
-        log_info('res code: {} data: {}'.format(str(response), str(response.text)))
+        try:
+            log_info('send get: ' + str(api_private_reply))
+            response = requests.get(api_private_reply, proxies={})
+            log_info('res code: {} data: {}'.format(str(response), str(response.text)))
+        except Exception as e:
+            log_err('fail to send qq:' + str(e))
 
     def reply_group(self, group_id: int, user_id: int, reply):
         at_user = ''
@@ -168,9 +165,12 @@ class GoCQHttp:
         api_group_reply = "http://{}:{}/send_group_msg?group_id={}&message={}".format(
                 self.post_host, self.post_port, group_id, at_reply_quote)
 
-        log_info('send get: ' + str(api_group_reply))
-        response = requests.get(api_group_reply, proxies={})            
-        log_info('res code: {} data: {}'.format(str(response), str(response.text)))
+        try:
+            log_info('send get: ' + str(api_group_reply))
+            response = requests.get(api_group_reply, proxies={})            
+            log_info('res code: {} data: {}'.format(str(response), str(response.text)))
+        except Exception as e:
+            log_err('fail to send qq:' + str(e))
 
     def reply_online(self, user, msg):
         self.reply_private(user, msg)
@@ -225,7 +225,7 @@ class ChatQQ:
         
     def get_question(self, msg):
         if self.type == GoCQHttp.name:
-            return self.go_cqhttp.get_message(msg)
+            return self.go_cqhttp.get_question(msg)
         return ''
 
     def get_user_id(self, msg):
@@ -236,6 +236,11 @@ class ChatQQ:
     def get_group_id(self, msg):
         if self.type == GoCQHttp.name:
             return self.go_cqhttp.get_group_id(msg)
+        return ''
+
+    def get_message(self, msg):
+        if self.type == GoCQHttp.name:
+            return self.go_cqhttp.get_message(msg)
         return ''
 
     def reply_private(self, user_id: int, reply: str):
@@ -297,7 +302,8 @@ class ChatQQ:
         elif self.is_group(msg):
 
             # only use at on group.
-            if not self.go_cqhttp.is_at_self(msg):
+            message = self.get_message(msg)
+            if not self.go_cqhttp.is_at_self(message):
                 return False
             
             uid = self.get_user_id(msg)
@@ -323,7 +329,8 @@ class ChatQQ:
         elif self.is_group(msg):
 
             # only use at on group.
-            if not self.go_cqhttp.is_at_self(msg):
+            message = self.get_message(msg)
+            if not self.go_cqhttp.is_at_self(message):
                 return False
             
             uid = self.get_user_id(msg)

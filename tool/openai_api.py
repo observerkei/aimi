@@ -2,7 +2,7 @@ from revChatGPT.V1 import Chatbot
 from typing import Generator
 import time
 
-from tool.util import log_dbg, log_err
+from tool.util import log_dbg, log_err, log_info
 from tool.config import config
 
 class OpenAIAPI:
