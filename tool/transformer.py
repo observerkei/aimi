@@ -1,8 +1,8 @@
 import torch
 from torch.utils.data import DataLoader, Dataset
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification, AdamW
-import json
 from typing import Any, List
+import os
 
 class QAData(Dataset):
     def __init__(self, data, tokenizer, max_length=32):
@@ -84,19 +84,30 @@ class Transformers:
     device: Any
     tokenizer: Any
     input_data: List[dict]
+    enable: bool = False
     
     def __init__(self):     
         self.tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    def save_model(self, model_file: str):
-        return export_model(self.model, model_file)
+    def save_model(self, model_file: str) -> bool:
+        if not self.enable:
+            return False
+
+        tmp_file = model_file + '.bak'
+        ret = export_model(self.model, tmp_file)
+        os.rename(tmp_file, model_file)
+
+        return True
 
     def load_model(self, model_file: str):
         self.model = load_model(model_file)
+        self.enable = True
         return self.model
 
     def predict(self, query, predict_limit: int = 3):
+        if not self.enable:
+            return {}
         return predict(self.model, query, self.input_data, self.tokenizer, self.device, top_k=predict_limit)
         
     def train(self, input_data):
@@ -121,9 +132,14 @@ class Transformers:
 
         
         self.model = DistilBertForSequenceClassification.from_pretrained("distilbert-base-uncased", num_labels=len(input_data))
-        return train(self.model, self.input_data, epochs=5, batch_size=2, device=self.device)
+        ret = train(self.model, self.input_data, epochs=5, batch_size=2, device=self.device)
+
+        self.enable = True
+
+        return ret
 
 def transformers_predict(input_data):
+    import json
 
     print('input: ' + str(input_data))
     
@@ -144,6 +160,8 @@ def transformers_predict(input_data):
     
 
 def test_predict(input_data):
+    import json
+
     model = DistilBertForSequenceClassification.from_pretrained("distilbert-base-uncased", num_labels=len(input_data))
     tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
 

@@ -7,6 +7,7 @@ from tool.util import log_dbg, log_err, log_info, write_yaml
 class Memory:
     openai_conversation_id: str = ''
     memory_model_type: str = 'transformers'
+    meomry_model_file: str = ''
     model_enable: bool = False
     idx: int = 0
     size: int = 1024
@@ -20,7 +21,6 @@ class Memory:
             self.model_enable = True
             from tool.transformer import Transformers
             self.memory_model = Transformers()
-            self.__train_model()
     
     def __load_memory(self):
         mem = config.load_memory()
@@ -44,15 +44,31 @@ class Memory:
             self.memory_model_type = config.setting['aimi']['memory_model']
         except:
             self.memory_model_type = 'transformers'
+
+        self.memory_model_file = config.memory_model_file 
         
         if len(self.pool) < self.size:
             self.pool.extend([None] * (self.size - len(self.pool)))
         if self.idx > self.size:
             self.idx = 0
 
+        # fix pool idx
+        end_idx = 0
+        for talk_item in reversed(self.pool):
+            if not talk_item:
+                end_idx += 1
+                continue
+            break
+
+        shold_idx = self.size - end_idx
+        log_dbg("shold_idx: " + str(shold_idx))
+        log_dbg('idx: ' + str(self.idx))
+        if shold_idx != self.idx:
+            log_info('idx({}) fix to {}'.format(self.idx, shold_idx))
+            self.idx = shold_idx
+
         log_dbg('conv_id: ' + str(self.openai_conversation_id))
         log_dbg('size: ' + str(self.size))
-        log_dbg('idx: ' + str(self.idx))
         for iter in self.pool:
             if iter:
                 log_dbg('pool: ' + str(iter))
@@ -75,19 +91,32 @@ class Memory:
             write_yaml(save_path, save_obj)
 
             log_info('save memory done: ' + str(save_path))
-            
             return True
 
         except Exception as e:
-            log_err('fail to save memory:{}, file:{}'.format(str(e), save_path))
+            log_err('fail to save memory: {}, file:{}'.format(str(e), save_path))
             return False
+
+        '''
+        try:
+            ret = self.__save_model()
+            if not ret:
+                log_err('fail to save memory: ' + str(self.memory_model_file))
+                return False
+            log_info('save memory model done: ' + str(self.memory_model_file))
+
+            return True
+        except Exception as e:
+            log_err('fail to save memory mode: {}, file:{}'
+                    .format(str(e), self.memory_model_file))
+            return False
+        '''
 
     def __get_memory(self, question: str) -> Union[str, List[dict]]:
         valid_talk_items: List[dict] = []
         
-        cur_index = self.idx
         max_length = self.size
-        range_target = cur_index
+        range_target = self.idx
 
         # add history right
         for talk_item in self.pool[range_target:]:
@@ -100,6 +129,10 @@ class Memory:
 
         return valid_talk_items
 
+    def dream(self):
+        return self.__train_model()
+
+
     def search(
         self,
         question: str,
@@ -110,62 +143,42 @@ class Memory:
 
         # use memory_model
         talk_history: List[str] = []
-        talk_history_appand = 0
-        
-
-        # 倒着插入的，所以要把历史放在前面插入
-        if self.model_enable:
-            recall_items = self.__predict_model(question)
-            log_dbg('model search: ' + str(recall_items))
-            for item in recall_items:
+        talk_history_append = 0
+        def qa_dict_to_list(pool_qa, talk_list, talk_list_append):
+            for item in pool_qa:
                 q = item.get('q', None)
                 a = item.get('a', None)
                 if q and a:
                     talk_prefix = '0 我说:“”\n'
-                    append_len = len(str(talk_history)) + len(q) + len(a) + 2*len(talk_prefix) + len(question)
+                    append_len = len(str(talk_list)) + len(q) + len(a) + 2*len(talk_prefix) + len(question)
                     
                     log_dbg('now len: ' + str(append_len))
                     
                     if append_len > max_size:
                         log_dbg('replay over limit. now openai_input len: ' + str(append_len))
-                        append_len = len(str(talk_history)) + len(q) + len(talk_prefix) + len(question)
+                        append_len = len(str(talk_list)) + len(q) + len(talk_prefix) + len(question)
                         if append_len > max_size:
                             log_dbg('replay over limit. skip history. len: ' + str(append_len))
                             break
                     
                         log_dbg('replay over limit, append pre question.')
-                        talk_history.insert(talk_history_appand, '我说:“{}”\n'.format(q))
+                        talk_history.insert(talk_list_append, '我说:“{}”\n'.format(q))
                         continue
                     # 0 是设定 先放回答再放提问，这样顺序反过来
-                    talk_history.insert(talk_history_appand, '你说:“{}”\n'.format(a))
-                    talk_history.insert(talk_history_appand, '我说:“{}”\n'.format(q))
+                    talk_history.insert(talk_list_append, '你说:“{}”\n'.format(a))
+                    talk_history.insert(talk_list_append, '我说:“{}”\n'.format(q))
+            return talk_list
+
+        # 倒着插入的，所以要把历史放在前面插入
+        if self.model_enable:
+            recall_items = self.__predict_model(question)
+            log_dbg('model search: ' + str(recall_items))
+            talk_history = qa_dict_to_list(recall_items, talk_history, talk_history_append)
 
         # 将model 的数据放在最前面。
-        talk_history_appand = len(talk_history)
-        
+        talk_history_append = len(talk_history)
         talk_items = self.__get_memory(question)
-        for item in reversed(talk_items):
-            q = item.get('q', None)
-            a = item.get('a', None)
-            if q and a:
-                talk_prefix = '0 我说:“”\n'
-                append_len = len(str(talk_history)) + len(q) + len(a) + 2*len(talk_prefix) + len(question)
-
-                log_dbg('now len: ' + str(append_len))
-
-                if append_len > max_size:
-                    log_dbg('replay over limit. now openai_input len: ' + str(append_len))
-                    append_len = len(str(talk_history)) + len(q) + len(talk_prefix) + len(question)
-                    if append_len > max_size:
-                        log_dbg('replay over limit. skip history. len: ' + str(append_len))
-                        break
-
-                    log_dbg('replay over limit, append pre question.')
-                    talk_history.insert(talk_history_appand, '我说:“{}”\n'.format(q))
-                    continue
-                # 0 是设定 先放回答再放提问，这样顺序反过来
-                talk_history.insert(talk_history_appand, '你说:“{}”\n'.format(a))
-                talk_history.insert(talk_history_appand, '我说:“{}”\n'.format(q))
+        talk_history = qa_dict_to_list(reversed(talk_items), talk_history, talk_history_append)
 
         talk_count = 0
  
@@ -190,11 +203,11 @@ class Memory:
 
     def __load_model(self):
         if self.model_enable:
-            return self.memory_model.load_model(config.memory_model_file)
+            return self.memory_model.load_model(self.memory_model_file)
 
     def __save_model(self):
         if self.model_enable:
-            return self.memory_model.save_model(config.memory_model_file)
+            return self.memory_model.save_model(self.memory_model_file)
  
     def append(self, q: str, a: str):
         if not self.need_memory(a):

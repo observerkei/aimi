@@ -59,6 +59,8 @@ class Aimi:
 
         threading.Thread(target = self.read).start()
         threading.Thread(target = chat_qq.server).start()
+        threading.Thread(target = memory.dream).start()
+
 
         cnt = 0
         while self.running:
