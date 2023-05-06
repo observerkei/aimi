@@ -1,6 +1,7 @@
 import requests
 import re
 import time
+import threading
 from typing import Set, Any
 from flask import Flask, request
 from urllib import parse
@@ -227,8 +228,9 @@ class ChatQQ:
                 time.sleep(1)
                 continue
 
+            log_info('recv reply. try send qq server')
+
             for reply_url in self.reply_message:
-                log_info('recv reply. try send qq server')
 
                 res = self.reply_url(reply_url)
                 if not res:
@@ -413,7 +415,10 @@ class ChatQQ:
             
             return 'ok'
         
-    def listen(self):
+    def server(self):
+        # 开启回复线程
+        threading.Thread(target = chat_qq.reply).start()
+
         from gevent import pywsgi
         self.http_server = pywsgi.WSGIServer(
             listener = (self.host, self.port),

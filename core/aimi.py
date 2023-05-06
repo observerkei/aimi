@@ -58,8 +58,7 @@ class Aimi:
         self.notify_online()
 
         threading.Thread(target = self.read).start()
-        threading.Thread(target = chat_qq.listen).start()
-        threading.Thread(target = chat_qq.reply).start()
+        threading.Thread(target = chat_qq.server).start()
         dream = threading.Thread(target = memory.dream)
         # 同时退出
         dream.setDaemon(True)
