@@ -110,7 +110,6 @@ class Memory:
     def __get_memory(self, question: str) -> Union[str, List[dict]]:
         valid_talk_items: List[dict] = []
         
-        max_length = self.size
         range_target = self.idx
 
         # add history right
@@ -127,6 +126,7 @@ class Memory:
     def dream(self):
         ret = self.__train_model()
         log_info('have a dream done')
+        return ret
 
     def search(
         self,

@@ -2,7 +2,7 @@ from typing import Dict, List
 import random
 import os
 
-from tool.util import read_yaml, write_yaml, log_dbg, log_err, log_info
+from tool.util import read_yaml, log_dbg, log_err
 
 class Meme:
     # 错误表情包路径

@@ -2,7 +2,7 @@ import atexit
 import signal
 import threading
 import time
-from typing import Generator, List, Tuple, Union, Set, Any
+from typing import Generator, List
 
 from tool.config import config
 from tool.openai_api import openai_api
@@ -58,7 +58,8 @@ class Aimi:
         self.notify_online()
 
         threading.Thread(target = self.read).start()
-        threading.Thread(target = chat_qq.server).start()
+        threading.Thread(target = chat_qq.listen).start()
+        threading.Thread(target = chat_qq.reply).start()
         threading.Thread(target = memory.dream).start()
 
 
@@ -260,8 +261,8 @@ class Aimi:
         
         log_info('now exit aimi.')
         self.notify_offline()
+        self.chat_qq.exit()
         
-        bye_string = 'server unknow error. sweven-box ready to go offline\n'
         if memory.save_memory():
             log_info('exit: save memory done.')
         else:

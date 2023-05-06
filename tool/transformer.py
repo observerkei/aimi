@@ -97,9 +97,10 @@ class Transformers:
 
         tmp_file = model_file + '.bak'
         ret = export_model(self.model, tmp_file)
-        os.rename(tmp_file, model_file)
+        if not ret:
+            return False
 
-        return True
+        return os.rename(tmp_file, model_file)
 
     def load_model(self, model_file: str):
         self.model = load_model(model_file)

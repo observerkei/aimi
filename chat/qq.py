@@ -1,11 +1,11 @@
-import abc
 import requests
 import re
-from typing import List, Tuple, Union, Set, Any, Generator
+import time
+from typing import Set, Any
 from flask import Flask, request
 from urllib import parse
 
-from tool.util import log_dbg, log_err, log_info, read_yaml, write_yaml
+from tool.util import log_dbg, log_err, log_info, read_yaml
 from tool.config import config
 
 class GoCQHttp:
@@ -142,20 +142,15 @@ class GoCQHttp:
     def get_image_cq(self, file) -> str:
         return '[CQ:image,file=file://{}]'.format(file)
     
-    def reply_private(self, user_id: int, reply: str):
+    def get_reply_private(self, user_id: int, reply: str) -> str:
         reply_quote = parse.quote(reply)
         
         api_private_reply = "http://{}:{}/send_private_msg?user_id={}&message={}".format(
             self.post_host, self.post_port, user_id, reply_quote)
 
-        try:
-            log_info('send get: ' + str(api_private_reply))
-            response = requests.get(api_private_reply, proxies={})
-            log_info('res code: {} data: {}'.format(str(response), str(response.text)))
-        except Exception as e:
-            log_err('fail to send qq:' + str(e))
+        return api_private_reply
 
-    def reply_group(self, group_id: int, user_id: int, reply):
+    def get_reply_group(self, group_id: int, user_id: int, reply) -> str:
         at_user = ''
         if user_id:
             at_user = self.make_at(user_id) + '\n'
@@ -165,20 +160,8 @@ class GoCQHttp:
         api_group_reply = "http://{}:{}/send_group_msg?group_id={}&message={}".format(
                 self.post_host, self.post_port, group_id, at_reply_quote)
 
-        try:
-            log_info('send get: ' + str(api_group_reply))
-            response = requests.get(api_group_reply, proxies={})            
-            log_info('res code: {} data: {}'.format(str(response), str(response.text)))
-        except Exception as e:
-            log_err('fail to send qq:' + str(e))
+        return api_group_reply
 
-    def reply_online(self, user, msg):
-        self.reply_private(user, msg)
-        
-    def reply_offline(self, user, msg):
-        self.reply_private(user, msg)    
-
-    
 class ChatQQ:
     response_user_ids: Set[int] = {}
     response_group_ids: Set[int] = {}
@@ -191,13 +174,21 @@ class ChatQQ:
     http_server: Any
     message: Set[dict] = []
     message_size: int = 1024    
-    
+    reply: Set[str] = []
+    reply_size: int = 1024
+    running: bool = True
+
+    def exit(self):
+        self.running = False
     
     def append_message(self, msg):
         if len(self.message) >= self.message_size:
-            log_err('msg full({}). bypass: {}'.format(str(len(self.message), str(msg))))
-            return
+            log_err('msg full: {}. bypass: {}'.format(str(len(self.message)), str(msg)))
+            return False
+
         self.message.append(msg)
+
+        return True
 
     def __iter__(self):
         return self
@@ -207,7 +198,46 @@ class ChatQQ:
             raise StopIteration
         else:
             return self.message.pop()
-    
+
+    def append_reply(self, reply: str):
+        if len(self.reply) >= self.reply_size:
+            log_err('msg fail: {}. bypass: {}'.format(str(len(self.reply)), str(reply)))
+            return False
+
+        self.reply.append(reply)
+
+        return True
+
+    def reply_url(self, reply_url: str) -> bool:
+        try:
+            log_dbg('send get: ' + str(reply_url))
+            response = requests.get(reply_url, proxies={})            
+            log_dbg('res code: {} data: {}'.format(str(response), str(response.text)))
+            if response.status_code != '200':
+                log_err('code: {}. fail to reply, sleep.'.format(response.status_code))
+                return False
+            return True
+        except Exception as e:
+            log_err('fail to reply, sleep: ' + str(e))
+            return False
+
+    def reply(self):
+        while self.running:
+            if not len(self.reply):
+                time.sleep(1)
+                continue
+
+            for reply_url in self.reply:
+                log_info('recv msg. try reply')
+
+                res = self.reply_url(reply_url)
+                if not res:
+                    log_err('fail to send reply. sleep...')
+                    time.sleep(15)
+                    continue
+
+                self.reply.remove(reply_url)
+
     def is_private(self, msg) -> bool:
         if self.type == GoCQHttp.name:
             return self.go_cqhttp.is_private(msg)
@@ -245,13 +275,17 @@ class ChatQQ:
 
     def reply_private(self, user_id: int, reply: str):
         if self.type == GoCQHttp.name:
-            return self.go_cqhttp.reply_private(user_id, reply)
-        return ''
+            reply_url = self.go_cqhttp.get_reply_private(user_id, reply)
+            return self.reply.append(reply_url)
+
+        return None
 
     def reply_group(self, group_id: int, user_id: int, reply):
         if self.type == GoCQHttp.name:
-            return self.go_cqhttp.reply_group(group_id, user_id, reply)
-        return ''
+            reply_url = self.go_cqhttp.reply_group(group_id, user_id, reply)
+            return self.reply.append(reply_url)
+
+        return None
 
     def get_image_message(self, file) -> str:
         if self.type == GoCQHttp.name:
@@ -262,10 +296,12 @@ class ChatQQ:
         user_id = self.get_user_id(msg)
         
         if self.is_private(msg):
-            self.reply_private(user_id, reply)
+            return self.reply_private(user_id, reply)
         elif self.is_group(msg):
             group_id = chat_qq.get_group_id(msg)
-            self.reply_group(group_id, user_id, reply) 
+            return self.reply_group(group_id, user_id, reply) 
+
+        return None
 
     def has_message(self):
         return len(self.message)
@@ -282,11 +318,16 @@ class ChatQQ:
 
     def reply_online(self):
         if self.type == GoCQHttp.name:
-            self.go_cqhttp.reply_online(self.master_id, 'server init complate :)')
+            return self.reply_private(self.master, 'server init complate :)')
+
+        return None
 
     def reply_offline(self):
         if self.type == GoCQHttp.name:
-            self.go_cqhttp.reply_offline(self.master_id, 'Server unknown error :(')
+            reply_api = self.go_cqhttp.get_reply_private(self.master_id, 'Server unknown error :(')
+            return self.reply_url(reply_api)
+
+        return None
             
     # notify permission denied
     def is_permission_denied(self, msg) -> bool:
@@ -372,7 +413,7 @@ class ChatQQ:
             
             return 'ok'
         
-    def server(self):
+    def listen(self):
         from gevent import pywsgi
         self.http_server = pywsgi.WSGIServer(
             listener = (self.host, self.port),

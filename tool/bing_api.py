@@ -1,7 +1,7 @@
 import asyncio
 from EdgeGPT import Chatbot, ConversationStyle
 from contextlib import suppress
-from typing import Generator, Dict, Any, List
+from typing import Generator, List
 import time
 
 from tool.util import log_dbg, log_err, log_info

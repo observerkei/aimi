@@ -3,7 +3,7 @@ import re
 import os
 import random
 
-from tool.util import log_dbg, log_info, log_err
+from tool.util import log_dbg, log_err
 
 # 将 Markdown 源码转换成 HTML
 
@@ -89,7 +89,7 @@ class Md:
             result = subprocess.run(['wkhtmltoimage', '--encoding', 'UTF-8', '--user-style-sheet', self.out_prefix + 'style.css', 
                                      '--zoom', '1', '--width', '300', 
                                      img_id + '.html', img_id + '.png'], stdout=subprocess.PIPE)
-            print(result.stdout.decode('utf-8'))
+            log_dbg(result.stdout.decode('utf-8'))
 
             return img_id + '.png'
 
@@ -103,7 +103,7 @@ class Md:
 
             # pandoc --webtex -o output.html input.md
             result = subprocess.run(['pandoc', '--webtex', '-o', img_id + '.html', img_id + '.md'], stdout=subprocess.PIPE)
-            print(result.stdout.decode('utf-8'))
+            log_dbg(result.stdout.decode('utf-8'))
 
             return self.__html_to_img(img_id)
 
