@@ -174,14 +174,11 @@ class ChatQQ:
     http_server: Any
     message: Set[dict] = []
     message_size: int = 1024    
-    reply: Set[str] = []
-    reply_size: int = 1024
+    reply_message: Set[str] = []
+    reply_message_size: int = 1024
     running: bool = True
 
-    def exit(self):
-        self.running = False
-    
-    def append_message(self, msg):
+    def __message_append(self, msg):
         if len(self.message) >= self.message_size:
             log_err('msg full: {}. bypass: {}'.format(str(len(self.message)), str(msg)))
             return False
@@ -199,12 +196,15 @@ class ChatQQ:
         else:
             return self.message.pop()
 
-    def append_reply(self, reply: str):
-        if len(self.reply) >= self.reply_size:
-            log_err('msg fail: {}. bypass: {}'.format(str(len(self.reply)), str(reply)))
+    def __reply_append(self, reply: str):
+        if len(self.reply_message) >= self.reply_message_size:
+            log_err('reply full: {}. bypass: {}'
+                    .format(str(len(self.reply_message)), str(reply)))
             return False
 
-        self.reply.append(reply)
+        self.reply_message.append(reply)
+
+        log_dbg('append new reply.')
 
         return True
 
@@ -213,7 +213,7 @@ class ChatQQ:
             log_dbg('send get: ' + str(reply_url))
             response = requests.get(reply_url, proxies={})            
             log_dbg('res code: {} data: {}'.format(str(response), str(response.text)))
-            if response.status_code != '200':
+            if response.status_code != 200:
                 log_err('code: {}. fail to reply, sleep.'.format(response.status_code))
                 return False
             return True
@@ -223,20 +223,20 @@ class ChatQQ:
 
     def reply(self):
         while self.running:
-            if not len(self.reply):
+            if not len(self.reply_message):
                 time.sleep(1)
                 continue
 
-            for reply_url in self.reply:
-                log_info('recv msg. try reply')
+            for reply_url in self.reply_message:
+                log_info('recv reply. try send qq server')
 
                 res = self.reply_url(reply_url)
                 if not res:
                     log_err('fail to send reply. sleep...')
-                    time.sleep(15)
+                    time.sleep(5)
                     continue
 
-                self.reply.remove(reply_url)
+                self.reply_message.remove(reply_url)
 
     def is_private(self, msg) -> bool:
         if self.type == GoCQHttp.name:
@@ -276,14 +276,14 @@ class ChatQQ:
     def reply_private(self, user_id: int, reply: str):
         if self.type == GoCQHttp.name:
             reply_url = self.go_cqhttp.get_reply_private(user_id, reply)
-            return self.reply.append(reply_url)
+            return self.__reply_append(reply_url)
 
         return None
 
     def reply_group(self, group_id: int, user_id: int, reply):
         if self.type == GoCQHttp.name:
             reply_url = self.go_cqhttp.reply_group(group_id, user_id, reply)
-            return self.reply.append(reply_url)
+            return self.__reply_append(reply_url)
 
         return None
 
@@ -318,7 +318,7 @@ class ChatQQ:
 
     def reply_online(self):
         if self.type == GoCQHttp.name:
-            return self.reply_private(self.master, 'server init complate :)')
+            return self.reply_private(self.master_id, 'server init complate :)')
 
         return None
 
@@ -404,7 +404,7 @@ class ChatQQ:
             log_info('recv msg: ' + str(msg))
             if self.need_reply(msg):
                 log_info('need reply append msg.')
-                self.append_message(msg)
+                self.__message_append(msg)
             elif self.is_permission_denied(msg):
                 log_info('user permission_denied')
                 self.reply_permission_denied(msg)
@@ -423,6 +423,7 @@ class ChatQQ:
         self.http_server.serve_forever()
 
     def stop(self):
+        self.running = False
         self.http_server.stop()
  
     def __load_setting(self):

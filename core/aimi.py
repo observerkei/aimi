@@ -60,8 +60,10 @@ class Aimi:
         threading.Thread(target = self.read).start()
         threading.Thread(target = chat_qq.listen).start()
         threading.Thread(target = chat_qq.reply).start()
-        threading.Thread(target = memory.dream).start()
-
+        dream = threading.Thread(target = memory.dream)
+        # 同时退出
+        dream.setDaemon(True)
+        dream.start()
 
         cnt = 0
         while self.running:
@@ -77,6 +79,8 @@ class Aimi:
                 log_info('save memory done')
             except Exception as e:
                 log_err('fail to save memory: ' + str(e))
+
+        log_dbg('aimi exit')
 
     def question_api_type(self, question: str) -> str:
         if '用必应' in question:
@@ -261,7 +265,6 @@ class Aimi:
         
         log_info('now exit aimi.')
         self.notify_offline()
-        self.chat_qq.exit()
         
         if memory.save_memory():
             log_info('exit: save memory done.')
