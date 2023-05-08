@@ -284,7 +284,7 @@ class ChatQQ:
 
     def reply_group(self, group_id: int, user_id: int, reply):
         if self.type == GoCQHttp.name:
-            reply_url = self.go_cqhttp.reply_group(group_id, user_id, reply)
+            reply_url = self.go_cqhttp.get_reply_group(group_id, user_id, reply)
             return self.__reply_append(reply_url)
 
         return None

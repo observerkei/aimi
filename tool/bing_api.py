@@ -97,7 +97,7 @@ class BingAPI:
                 log_info('server fail, sleep 15')
                 time.sleep(15)
 
-                self.__bot_reload()
+                await self.__bot_reload()
                 
                 answer['message'] = str(e)
                 answer['code'] = -1
