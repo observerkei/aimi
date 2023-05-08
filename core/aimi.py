@@ -101,12 +101,129 @@ class Aimi:
                 api_type = self.question_api_type(question) 
 
                 reply = ''
+                reply_line = ''
+                reply_div = ''
+
+                class TalkList:
+                    has_start: bool = False
+                    now_list_line_cnt: int = 0
+                    list_line_cnt_max: int = 0
+                    now_list_id: int = 0
+                    cul_line_cnt_max: bool = True
+                    
+                    def check_talk_list(self, line: str) -> bool:
+                        if self.now_list_line_cnt < self.list_line_cnt_max:
+                            self.now_list_line_cnt += 1
+                            return True
+
+                        # 刚好下一个下标过来了
+                        self.next_list_id_str = '{}. '.format(self.now_list_id + 1)
+                        self.next_list_id_ch_str = '{}。 '.format(self.now_list_id + 1)
+                        if (self.next_list_id_str in line) or \
+                           (self.next_list_id_ch_str in line):
+                            self.now_list_line_cnt = 0
+                            self.now_list_id += 1
+                            return True
+                        
+                        return False
+                    
+                    def reset(self):
+                        self.has_start = False
+                        self.now_list_line_cnt = 0
+                        self.list_line_cnt_max = 0
+                        self.now_list_id = 0
+                        self.cul_line_cnt_max = True
+
+                    def is_talk_list(self, line: str):
+
+                        # 有找到开始的序号
+                        if (not self.has_start) and \
+                           (('1. ' in line) or ('1。 ' in line)):
+                            self.has_start = True
+                            self.now_list_line_cnt += 1
+                            self.list_line_cnt_max += 1
+                            self.now_list_id = 1
+                            return True
+                        
+                        # 标记过才处理
+                        if not self.has_start:
+                            return False
+
+                        # 已经找到当前每行的长度
+                        if not self.cul_line_cnt_max:
+                            ret = self.check_talk_list(line)
+                            if not ret:
+                                self.reset()
+                            return ret
+
+                        if (self.now_list_id) and \
+                           (('2. ' in line) or ('2。 ' in line)):
+                            self.now_list_id = 2
+                            self.now_list_line_cnt = 0
+                            self.cul_line_cnt_max = False
+                            ret = self.check_talk_list(line)
+                            if not ret:
+                                self.reset()
+                            return ret
+
+                        # 统计每块最大行
+                        self.list_line_cnt_max += 1
+                        return True
+                    
+
+                talk_list = TalkList()
                 code = 0
                 for answer in self.ask(question, nickname):
-                    reply = answer['message']
                     code = answer['code']
-                    log_dbg('msg: ' + str(reply))
+                    
+                    message = answer['message'][len(reply) :]
+                    reply_line += message
+                    
+                    reply = answer['message']
+                    
+                    log_dbg('reply: ' + str(reply))
+                    log_dbg('reply_div: ' + str(reply_div))
+                    log_dbg('message: ' + str(message))
+                    log_dbg('reply_line: ' + str(reply_line))
 
+                    if code == 0 and len(reply_div) > 1:
+                        reply_div += reply_line
+                        reply_div = self.reply_adjust(reply_div, api_type)
+                        log_dbg('send div: ' + str(reply_div))
+                        chat_qq.reply_question(msg, reply_div)
+                    
+                    if code != 1:
+                        continue
+                    
+                    if '\n' in reply_line:
+                        def is_math_format(line: str) -> bool:
+                            if '=' in line:
+                                return True
+                            if md.has_latex(line):
+                                return True
+                            if md.has_html(line):
+                                return True
+                            return False
+                        
+                        if talk_list.is_talk_list(reply_line):
+                            reply_div += reply_line
+                            reply_line = ''
+                            continue
+                        elif is_math_format(reply_line):
+                            reply_div += reply_line
+                            reply_line = ''
+                            continue
+                    
+                        reply_div = self.reply_adjust(reply_div, api_type)
+                        
+                        log_dbg('send div: ' + str(reply_div))
+
+                        chat_qq.reply_question(msg, reply_div)
+                        
+                        reply_div = reply_line
+                        reply_line = ''
+                    
+                      
                 log_dbg('answer: ' + str(type(answer)) + ' ' + str(answer))
                 reply = self.reply_adjust(reply, api_type)
                 log_dbg('adjust: ' + str(reply))
@@ -116,7 +233,7 @@ class Aimi:
 
 
                 if code == 0:
-                    chat_qq.reply_question(msg, reply)
+                    pass #chat_qq.reply_question(msg, reply)
 
                 # server failed
                 if code == -1:
