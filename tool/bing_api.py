@@ -1,8 +1,9 @@
 import asyncio
 from EdgeGPT import Chatbot, ConversationStyle
 from contextlib import suppress
-from typing import Generator, List
+from typing import Generator, List, Any
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 from tool.util import log_dbg, log_err, log_info
 from tool.config import config
@@ -22,52 +23,17 @@ class BingAPI:
         'XI',   'XII',  'XIII',  'XIV', 'XV',
         'XVI', 'XVII', 'XVIII', 'XVIV', 'XX'
     ]
+    loop: Any
 
     def ask(
         self,
         question: str,
         timeout: int = 360,
     ) -> Generator[dict, None, None]:
-        async def fuck_async(question: str, timeout: int = 360) -> Generator[dict, None, None]:
-            result: dict = {}
-            async for res in self.web_ask(question, timeout):
-                log_dbg('out: ' + str(type(result)) + ' val: ' + str(res))
-                result = res
-            return result
         
         if self.use_web_ask:
-            result = asyncio.run(fuck_async(question, timeout))
-            log_dbg('res: ' + str(type(result)) + ' val: ' + str(result))
+            yield from self.__fuck_async(self.web_ask(question, timeout))
 
-            # set stream reply
-            try:
-                code = result['code']
-                lines = result['message'].split('\n')
-                message = ''
-                cnt = 0
-                
-                for line in lines:
-                    message += line + '\n'
-                    cnt += 1
-                    if (cnt < len(lines)):                    
-                        yield {
-                            "message": message,
-                            "code": 1
-                        }
-                    else:
-                        yield {
-                            "message": message,
-                            "code": code
-                        }
-
-                    t = 0.5
-                    _, ms = divmod(t, 1)
-                    time.sleep(ms)
-            except Exception as e:
-                log_err('fail to for yield: ' + str(e))
-                yield result
-
-            
     async def web_ask(
         self,
         question: str,
@@ -133,12 +99,28 @@ class BingAPI:
             # request complate.
             if answer['code'] == 0:
                 break
+    
+    def __fuck_async(self, async_gen):        
+       while True:
+           try:
+               yield self.loop.run_until_complete(async_gen.__anext__())
+           except StopAsyncIteration:
+               log_dbg("stop: " +str(StopAsyncIteration))
+               break
+           except Exception as e:
+               log_dbg("fail to get res " + str(e))
+               break
 
     def __init__(self) -> None:
 
         self.__load_setting()
         
         asyncio.run(self.__bot_create())
+
+        
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        self.loop = asyncio.get_event_loop()
         
     async def __bot_create(self):
         self.chatbot = await Chatbot.create(None, None, self.cookie_path)

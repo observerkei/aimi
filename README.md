@@ -99,4 +99,4 @@ https://github.com/LSTM-Kirigaya/go-cqhttp-python-server
 
 7. release claims
 
-Welcome to develop and exchange, reserve the right of final interpretation and copyright, prohibited commercial
+Development and communication are welcome, final interpretation and copyright are reserved, based on the MIT agreement.
