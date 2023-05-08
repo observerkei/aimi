@@ -42,7 +42,7 @@ class BingAPI:
             # set stream reply
             try:
                 code = result['code']
-                lines = result['message'].splitlines()
+                lines = result['message'].split('\n')
                 message = ''
                 cnt = 0
                 
