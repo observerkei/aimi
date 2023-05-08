@@ -38,7 +38,34 @@ class BingAPI:
         if self.use_web_ask:
             result = asyncio.run(fuck_async(question, timeout))
             log_dbg('res: ' + str(type(result)) + ' val: ' + str(result))
-            yield result
+
+            # set stream reply
+            try:
+                code = result['code']
+                lines = result['message'].splitlines()
+                message = ''
+                cnt = 0
+                
+                for line in lines:
+                    message += line + '\n'
+                    cnt += 1
+                    if (cnt < len(lines)):                    
+                        yield {
+                            "message": message,
+                            "code": 1
+                        }
+                    else:
+                        yield {
+                            "message": message,
+                            "code": code
+                        }
+
+                    t = 0.5
+                    _, ms = divmod(t, 1)
+                    time.sleep(ms)
+            except Exception as e:
+                log_err('fail to for yield: ' + str(e))
+                yield result
 
             
     async def web_ask(

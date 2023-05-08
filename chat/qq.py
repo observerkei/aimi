@@ -295,6 +295,10 @@ class ChatQQ:
         return ''            
 
     def reply_question(self, msg, reply):
+        if not len(reply):
+            log_info('reply is empty.')
+            return None
+        
         user_id = self.get_user_id(msg)
         
         if self.is_private(msg):

@@ -110,6 +110,10 @@ class Transformers:
     def predict(self, query, predict_limit: int = 3):
         if not self.enable:
             return {}
+        # limit over flow
+        if predict_limit >= len(self.input_data):
+            predict_limit = self.input_data - 1
+
         return predict(self.model, query, self.input_data, self.tokenizer, self.device, top_k=predict_limit)
         
     def train(self, input_data, depth):

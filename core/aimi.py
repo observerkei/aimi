@@ -180,17 +180,22 @@ class Aimi:
                     reply_line += message
                     
                     reply = answer['message']
-                    
+
+                    log_dbg('code: ' + str(code))
                     log_dbg('reply: ' + str(reply))
                     log_dbg('reply_div: ' + str(reply_div))
                     log_dbg('message: ' + str(message))
                     log_dbg('reply_line: ' + str(reply_line))
 
-                    if code == 0 and len(reply_div) > 1:
+                    if code == 0 and (len(reply_div) or ((not len(reply_div)) and len(reply_line))):
                         reply_div += reply_line
+                        reply_line = ''
+                        
                         reply_div = self.reply_adjust(reply_div, api_type)
                         log_dbg('send div: ' + str(reply_div))
                         chat_qq.reply_question(msg, reply_div)
+                        
+                        break
                     
                     if code != 1:
                         continue
@@ -213,13 +218,15 @@ class Aimi:
                             reply_div += reply_line
                             reply_line = ''
                             continue
+                        
                     
                         reply_div = self.reply_adjust(reply_div, api_type)
                         
                         log_dbg('send div: ' + str(reply_div))
 
                         chat_qq.reply_question(msg, reply_div)
-                        
+
+                        # 把满足规则的先发送，然后再保存新的行。
                         reply_div = reply_line
                         reply_line = ''
                     
