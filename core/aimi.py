@@ -123,6 +123,7 @@ class Aimi:
                         if (next_list_id_str in line) or \
                            (next_list_id_ch_str in line) or \
                            (next_list_id_bing_str in line):
+                            log_dbg('check talk list[{}]'.format(self.now_list_id))
                             self.now_list_line_cnt = 0
                             self.now_list_id += 1
                             return True
@@ -184,8 +185,10 @@ class Aimi:
                         if '=' in line:
                             return True
                         if md.has_latex(line):
+                            log_dbg('match: is latex')
                             return True
                         if md.has_html(line):
+                            log_dbg('match: is html')
                             return True
                         return False
                     
@@ -247,6 +250,10 @@ class Aimi:
                             reply_div += reply_line
                             reply_line = ''
                             continue
+                        elif not len(reply_div):
+                            # first line.
+                            reply_div += reply_line
+                            reply_line = ''
                         
                     
                         reply_div = self.reply_adjust(reply_div, api_type)
