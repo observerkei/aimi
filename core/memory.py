@@ -239,7 +239,7 @@ class Memory:
             'q': q,
             'a': a
         }
-        log_dbg('append: ' + str(talk_item))
+        log_dbg('append memory: ' + str(talk_item))
         self.pool[self.idx] = talk_item
         self.idx = self.__get_next_idx()
 

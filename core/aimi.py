@@ -318,17 +318,18 @@ class Aimi:
         answer = self.__post_question(link_think, api_type)
 
         for message in answer:
+
             if (not message):
                 continue
             log_dbg('message: {} {} answer: {} {}'.format(
             str(type(message)), str(message), str(type(answer)), str(answer)))
+            
+            # save memory
+            if (message['code'] == 0):
+                memory.append(q = question, a = message['message'])
 
             yield message 
-            
-            if (message['code'] != 0):
-                continue
-            
-            memory.append(q = question, a = message['message'])
+
     
     def __post_question(
         self, 
