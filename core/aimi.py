@@ -3,6 +3,7 @@ import signal
 import threading
 import time
 from typing import Generator, List
+import random
 
 from tool.config import config
 from tool.openai_api import openai_api
@@ -85,6 +86,13 @@ class Aimi:
         if '用必应' in question:
             return bing_api.type
         return openai_api.type
+
+    @property
+    def __busy_reply(self):
+        busy = [ "让我想想...", "......", "那个...", "这个...", "？", "喵喵喵？",
+                 "*和未知敌人战斗中*", "*大脑宕机*", "*大脑停止响应*", "*正在构造语言中*",
+                 "*被神秘射线击中,尝试恢复中*", "*猫猫叹气*" ]
+        return random.choice(busy) 
 
     def read(self):
         while self.running:
@@ -237,7 +245,7 @@ class Aimi:
                         break
                     if (code == -1) and (len(reply_div) or len(reply_line)):
                         if not len(reply_div):
-                            reply_div = '让我想想'
+                            reply_div = self.__busy_reply
                         reply_div = self.reply_adjust(reply_div, api_type)
                         log_dbg('fail: {}, send div: {}'.format(str(reply_line), str(reply_div)))
                         reply_div += '... '
