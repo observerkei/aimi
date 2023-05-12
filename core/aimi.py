@@ -248,7 +248,6 @@ class Aimi:
                             reply_div = self.__busy_reply
                         reply_div = self.reply_adjust(reply_div, api_type)
                         log_dbg('fail: {}, send div: {}'.format(str(reply_line), str(reply_div)))
-                        reply_div += '... '
                         chat_qq.reply_question(msg, reply_div)
                         reply_line = ''
                         reply_div = ''
