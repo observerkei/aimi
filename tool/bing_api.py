@@ -28,12 +28,13 @@ class BingAPI:
     trigger: Dict[str, List[str]] = {}
 
     class ConversationStyle:
+        default: str = 'precise'
         creative: str = 'creative'
         balanced: str = 'balanced'
         precise: str = 'precise'
 
     def is_call(self, question) -> bool:
-        for default in self.trigger[self.ConversationStyle.default]:
+        for default in self.trigger['bing']:
             if default.lower() in question.lower():
                 return True
         

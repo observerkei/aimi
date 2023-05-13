@@ -69,9 +69,12 @@ class BardAPI:
 
         self.__load_setting()
         
-        cookie_key = self.cookie_key
-        if cookie_key and len(cookie_key):
-            self.chatbot = Chatbot(cookie_key)
+        try:
+            cookie_key = self.cookie_key
+            if cookie_key and len(cookie_key):
+                self.chatbot = Chatbot(cookie_key)
+        except Exception as e:
+            log_err('fail to init Bard: ' + str(e))
 
     def __load_setting(self):
         try:
