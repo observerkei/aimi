@@ -13,6 +13,7 @@ class BardAPI:
     max_repeat_times: int = 3
     type: str = 'bard'
     trigger: List[str] = []
+    init: bool = False
 
     def is_call(self, question) -> bool:
         for call in self.trigger:
@@ -36,6 +37,9 @@ class BardAPI:
            "message": '',
            "code": 1
         }
+
+        if not self.init:
+            self.__bot_create()
 
         req_cnt = 0
         
@@ -65,16 +69,22 @@ class BardAPI:
             if answer['code'] == 0:
                 break
 
+    def __bot_create(self):
+        cookie_key = self.cookie_key
+        if cookie_key and len(cookie_key):
+            self.chatbot = Chatbot(cookie_key)
+    
+        self.init = True
+    
     def __init__(self) -> None:
 
         self.__load_setting()
         
         try:
-            cookie_key = self.cookie_key
-            if cookie_key and len(cookie_key):
-                self.chatbot = Chatbot(cookie_key)
+            self.__bot_create()
         except Exception as e:
             log_err('fail to init Bard: ' + str(e))
+            self.init = False
 
     def __load_setting(self):
         try:
