@@ -48,6 +48,7 @@ class BingAPI:
         
         while req_cnt < self.max_repeat_times:
             req_cnt += 1
+            answer['code'] = 1
             
             try:
                 log_dbg('try ask: ' + str(question))
@@ -81,6 +82,12 @@ class BingAPI:
                     res_all = raw_text + '\n' + '[{}]'.format(self.countdown[cd_idx])
 
                     answer['message'] = res_all
+
+                if '> Conversation disengaged' == answer['message']:
+                    answer['code'] = -1
+                    log_err('bing search fail.')
+                    raise Exception(str(answer))
+
 
                 answer['code'] = 0
                 yield answer

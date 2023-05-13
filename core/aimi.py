@@ -144,8 +144,8 @@ class Aimi:
                            (('1. ' in line) or ('1。 ' in line) or \
                             ('[1]: ' in line)):
                             self.has_start = True
-                            self.now_list_line_cnt += 1
-                            self.list_line_cnt_max += 1
+                            self.now_list_line_cnt = 1
+                            self.list_line_cnt_max = 1
                             self.now_list_id = 1
                             return True
                         
@@ -235,6 +235,17 @@ class Aimi:
                         chat_qq.reply_question(msg, reply_div)
                         
                         break
+                    if (code == -1) and (len(reply_div) or len(reply_line)):
+                        if not len(reply_div):
+                            reply_div = '让我想想'
+                        reply_div = self.reply_adjust(reply_div, api_type)
+                        log_dbg('fail: {}, send div: {}'.format(str(reply_line), str(reply_div)))
+                        reply_div += '... '
+                        chat_qq.reply_question(msg, reply_div)
+                        reply_line = ''
+                        reply_div = ''
+                        continue
+
                     
                     if code != 1:
                         continue
@@ -359,14 +370,14 @@ class Aimi:
         # get yield last val
         for message in answer:
             log_dbg('now msg: ' + str(message))
-            yield from answer
 
-            if (not message) or (message['code'] != 0):
-                continue
-            
-            if message['conversation_id'] and message['conversation_id'] != memory.openai_conversation_id:
-                memory.openai_conversation_id = message['conversation_id']
-                log_info('set new con_id: ' + str(memory.openai_conversation_id))
+            if (message) and (message['code'] == 0):
+                if message['conversation_id'] and \
+                   message['conversation_id'] != memory.openai_conversation_id:
+                    memory.openai_conversation_id = message['conversation_id']
+                    log_info('set new con_id: ' + str(memory.openai_conversation_id))
+
+            yield message
         
     def __load_setting(self):
         try:

@@ -139,7 +139,7 @@ class Memory:
         # use memory_model
         talk_history: List[str] = []
         talk_history_append = 0
-        def qa_dict_to_list(pool_qa, talk_list, talk_list_append):
+        def qa_dict_to_list(pool_qa, talk_list, talk_list_append, max_size=max_size):
             for item in pool_qa:
                 q = item.get('q', None)
                 a = item.get('a', None)
@@ -168,7 +168,7 @@ class Memory:
         if self.model_enable:
             recall_items = self.__predict_model(question)
             log_dbg('model search: ' + str(recall_items))
-            talk_history = qa_dict_to_list(recall_items, talk_history, talk_history_append)
+            talk_history = qa_dict_to_list(recall_items, talk_history, talk_history_append, max_size/2)
 
         # 将model 的数据放在最前面。
         talk_history_append = len(talk_history)
@@ -244,7 +244,7 @@ class Memory:
         self.idx = self.__get_next_idx()
 
     def need_memory(self, a: str) -> bool:
-        if 'OpenAI' in a:
+        if ('OpenAI' in a) or ('ChatGPT' in a):
             if '使用政策' in a:
                 return False
             if '道德准则' in a:

@@ -45,6 +45,7 @@ class OpenAIAPI:
         
         while req_cnt < self.max_repeat_times:
             req_cnt += 1
+            answer['code'] = 1
             
             try:
                 log_dbg('try ask: ' + str(question))
