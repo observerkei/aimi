@@ -1,6 +1,7 @@
-from revChatGPT.V1 import Chatbot
-from typing import Generator
+import os
 import time
+from typing import Generator
+from revChatGPT.V1 import Chatbot
 
 from tool.util import log_dbg, log_err, log_info
 from tool.config import config
@@ -11,6 +12,7 @@ class OpenAIAPI:
     max_requestion: int = 1024
     access_token: str = ''
     max_repeat_times: int = 3
+    fackopen_url: str = ''
     type: str = 'openai'
 
     class InputType:
@@ -110,6 +112,11 @@ class OpenAIAPI:
     def __init__(self) -> None:
 
         self.__load_setting()
+
+        # set revChatGPT fackopen_url
+        fackopen_url = self.fackopen_url
+        if len(fackopen_url):
+            os.environ['CHATGPT_BASE_URL'] = fackopen_url 
         
         access_token = self.access_token
         if len(access_token):
@@ -131,5 +138,9 @@ class OpenAIAPI:
             self.max_repeat_times = config.setting['openai']['max_repeat_times']
         except:
             self.max_repeat_times = 3
+        try:
+            self.fackopen_url = config.setting['openai']['fackopen_url']
+        except:
+            self.fackopen_url = ''
 
 openai_api = OpenAIAPI()

@@ -48,7 +48,6 @@ class Meme:
         except:
             return ''
     
-
 class Config:
     go_cqhttp_config: str = './run/config.yml'
     setting_config: str = './run/setting.yml'
@@ -115,6 +114,11 @@ class Config:
             s['bing'] = obj.get('bing', [])
         except Exception as e:
             s['bing'] = []
+            log_err('fail to load setting: ' + str(e))
+        try:
+            s['bard'] = obj.get('bard', [])
+        except Exception as e:
+            s['bard'] = []
             log_err('fail to load setting: ' + str(e))
         try:
             s['aimi'] = obj.get('aimi', [])

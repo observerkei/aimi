@@ -6,10 +6,11 @@ from typing import Generator, List
 import random
 
 from tool.config import config
-from tool.openai_api import openai_api
-from tool.bing_api import bing_api
 from tool.util import log_dbg, log_err, log_info
 from chat.qq import chat_qq
+from tool.openai_api import openai_api
+from tool.bing_api import bing_api
+from tool.bard_api import bard_api
 
 from core.md2img import md
 from core.memory import memory
@@ -83,8 +84,10 @@ class Aimi:
         log_dbg('aimi exit')
 
     def question_api_type(self, question: str) -> str:
-        if '用必应' in question:
+        if ('用必应' in question) or ( '@bing' in question):
             return bing_api.type
+        if '@bard' in question:
+            return bard_api.type
         return openai_api.type
 
     @property
@@ -330,6 +333,8 @@ class Aimi:
 
         if api_type == bing_api.type:
             link_think = question
+        elif api_type == bard_api.type:
+            link_think = question
         else:
             link_think = self.make_link_think(question, nickname)
 
@@ -358,12 +363,19 @@ class Aimi:
         if api_type == openai_api.type:
             yield from self.__post_openai(link_think, memory.openai_conversation_id)
         elif api_type == bing_api.type:
-            yield from self.__post_bing(link_think, memory.openai_conversation_id)
-     
+            yield from self.__post_bing(link_think)
+        elif api_type == bard_api.type:
+            yield from self.__post_bard(link_think)
+    
+    def __post_bard(
+        self, 
+        question: str
+    )-> Generator[dict, None, None]:
+        yield from bard.ask(question)
+    
     def __post_bing(
         self, 
-        question: str,
-        openai_conversation_id: str = None
+        question: str
     )-> Generator[dict, None, None]:
         yield from bing_api.ask(question)
     
