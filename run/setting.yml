@@ -48,7 +48,7 @@ poe:
     Aimi0514:
       model: 'aimi0514'
       trigger: # model trigger much has prefix poe
-          - '#poe-aimi'
+        - '#poe-aimi'
     ChatGPT:
       model: 'chinchilla'
       trigger:
