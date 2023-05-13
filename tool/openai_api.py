@@ -121,8 +121,9 @@ class OpenAIAPI:
 
         # set revChatGPT fackopen_url
         fackopen_url = self.fackopen_url
-        if len(fackopen_url):
+        if fackopen_url and len(fackopen_url):
             self.chatbot.BASE_URL = fackopen_url
+            log_info('use fackopen_url: ' + str(fackopen_url))
         
     def __load_setting(self):
         try:

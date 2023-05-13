@@ -93,7 +93,7 @@ class Aimi:
     @property
     def __busy_reply(self):
         busy = [ "让我想想...", "......", "那个...", "这个...", "？", "喵喵喵？",
-                 "*和未知敌人战斗中*", "*大脑宕机*", "*大脑停止响应*", "*正在构造语言中*",
+                 "*和未知敌人战斗中*", "*大脑宕机*", "*大脑停止响应*", "*尝试构造语言中*",
                  "*被神秘射线击中,尝试恢复中*", "*猫猫叹气*" ]
         return random.choice(busy) 
 
@@ -331,12 +331,15 @@ class Aimi:
 
         api_type = self.question_api_type(question) 
 
+        link_think = ''
         if api_type == bing_api.type:
             link_think = question
         elif api_type == bard_api.type:
             link_think = question
-        else:
+        elif api_type == openai_api.type:
             link_think = self.make_link_think(question, nickname)
+        else:
+            link_think = question
 
         answer = self.__post_question(link_think, api_type)
 

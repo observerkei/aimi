@@ -77,7 +77,7 @@ class Md:
         #r'\$\$.*?\$\$|\$.*?\$'
         #r'\$.*?\$|\$\$.*?\$\$|\\\(.*?\\\)|\\\[.*?\\\]'
         pattern = r'\$.*?\$|\$\$.*?\$\$|\\\((.|\s)*?\\\)|\\\[([\s\S]*?)\\\]|LaTeX|\{\\frac\{.*?\}\{.*?\s*\}\}' 
-        return re.search(pattern, text) is not None
+        return re.search(pattern, text, re.IGNORECASE) is not None
     
     def has_html(self, text) -> bool:
         pattern = r'<.*?>'
