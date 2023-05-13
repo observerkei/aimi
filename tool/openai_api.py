@@ -1,4 +1,3 @@
-import os
 import time
 from typing import Generator
 from revChatGPT.V1 import Chatbot
@@ -113,11 +112,6 @@ class OpenAIAPI:
 
         self.__load_setting()
 
-        # set revChatGPT fackopen_url
-        fackopen_url = self.fackopen_url
-        if len(fackopen_url):
-            os.environ['CHATGPT_BASE_URL'] = fackopen_url 
-        
         access_token = self.access_token
         if len(access_token):
             self.chatbot = Chatbot({
@@ -125,6 +119,11 @@ class OpenAIAPI:
             })
             self.use_web_ask = True
 
+        # set revChatGPT fackopen_url
+        fackopen_url = self.fackopen_url
+        if len(fackopen_url):
+            self.chatbot.BASE_URL = fackopen_url
+        
     def __load_setting(self):
         try:
             self.max_requestion = config.setting['openai']['max_requestion']
