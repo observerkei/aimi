@@ -75,9 +75,6 @@ class Memory:
 
         log_dbg('conv_id: ' + str(self.openai_conversation_id))
         log_dbg('size: ' + str(self.size))
-        for iter in self.pool:
-            if iter:
-                log_dbg('pool: ' + str(iter))
         
     def save_memory(self) -> bool:
 

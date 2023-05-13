@@ -371,7 +371,7 @@ class Aimi:
         self, 
         question: str
     )-> Generator[dict, None, None]:
-        yield from bard.ask(question)
+        yield from bard_api.ask(question)
     
     def __post_bing(
         self, 
