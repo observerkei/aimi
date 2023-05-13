@@ -1,7 +1,8 @@
 import asyncio
-from EdgeGPT import Chatbot, ConversationStyle
+from EdgeGPT import Chatbot
+from EdgeGPT import ConversationStyle as EdgeConversationStyle
 from contextlib import suppress
-from typing import Generator, List, Any
+from typing import Generator, List, Any, Dict
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -24,6 +25,32 @@ class BingAPI:
         'XVI', 'XVII', 'XVIII', 'XVIV', 'XX'
     ]
     loop: Any
+    trigger: Dict[str, List[str]] = {}
+
+    class ConversationStyle:
+        creative: str = 'creative'
+        balanced: str = 'balanced'
+        precise: str = 'precise'
+
+    def is_call(self, question) -> bool:
+        for default in self.trigger[self.ConversationStyle.default]:
+            if default.lower() in question.lower():
+                return True
+        
+        return False
+
+    def __get_conversation_style(self, question: str):
+        for precise in self.trigger[self.ConversationStyle.precise]:
+            if precise.lower() in question.lower():
+                return EdgeConversationStyle.precise
+        for balanced in self.trigger[self.ConversationStyle.balanced]:
+            if balanced.lower() in question.lower():
+                return EdgeConversationStyle.balanced
+        for creative in self.trigger[self.ConversationStyle.creative]:
+            if creative.lower() in question.lower():
+                return EdgeConversationStyle.creative
+        
+        return EdgeConversationStyle.precise
 
     def ask(
         self,
@@ -45,6 +72,7 @@ class BingAPI:
         }
 
         req_cnt = 0
+        conversation_style = self.__get_conversation_style(question)
         
         while req_cnt < self.max_repeat_times:
             req_cnt += 1
@@ -55,7 +83,7 @@ class BingAPI:
 
                 async for final, response in self.chatbot.ask_stream(
                     prompt = question, 
-                    conversation_style = ConversationStyle.creative,
+                    conversation_style = conversation_style,
                     wss_link = self.wss_link
                 ):
                     if not response:
@@ -124,7 +152,6 @@ class BingAPI:
         
         asyncio.run(self.__bot_create())
 
-        
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
         self.loop = asyncio.get_event_loop()
@@ -147,24 +174,45 @@ class BingAPI:
         try:
             self.max_requestion = config.setting['bing']['max_requestion']
         except Exception as e:
-            log_err('fail to load chatbing config: ' + str(e))
+            log_err('fail to load bing config: ' + str(e))
             self.max_requestion = 512
         try:
             self.max_repeat_times = config.setting['bing']['max_repeat_times']
         except Exception as e:
-            log_err('fail to load chatbing config: ' + str(e))
+            log_err('fail to load bing config: ' + str(e))
             self.max_repeat_times = 3
         try:
             self.cookie_path = config.setting['bing']['cookie_path']
             self.use_web_ask = True
         except Exception as e:
-            log_err('fail to load chatbing config: ' + str(e))
+            log_err('fail to load bing config: ' + str(e))
             self.cookie_path = ''
 
         try:
             self.wss_link = config.setting['bing']['wss_link']
         except Exception as e:
-            log_err('fail to load chatbing config: ' + str(e))
+            log_err('fail to load bing config: ' + str(e))
             self.wss_link = ''
+
+        try:
+            self.trigger['bing'] = config.setting['bing']['trigger']['default']
+        except Exception as e:
+            log_err('fail to load bing config: ' + str(e))
+            self.trigger['bing'] = [ '#bing', '@bing' ]
+        try:
+            self.trigger[self.ConversationStyle.creative] = config.setting['bing']['trigger'][self.ConversationStyle.creative]
+        except Exception as e:
+            log_err('fail to load bing config: ' + str(e))
+            self.trigger[self.ConversationStyle.creative] = []
+        try:
+            self.trigger[self.ConversationStyle.balanced] = config.setting['bing']['trigger'][self.ConversationStyle.balanced]
+        except Exception as e:
+            log_err('fail to load bing config: ' + str(e))
+            self.trigger[self.ConversationStyle.balanced] = []
+        try:
+            self.trigger[self.ConversationStyle.precise] = config.setting['bing']['trigger'][self.ConversationStyle.precise]
+        except Exception as e:
+            log_err('fail to load bing config: ' + str(e))
+            self.trigger[self.ConversationStyle.precise] = []
 
 bing_api = BingAPI()

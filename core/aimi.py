@@ -15,6 +15,111 @@ from tool.bard_api import bard_api
 from core.md2img import md
 from core.memory import memory
 
+class ReplyStep:
+    class TalkList:
+        has_start: bool = False
+        now_list_line_cnt: int = 0
+        list_line_cnt_max: int = 0
+        now_list_id: int = 0
+        cul_line_cnt_max: bool = True
+        
+        def check_talk_list(self, line: str) -> bool:
+            if self.now_list_line_cnt < self.list_line_cnt_max:
+                self.now_list_line_cnt += 1
+                return True
+
+            # 刚好下一个下标过来了
+            next_list_id_str = '{}. '.format(self.now_list_id + 1)
+            next_list_id_ch_str = '{}。 '.format(self.now_list_id + 1)
+            next_list_id_bing_str = '[{}]: '.format(self.now_list_id + 1)
+            if (next_list_id_str in line) or \
+               (next_list_id_ch_str in line) or \
+               (next_list_id_bing_str in line):
+                log_dbg('check talk list[{}]'.format(self.now_list_id))
+                self.now_list_line_cnt = 0
+                self.now_list_id += 1
+                return True
+            
+            return False
+        
+        def reset(self):
+            self.has_start = False
+            self.now_list_line_cnt = 0
+            self.list_line_cnt_max = 0
+            self.now_list_id = 0
+            self.cul_line_cnt_max = True
+
+        def is_talk_list(self, line: str):
+
+            # 有找到开始的序号
+            if (not self.has_start) and \
+               (('1. ' in line) or ('1。 ' in line) or \
+                ('[1]: ' in line)):
+                self.has_start = True
+                self.now_list_line_cnt = 1
+                self.list_line_cnt_max = 1
+                self.now_list_id = 1
+                return True
+            
+            # 标记过才处理
+            if not self.has_start:
+                return False
+
+            if '\n' == line:
+                return True
+
+            # 已经找到当前每行的长度
+            if not self.cul_line_cnt_max:
+                ret = self.check_talk_list(line)
+                if not ret:
+                    self.reset()
+                return ret
+
+            if (self.now_list_id) and \
+               (('2. ' in line) or ('2。 ' in line) or \
+                ('[2]: ' in line)):
+                self.now_list_id = 2
+                self.now_list_line_cnt = 0
+                self.cul_line_cnt_max = False
+                ret = self.check_talk_list(line)
+                if not ret:
+                    self.reset()
+                return ret
+
+            # 统计每块最大行
+            self.list_line_cnt_max += 1
+            return True
+    
+    class MathList:
+        has_start: bool = False
+        
+        def is_math_format(self, line: str) -> bool:
+            if '=' in line:
+                return True
+            if md.has_latex(line):
+                log_dbg('match: is latex')
+                return True
+            if md.has_html(line):
+                log_dbg('match: is html')
+                return True
+            return False
+        
+        def is_math_list(self, line: str) -> bool:
+
+            if self.is_math_format(line):
+                self.has_start = True
+                return True
+
+            if not self.has_start:
+                return False
+
+            if '\n' == line:
+                return True
+
+            self.has_start = False
+            return False
+        
+        
 class Aimi:
     timeout: int = 360
     master_name: str = ''
@@ -83,15 +188,18 @@ class Aimi:
 
         log_dbg('aimi exit')
 
-    def question_api_type(self, question: str) -> str:
-        if ('用必应' in question) or ( '@bing' in question):
+    def __question_api_type(self, question: str) -> str:
+        if bing_api.is_call(question):
             return bing_api.type
-        if '@bard' in question:
+        if bard_api.is_call(question):
             return bard_api.type
-        return openai_api.type
+        if openai_api.is_call(question):
+            return openai_api.type
+        
+        return self.api[0]
 
     @property
-    def __busy_reply(self):
+    def __busy_reply(self) -> str:
         busy = [ "让我想想...", "......", "那个...", "这个...", "？", "喵喵喵？",
                  "*和未知敌人战斗中*", "*大脑宕机*", "*大脑停止响应*", "*尝试构造语言中*",
                  "*被神秘射线击中,尝试恢复中*", "*猫猫叹气*" ]
@@ -109,119 +217,14 @@ class Aimi:
                 question = chat_qq.get_question(msg)
                 log_info('{}: {}'.format(nickname, question))
 
-                api_type = self.question_api_type(question) 
+                api_type = self.__question_api_type(question) 
 
                 reply = ''
                 reply_line = ''
                 reply_div = ''
-
-                class TalkList:
-                    has_start: bool = False
-                    now_list_line_cnt: int = 0
-                    list_line_cnt_max: int = 0
-                    now_list_id: int = 0
-                    cul_line_cnt_max: bool = True
-                    
-                    def check_talk_list(self, line: str) -> bool:
-                        if self.now_list_line_cnt < self.list_line_cnt_max:
-                            self.now_list_line_cnt += 1
-                            return True
-
-                        # 刚好下一个下标过来了
-                        next_list_id_str = '{}. '.format(self.now_list_id + 1)
-                        next_list_id_ch_str = '{}。 '.format(self.now_list_id + 1)
-                        next_list_id_bing_str = '[{}]: '.format(self.now_list_id + 1)
-                        if (next_list_id_str in line) or \
-                           (next_list_id_ch_str in line) or \
-                           (next_list_id_bing_str in line):
-                            log_dbg('check talk list[{}]'.format(self.now_list_id))
-                            self.now_list_line_cnt = 0
-                            self.now_list_id += 1
-                            return True
-                        
-                        return False
-                    
-                    def reset(self):
-                        self.has_start = False
-                        self.now_list_line_cnt = 0
-                        self.list_line_cnt_max = 0
-                        self.now_list_id = 0
-                        self.cul_line_cnt_max = True
-
-                    def is_talk_list(self, line: str):
-
-                        # 有找到开始的序号
-                        if (not self.has_start) and \
-                           (('1. ' in line) or ('1。 ' in line) or \
-                            ('[1]: ' in line)):
-                            self.has_start = True
-                            self.now_list_line_cnt = 1
-                            self.list_line_cnt_max = 1
-                            self.now_list_id = 1
-                            return True
-                        
-                        # 标记过才处理
-                        if not self.has_start:
-                            return False
-
-                        if '\n' == line:
-                            return True
-
-                        # 已经找到当前每行的长度
-                        if not self.cul_line_cnt_max:
-                            ret = self.check_talk_list(line)
-                            if not ret:
-                                self.reset()
-                            return ret
-
-                        if (self.now_list_id) and \
-                           (('2. ' in line) or ('2。 ' in line) or \
-                            ('[2]: ' in line)):
-                            self.now_list_id = 2
-                            self.now_list_line_cnt = 0
-                            self.cul_line_cnt_max = False
-                            ret = self.check_talk_list(line)
-                            if not ret:
-                                self.reset()
-                            return ret
-
-                        # 统计每块最大行
-                        self.list_line_cnt_max += 1
-                        return True
-                
-                class MathList:
-                    has_start: bool = False
-                    
-                    def is_math_format(self, line: str) -> bool:
-                        if '=' in line:
-                            return True
-                        if md.has_latex(line):
-                            log_dbg('match: is latex')
-                            return True
-                        if md.has_html(line):
-                            log_dbg('match: is html')
-                            return True
-                        return False
-                    
-                    def is_math_list(self, line: str) -> bool:
-
-                        if self.is_math_format(line):
-                            self.has_start = True
-                            return True
-
-                        if not self.has_start:
-                            return False
-
-                        if '\n' == line:
-                            return True
-
-                        self.has_start = False
-                        return False
-                    
-                    
-
-                talk_list = TalkList()
-                math_list = MathList()
+    
+                talk_list = ReplyStep.TalkList()
+                math_list = ReplyStep.MathList()
                 code = 0
                 for answer in self.ask(question, nickname):
                     code = answer['code']
@@ -261,7 +264,6 @@ class Aimi:
                         continue
                     
                     if '\n' in reply_line:
-             
                         
                         if talk_list.is_talk_list(reply_line):
                             reply_div += reply_line
@@ -329,14 +331,10 @@ class Aimi:
         nickname: str = None
     ) -> Generator[dict, None, None]:
 
-        api_type = self.question_api_type(question) 
+        api_type = self.__question_api_type(question) 
 
         link_think = ''
-        if api_type == bing_api.type:
-            link_think = question
-        elif api_type == bard_api.type:
-            link_think = question
-        elif api_type == openai_api.type:
+        if api_type == openai_api.type:
             link_think = self.make_link_think(question, nickname)
         else:
             link_think = question
@@ -413,15 +411,11 @@ class Aimi:
 
         try:
             self.api = config.setting['aimi']['api']
-        except:
+        except Exception as e:
+            log_err('fail to load aimi api: ' + str(e))
             self.api = [openai_api.type]
-            
-        if openai_api.type in self.api:
-            self.max_link_think = openai_api.max_requestion
-        elif bing_api.type in self.api:
-            self.max_link_think = bing_api.max_requestion
-        else:
-            self.max_link_think = 1024
+        
+        self.max_link_think = openai_api.max_requestion
 
         try:
             self.preset_facts = ''
@@ -434,13 +428,9 @@ class Aimi:
                 if count != len(preset_facts):
                     fact += '\n'
                 self.preset_facts += fact
-        except:
+        except Exception as e:
+            log_err('fail to load aimi preset: ' + str(e))
             self.preset_facts = ''
-
-    def need_reply(self, user: dict) -> bool:
-        if user['chat'] == 'qq' and chat_qq.need_reply(user):
-            return True
-        return False
 
     def notify_online(self):
         chat_qq.reply_online()

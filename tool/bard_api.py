@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Generator
+from typing import Generator, List
 from Bard import Chatbot
 
 from tool.util import log_dbg, log_err, log_info
@@ -12,7 +12,14 @@ class BardAPI:
     max_requestion: int = 1024
     max_repeat_times: int = 3
     type: str = 'bard'
+    trigger: List[str] = []
 
+    def is_call(self, question) -> bool:
+        for call in self.trigger:
+            if call.lower() in question.lower():
+                return True
+        return False
+    
     def ask(
         self,
         question: str,
@@ -63,21 +70,29 @@ class BardAPI:
         self.__load_setting()
         
         cookie_key = self.cookie_key
-        if len(cookie_key):
+        if cookie_key and len(cookie_key):
             self.chatbot = Chatbot(cookie_key)
 
     def __load_setting(self):
         try:
             self.max_requestion = config.setting['bard']['max_requestion']
-        except:
+        except Exception as e:
+            log_err('fail to load bard config: ' + str(e))
             self.max_requestion = 1024
         try:
             self.cookie_key = config.setting['bard']['cookie_1psd']
-        except:
+        except Exception as e:
+            log_err('fail to load bard config: ' + str(e))
             self.cookie_key = ''
         try:
-            self.max_repeat_times = config.setting['board']['max_repeat_times']
-        except:
+            self.max_repeat_times = config.setting['bard']['max_repeat_times']
+        except Exception as e:
+            log_err('fail to load bard config: ' + str(e))
             self.max_repeat_times = 3
+        try:
+            self.trigger = config.setting['bard']['trigger']
+        except Exception as e:
+            log_err('fail to load bard config: ' + str(e))
+            self.trigger = [ '@bard', '#bard' ]
 
 bard_api = BardAPI()

@@ -1,5 +1,5 @@
 import time
-from typing import Generator
+from typing import Generator, List
 from revChatGPT.V1 import Chatbot
 
 from tool.util import log_dbg, log_err, log_info
@@ -13,11 +13,19 @@ class OpenAIAPI:
     max_repeat_times: int = 3
     fackopen_url: str = ''
     type: str = 'openai'
+    trigger: List[str] = []
 
     class InputType:
         SYSTEM = 'system'
         USER = 'user'
         ASSISTANT = 'assistant'
+
+    def is_call(self, question) -> bool:
+        for call in self.trigger:
+            if call.lower() in question.lower():
+                return True
+        
+        return False
 
     def ask(
         self,
@@ -113,34 +121,46 @@ class OpenAIAPI:
         self.__load_setting()
 
         access_token = self.access_token
-        if len(access_token):
+        if access_token and len(access_token):
             self.chatbot = Chatbot({
                 "access_token": access_token
             })
             self.use_web_ask = True
 
-        # set revChatGPT fackopen_url
-        fackopen_url = self.fackopen_url
-        if fackopen_url and len(fackopen_url):
-            self.chatbot.BASE_URL = fackopen_url
-            log_info('use fackopen_url: ' + str(fackopen_url))
+            # set revChatGPT fackopen_url
+            fackopen_url = self.fackopen_url
+            if fackopen_url and len(fackopen_url):
+                self.chatbot.BASE_URL = fackopen_url
+                log_info('use fackopen_url: ' + str(fackopen_url))
         
     def __load_setting(self):
         try:
             self.max_requestion = config.setting['openai']['max_requestion']
-        except:
+        except Exception as e:
+            log_err('fail to load openai config: ' + str(e))
             self.max_requestion = 1024
         try:
             self.access_token = config.setting['openai']['access_token']
-        except:
+        except Exception as e:
+            log_err('fail to load openai config: ' + str(e))
             self.access_token = ''
         try:
             self.max_repeat_times = config.setting['openai']['max_repeat_times']
-        except:
+        except Exception as e:
+            log_err('fail to load openai config: ' + str(e))
             self.max_repeat_times = 3
         try:
             self.fackopen_url = config.setting['openai']['fackopen_url']
-        except:
+        except Exception as e:
+            log_err('fail to load openai config: ' + str(e))
             self.fackopen_url = ''
+
+        try:
+            self.trigger = config.setting['openai']['trigger']
+        except Exception as e:
+            log_err('fail to load openai config: ' + str(e))
+            self.trigger = ['@openai', '#openai' ]
+
+        
 
 openai_api = OpenAIAPI()

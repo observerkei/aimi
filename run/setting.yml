@@ -1,19 +1,39 @@
 openai:
   access_token: 
-  fackopen_url: 'https://ai.fakeopen.com/api/'
+  fackopen_url: #'https://ai.fakeopen.com/api/'
   max_requestion: 550
   max_repeat_times: 3
+  trigger:
+    - '@openai'
+    - '#openai'
 
 bing:
   cookie_path: './run/bing_cookie.json'
   wss_link: 'wss://sydney.bing.com/sydney/ChatHub'
   max_requestion: 1024
   max_repeat_times: 3
+  trigger:
+    default: # default need is conversation style prefix
+      - '@bing'
+      - '#bing'
+      - '用必应'
+    creative:
+      - '@bing-c'
+      - '#bing-c'
+    balanced:
+      - '@bing-b'
+      - '#bing-b'
+    precise:
+      - '@bing-p'
+      - '#bing-p'
 
 bard:
   cookie_1psd: 
   max_requestion: 1024
   max_repeat_times: 3
+  trigger:
+    - '@bard'
+    - '#bard'
 
 qq:
   type: go-cqhttp
@@ -29,9 +49,10 @@ web:
 
 aimi:
   name: Aimi
-  api: 
+  api: # first is default
     - openai
-    - bing 
+    - bing
+    - bard
   master_name: lostFall
   memory_size: 10240
   memory_model: transformers
