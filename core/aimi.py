@@ -11,6 +11,7 @@ from chat.qq import chat_qq
 from tool.openai_api import openai_api
 from tool.bing_api import bing_api
 from tool.bard_api import bard_api
+from tool.poe_api import poe_api
 
 from core.md2img import md
 from core.memory import memory
@@ -189,6 +190,8 @@ class Aimi:
         log_dbg('aimi exit')
 
     def __question_api_type(self, question: str) -> str:
+        if poe_api.is_call(question):
+            return poe_api.type
         if bing_api.is_call(question):
             return bing_api.type
         if bard_api.is_call(question):
@@ -360,13 +363,25 @@ class Aimi:
         link_think: str,
         api_type: str
     )-> Generator[dict, None, None]:
+
         log_dbg('use api: ' + str(api_type))
+        
         if api_type == openai_api.type:
             yield from self.__post_openai(link_think, memory.openai_conversation_id)
         elif api_type == bing_api.type:
             yield from self.__post_bing(link_think)
         elif api_type == bard_api.type:
             yield from self.__post_bard(link_think)
+        elif api_type == poe_api.type:
+            yield from self.__post_poe(link_think)
+        else:
+            log_err('not suppurt api_type: ' + str(api_type))
+    
+    def __post_poe(
+        self, 
+        question: str
+    )-> Generator[dict, None, None]:
+        yield from poe_api.ask(question)
     
     def __post_bard(
         self, 
@@ -419,7 +434,7 @@ class Aimi:
 
         try:
             self.preset_facts = ''
-            preset_facts: List[str] = config.setting['aimi']['preset_facts']
+            preset_facts: List[str] = config.setting['aimi']['preset_facts'][self.api[0]]
             count = 0
             for fact in preset_facts:
                 fact = fact.replace('<name>', self.aimi_name)

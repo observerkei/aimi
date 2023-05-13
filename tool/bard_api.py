@@ -7,11 +7,11 @@ from tool.util import log_dbg, log_err, log_info
 from tool.config import config
 
 class BardAPI:
+    type: str = 'bard'
     chatbot: Chatbot
     cookie_key: str = ''
     max_requestion: int = 1024
     max_repeat_times: int = 3
-    type: str = 'bard'
     trigger: List[str] = []
     init: bool = False
 
@@ -38,8 +38,11 @@ class BardAPI:
            "code": 1
         }
 
-        if not self.init:
-            self.__bot_create()
+        if (not self.init) and (self.__bot_create()):
+            log_err('fail to create bard bot')
+            answer['code'] = -1
+            return answer
+            
 
         req_cnt = 0
         

@@ -62,6 +62,7 @@ class Config:
             setting_config = read_yaml(self.setting_config)
             self.setting = self.__load_setting(setting_config)
         except:
+            log_err('fail to load setting: ' + str(e))
             self.setting = {}
         self.meme = Meme()
         
@@ -101,29 +102,34 @@ class Config:
         s = {}
 
         try:
-            s['qq'] = obj.get('qq', [])
+            s['qq'] = obj.get('qq', {})
         except Exception as e:
-            s['qq'] = []
+            s['qq'] = {}
             log_err('fail to load setting: ' + str(e))
         try:
-            s['openai'] = obj.get('openai', [])
+            s['openai'] = obj.get('openai', {})
         except Exception as e:
-            s['openai'] = []
+            s['openai'] = {}
             log_err('fail to load setting: ' + str(e))
         try:
-            s['bing'] = obj.get('bing', [])
+            s['bing'] = obj.get('bing', {})
         except Exception as e:
-            s['bing'] = []
+            s['bing'] = {}
             log_err('fail to load setting: ' + str(e))
         try:
-            s['bard'] = obj.get('bard', [])
+            s['bard'] = obj.get('bard', {})
         except Exception as e:
-            s['bard'] = []
+            s['bard'] = {}
             log_err('fail to load setting: ' + str(e))
         try:
-            s['aimi'] = obj.get('aimi', [])
+            s['poe'] = obj.get('poe', {})
         except Exception as e:
-            s['aimi'] = []
+            s['poe'] = {}
+            log_err('fail to load setting: ' + str(e))
+        try:
+            s['aimi'] = obj.get('aimi', {})
+        except Exception as e:
+            s['aimi'] = {}
             log_err('fail to load setting: ' + str(e))
         
         return s

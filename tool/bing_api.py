@@ -10,11 +10,10 @@ from tool.util import log_dbg, log_err, log_info
 from tool.config import config
 
 class BingAPI:
+    type: str = 'bing'
     chatbot: Chatbot
-    use_web_ask: bool = True
     max_requestion: int = 1024
     max_repeat_times: int = 3
-    type: str = 'bing'
     cookie_path: str = ''
     wss_link: str = ''
     countdown: List[str] = [
@@ -26,15 +25,15 @@ class BingAPI:
     ]
     loop: Any
     trigger: Dict[str, List[str]] = {}
+    init: bool = False
 
     class ConversationStyle:
-        default: str = 'precise'
         creative: str = 'creative'
         balanced: str = 'balanced'
         precise: str = 'precise'
 
     def is_call(self, question) -> bool:
-        for default in self.trigger['bing']:
+        for default in self.trigger['default']:
             if default.lower() in question.lower():
                 return True
         
@@ -58,9 +57,7 @@ class BingAPI:
         question: str,
         timeout: int = 360,
     ) -> Generator[dict, None, None]:
-        
-        if self.use_web_ask:
-            yield from self.__fuck_async(self.web_ask(question, timeout))
+        yield from self.__fuck_async(self.web_ask(question, timeout))
 
     async def web_ask(
         self,
@@ -72,6 +69,12 @@ class BingAPI:
            "code": 1
         }
 
+        if (not self.init) and (not await self.__bot_create()):
+            log_err('fail to load bing bot')
+            answer['code'] = -1
+            yield answer
+            return
+            
         req_cnt = 0
         conversation_style = self.__get_conversation_style(question)
         
@@ -158,8 +161,14 @@ class BingAPI:
         self.loop = asyncio.get_event_loop()
         
     async def __bot_create(self):
-        self.chatbot = await Chatbot.create(None, None, self.cookie_path)
-        self.use_web_ask = True
+        try:        
+            self.chatbot = await Chatbot.create(None, None, self.cookie_path)
+            self.init = True
+        except Exception as e:
+            log_err('fail to create bing bot: ' + str(e))
+            self.init = False
+
+        return self.init
     
     async def __bot_reload(self):
         log_dbg('try reload chatbing bot')
@@ -184,7 +193,6 @@ class BingAPI:
             self.max_repeat_times = 3
         try:
             self.cookie_path = config.setting['bing']['cookie_path']
-            self.use_web_ask = True
         except Exception as e:
             log_err('fail to load bing config: ' + str(e))
             self.cookie_path = ''
@@ -196,10 +204,10 @@ class BingAPI:
             self.wss_link = ''
 
         try:
-            self.trigger['bing'] = config.setting['bing']['trigger']['default']
+            self.trigger['default'] = config.setting['bing']['trigger']['default']
         except Exception as e:
             log_err('fail to load bing config: ' + str(e))
-            self.trigger['bing'] = [ '#bing', '@bing' ]
+            self.trigger['default'] = [ '#bing', '@bing' ]
         try:
             self.trigger[self.ConversationStyle.creative] = config.setting['bing']['trigger'][self.ConversationStyle.creative]
         except Exception as e:

@@ -6,13 +6,13 @@ from tool.util import log_dbg, log_err, log_info
 from tool.config import config
 
 class OpenAIAPI:
+    type: str = 'openai'
     chatbot: Chatbot
     use_web_ask: bool = True
     max_requestion: int = 1024
     access_token: str = ''
     max_repeat_times: int = 3
     fackopen_url: str = ''
-    type: str = 'openai'
     trigger: List[str] = []
 
     class InputType:

@@ -4,6 +4,8 @@ from transformers import DistilBertTokenizer, DistilBertForSequenceClassificatio
 from typing import Any, List
 import os
 
+from tool.util import log_info
+
 class QAData(Dataset):
     def __init__(self, data, tokenizer, max_length=32):
         self.data = data
@@ -135,8 +137,8 @@ class Transformers:
             iter['label'] = label
             self.input_data.insert(0, iter)
             label += 1
-            log_dbg('ran ' + str(iter))
-
+            
+        log_info('ran count: ' + str(label))
         
         self.model = DistilBertForSequenceClassification.from_pretrained("distilbert-base-uncased", num_labels=len(input_data))
         ret = train(self.model, self.input_data, epochs=5, batch_size=2, device=self.device)
