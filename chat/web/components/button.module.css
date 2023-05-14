@@ -1,0 +1,7 @@
+.send_button {
+    background-color: transparent; /* 设置按钮内部为透明 */
+    border: 2px solid #000; /* 设置按钮外部为线框，颜色为黑色 */
+    border-radius: 25px; /* 设置按钮的圆角大小为 8px */
+    padding: 8px 16px; /* 设置按钮的内边距 */
+    color: #000; /* 设置按钮的字体颜色为黑色 */
+  }

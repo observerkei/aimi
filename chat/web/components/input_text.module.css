@@ -1,0 +1,5 @@
+.send_input {
+    border-radius: 25px; /* 设置按钮的圆角大小为 8px */
+    height: auto;  
+    min-height: 40px;
+}

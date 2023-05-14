@@ -87,7 +87,7 @@ def handle_post_api_request():
     return Response(event_stream(), mimetype='text/event-stream')
 
 def run_app():
-    app.run(port=2464)
+    app.run(port=4642)
 
 if __name__ == '__main__':
     t = threading.Thread(target=run_app)

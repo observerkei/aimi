@@ -1,0 +1,10 @@
+.page {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .page > * {
+    flex-grow: 1;
+    flex-shrink: 0;
+  }

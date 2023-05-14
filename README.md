@@ -3,7 +3,7 @@
 # function
 
 1. catgirl
-2. Chat AI developed based on OpenAI
+2. Chat AI developed based on OpenAI/bard/bing/poe
 3. Support qq individual or group chat permission
 4. mathematical expression(LaTex) / html converted to pictures
 
@@ -54,6 +54,8 @@ qq:
 
 4. Visit this link to get your OpenAI access_token:
 
+(For development communication only)
+
 https://chat.openai.com/api/auth/session
 
 save to ./run/setting.yml
@@ -96,6 +98,7 @@ https://github.com/Mrs4s/go-cqhttp
 
 https://github.com/LSTM-Kirigaya/go-cqhttp-python-server
 
+https://github.com/vercel/examples
 
 7. release claims
 
