@@ -138,3 +138,4 @@ qq_server_data/
 /run/go-cqhttp
 /run/data
 /run/memory.pt
+/run/bing_cookie.json

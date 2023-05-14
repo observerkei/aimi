@@ -83,6 +83,9 @@ class PoeAPI:
                 log_err('fail to ask: ' + str(e))
                 log_info('server fail, sleep 15')
                 time.sleep(15)
+                if 'RemoteDisconnected' in str(e):
+                    log_info("try recreate poe bot")
+                    self.__create_bot()
                 
                 answer['message'] = str(e)
                 answer['code'] = -1
