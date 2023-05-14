@@ -4,7 +4,7 @@ import colorlog
 
 def log_init():
     # 创建一个 logger 对象
-    logger = logging.getLogger('my_logger')
+    logger = logging.getLogger(__name__)
 
     # 设置 logger 的日志级别
     logger.setLevel(logging.DEBUG)
@@ -46,7 +46,10 @@ def log_init():
 
     #logging.basicConfig(filename=log_file, level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
 
+    logger.propagate = False  # 禁止日志信息向父级传递
+
     return logger
+
 
 def log_err(message: str):
     logger.error(message)
