@@ -119,6 +119,9 @@ class Transformers:
         return predict(self.model, query, self.input_data, self.tokenizer, self.device, top_k=predict_limit)
         
     def train(self, input_data, depth):
+        if not self.depth:
+            return None
+
         import random
         from tool.util import log_dbg
 
@@ -138,7 +141,7 @@ class Transformers:
             self.input_data.insert(0, iter)
             label += 1
             
-        log_info('ran count: ' + str(label))
+        log_info('ran count: ' + str(label-1))
         
         self.model = DistilBertForSequenceClassification.from_pretrained("distilbert-base-uncased", num_labels=len(input_data))
         ret = train(self.model, self.input_data, epochs=5, batch_size=2, device=self.device)

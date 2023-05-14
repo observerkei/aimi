@@ -240,6 +240,11 @@ class ChatQQ:
 
                 self.reply_message.remove(reply_url)
 
+    def is_message(self, msg) -> bool:
+        if self.type == GoCQHttp.name:
+            return self.go_cqhttp.is_message(msg)
+        return False
+
     def is_private(self, msg) -> bool:
         if self.type == GoCQHttp.name:
             return self.go_cqhttp.is_private(msg)
@@ -407,6 +412,9 @@ class ChatQQ:
         @self.app.route('/', methods = ['POST'])
         def listen():
             msg = request.get_json()
+            if not self.is_message(msg):
+                log_dbg('skip not msg.')
+                return 'skip'
             log_info('recv msg: ' + str(msg))
             if self.need_reply(msg):
                 log_info('need reply append msg.')
