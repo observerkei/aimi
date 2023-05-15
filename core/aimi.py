@@ -8,6 +8,7 @@ import random
 from tool.config import config
 from tool.util import log_dbg, log_err, log_info
 from chat.qq import chat_qq
+from chat.web import chat_web
 from tool.openai_api import openai_api
 from tool.bing_api import bing_api
 from tool.bard_api import bard_api
@@ -170,12 +171,21 @@ class Aimi:
 
         self.notify_online()
 
-        threading.Thread(target = self.read).start()
-        threading.Thread(target = chat_qq.server).start()
-        dream = threading.Thread(target = memory.dream)
+        aimi_read = threading.Thread(target = self.read)
+        chat_qq_server = threading.Thread(target = chat_qq.server)
+        chat_web_server = threading.Thread(target = chat_web.server)
+        aimi_dream = threading.Thread(target = memory.dream)
         # 同时退出
-        dream.setDaemon(True)
-        dream.start()
+        aimi_read.setDaemon(True)
+        aimi_read.start()
+        chat_qq_server.setDaemon(True)
+        chat_qq_server.start()
+        chat_web_server.setDaemon(True)
+        chat_web_server.start()
+        aimi_dream.setDaemon(True)
+        aimi_dream.start()
+
+        
 
         cnt = 0
         while self.running:
