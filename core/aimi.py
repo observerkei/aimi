@@ -11,7 +11,7 @@ from chat.qq import chat_qq
 from tool.openai_api import openai_api
 from tool.bing_api import bing_api
 from tool.bard_api import bard_api
-from tool.poe_api import poe_api
+from tool.aimi_plugin import aimi_plugin
 
 from core.md2img import md
 from core.memory import memory
@@ -138,6 +138,11 @@ class Aimi:
         signal.signal(signal.SIGTERM, self.__signal_exit)
         signal.signal(signal.SIGINT, self.__signal_exit)
 
+        try:
+            aimi_plugin.when_init()
+        except Exception as e:
+            log_err(f'fail to init aimi plugin: {e}')
+
     def make_link_think(
         self,
         question: str,
@@ -190,14 +195,14 @@ class Aimi:
         log_dbg('aimi exit')
 
     def __question_api_type(self, question: str) -> str:
-        if poe_api.is_call(question):
-            return poe_api.type
         if bing_api.is_call(question):
             return bing_api.type
         if bard_api.is_call(question):
             return bard_api.type
         if openai_api.is_call(question):
             return openai_api.type
+        if aimi_plugin.bot_is_call(question):
+            return aimi_plugin.bot_get_call_type(question)
         
         return self.api[0]
 
@@ -372,16 +377,10 @@ class Aimi:
             yield from self.__post_bing(link_think)
         elif api_type == bard_api.type:
             yield from self.__post_bard(link_think)
-        elif api_type == poe_api.type:
-            yield from self.__post_poe(link_think)
+        elif aimi_plugin.has_bot_type(api_type):
+            yield from aimi_plugin.bot_ask(api_type, link_think)
         else:
             log_err('not suppurt api_type: ' + str(api_type))
-    
-    def __post_poe(
-        self, 
-        question: str
-    )-> Generator[dict, None, None]:
-        yield from poe_api.ask(question)
     
     def __post_bard(
         self, 
@@ -469,6 +468,9 @@ class Aimi:
         else:
             log_err('exit: fail to save memory.')
 
-
+        try:
+            aimi_plugin.when_exit()
+        except Exception as e:
+            log_err(f'fail to exit aimi plugin: {e}')
 
 aimi = Aimi()

@@ -36,7 +36,7 @@ bard:
     - '#bard'
 
 poe:
-  cookie_p-b:
+  cookie_p-b: 
   max_requestion: 1024
   max_repeat_times: 3
   models:
@@ -97,6 +97,7 @@ aimi:
     - openai
     - bing
     - bard
+  plugin_path: './aimi_plugin'
   master_name: lostFall
   memory_size: 10240
   memory_model: transformers
