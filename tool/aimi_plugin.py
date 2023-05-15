@@ -97,7 +97,7 @@ class AimiPlugin:
                     except Exception as e:
                         log_err(f'fail to add plugin bot: {e}')
                         
-    def has_bot_type(self, type) -> bool:
+    def bot_has_type(self, type) -> bool:
         if not len(self.bots):
             return False
         

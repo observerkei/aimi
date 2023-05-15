@@ -377,7 +377,7 @@ class Aimi:
             yield from self.__post_bing(link_think)
         elif api_type == bard_api.type:
             yield from self.__post_bard(link_think)
-        elif aimi_plugin.has_bot_type(api_type):
+        elif aimi_plugin.bot_has_type(api_type):
             yield from aimi_plugin.bot_ask(api_type, link_think)
         else:
             log_err('not suppurt api_type: ' + str(api_type))
