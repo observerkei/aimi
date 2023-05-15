@@ -3,7 +3,7 @@
 # function
 
 1. catgirl
-2. Chat AI developed based on OpenAI/bard/bing/poe
+2. Chat AI developed based on OpenAI/bard/bing/plugin
 3. Support qq individual or group chat permission
 4. mathematical expression(LaTex) / html converted to pictures
 
