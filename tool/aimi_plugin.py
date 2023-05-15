@@ -27,7 +27,7 @@ class Bot:
         question = caller.bot_get_question(ask_data)
         yield caller.bot_set_response(code=1, message="o")
         yield caller.bot_set_response(code=0, message="ok.")
-        # if error, then: yield caller.bot_set_response(code=-1, messa
+        # if error, then: yield caller.bot_set_response(code=-1, message="err")
 
     # exit bot
     def when_exit(self):
@@ -43,10 +43,6 @@ class Bot:
     # no need define bot_get_question
     def bot_get_question(self, ask_data):
         return ask_data['question']
-
-    # no need define get_timeout
-    def bot_get_timeout(self, ask_data):
-        return ask_data['timeout']
 
     # no need define bot_set_response
     def bot_set_response(self, code: int, message: str) -> Any:
@@ -77,7 +73,7 @@ class AimiPlugin:
         # 遍历目录中的文件
         for filename in os.listdir(self.plugin_path):
             # skip example 
-            if 'bot_example.py' == filename:
+            if self.bot_obj.plugin_prefix + 'example.py' == filename:
                 continue
                 
             # 如果文件名以指定前缀开头并且是 Python 脚本
