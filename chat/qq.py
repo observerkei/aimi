@@ -164,7 +164,6 @@ class GoCQHttp:
         return api_group_reply
 
 class ChatQQ:
-    type: str = 'qq'
     response_user_ids: Set[int] = {}
     response_group_ids: Set[int] = {}
     master_id: int = 0
@@ -446,7 +445,7 @@ class ChatQQ:
  
     def __load_setting(self):
         try:
-            setting = config.load_setting(self.type)
+            setting = config.load_setting('qq')
         except Exception as e:
             log_err(f'fail to load {self.type}: {e}')
             setting = {}
