@@ -385,11 +385,18 @@ class ChatQQ:
             if not self.go_cqhttp.is_at_self(message):
                 return False
             
-            uid = self.get_user_id(msg)
             gid = self.get_group_id(msg)
 
-            if uid in self.response_user_ids and gid in self.response_group_ids:
-                return True            
+            if not (gid in self.response_group_ids):
+                return False
+
+            uid = self.get_user_id(msg)
+
+            if uid == self.master_id:
+                return True
+
+            if uid in self.response_user_ids:
+                return True
         else:
             return False
         

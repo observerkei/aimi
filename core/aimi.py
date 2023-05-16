@@ -433,11 +433,13 @@ class Aimi:
         
         try:
             self.aimi_name = setting['name']
-        except:
+        except Exception as e:
+            log_err('fail to load aimi: {e}')
             self.aimi_name = 'Aimi'
         try:
             self.master_name = setting['master_name']
-        except:
+        except Exception as e:
+            log_err('fail to load aimi: {e}')
             self.master_name = ''
 
         try:
