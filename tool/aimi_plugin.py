@@ -51,13 +51,13 @@ class Bot:
     def bot_load_setting(self, type: str):
         return config.load_setting(type)
 
-    def bot_log_dbg(self, msg):
+    def bot_log_dbg(msg):
         return log_dbg(msg)
 
-    def bot_log_err(self, msg):
-        return log_err(self, msg)
+    def bot_log_err(msg):
+        return log_err(msg)
 
-    def bot_log_info(self, msg):
+    def bot_log_info(msg):
         return log_info(msg)
 
 class AimiPlugin:
