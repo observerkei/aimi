@@ -425,16 +425,23 @@ class Aimi:
         
     def __load_setting(self):
         try:
-            self.aimi_name = config.setting['aimi']['name']
+            setting = config.load_setting('aimi')
+        except Exception as e:
+            log_err(f'fail to load {self.type}: {e}')
+            setting = {}
+            return
+        
+        try:
+            self.aimi_name = setting['name']
         except:
             self.aimi_name = 'Aimi'
         try:
-            self.master_name = config.setting['aimi']['master_name']
+            self.master_name = setting['master_name']
         except:
             self.master_name = ''
 
         try:
-            self.api = config.setting['aimi']['api']
+            self.api = setting['api']
         except Exception as e:
             log_err('fail to load aimi api: ' + str(e))
             self.api = [openai_api.type]
@@ -443,7 +450,7 @@ class Aimi:
 
         try:
             self.preset_facts = ''
-            preset_facts: List[str] = config.setting['aimi']['preset_facts'][self.api[0]]
+            preset_facts: List[str] = setting['preset_facts'][self.api[0]]
             count = 0
             for fact in preset_facts:
                 fact = fact.replace('<name>', self.aimi_name)

@@ -20,8 +20,12 @@ class Memory:
 
         if self.memory_model_type == 'transformers':
             self.model_enable = True
-            from tool.transformer import Transformers
-            self.memory_model = Transformers()
+            try:
+                from tool.transformer import Transformers
+                self.memory_model = Transformers()
+            except Exception as e:
+                self.memory_model = None
+                log_err(f'fail to load Transformers: {e}')
 
     def __load_memory(self):
         mem = config.load_memory()

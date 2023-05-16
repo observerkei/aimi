@@ -30,11 +30,11 @@ class Bot:
         # if error, then: yield caller.bot_set_response(code=-1, message="err")
 
     # exit bot
-    def when_exit(self):
+    def when_exit(self, caller: Any):
         pass
 
     # init bot
-    def when_init(self):
+    def when_init(self, caller: Any):
         pass
 
     # no need define plugin_prefix
@@ -47,6 +47,18 @@ class Bot:
     # no need define bot_set_response
     def bot_set_response(self, code: int, message: str) -> Any:
         return {"code": code, "message": message}
+
+    def bot_load_setting(self, type: str):
+        return config.load_setting(type)
+
+    def bot_log_dbg(self, msg):
+        return log_dbg(msg)
+
+    def bot_log_err(self, msg):
+        return log_err(self, msg)
+
+    def bot_log_info(self, msg):
+        return log_info(msg)
 
 class AimiPlugin:
     bots: Dict = {}
@@ -64,7 +76,14 @@ class AimiPlugin:
 
     def __load_setting(self):
         try:
-            self.plugin_path = config.setting['aimi']['plugin_path']
+            setting = config.load_setting('aimi')
+        except Exception as e:
+            log_err(f'fail to load {self.type}: {e}')
+            setting = {}
+            return
+        
+        try:
+            self.plugin_path = setting['plugin_path']
         except Exception as e:
             log_err(f'fail to get plugin_path: {e}')
             self.plugin_path = './aimi_plugin'
@@ -91,9 +110,11 @@ class AimiPlugin:
                 if hasattr(module, 'Bot'):
                     try:
                         bot = module.Bot()
-                        type = bot.type
-                        self.bots[type] = bot
-                        log_info(f'add plugin bot:{module_name}')
+                        bot_type = bot.type
+                        if bot_type in self.bots:
+                            raise Exception(f'{bot_type} has in bots')
+                        self.bots[bot_type] = bot
+                        log_info(f'add plugin bot_type:{bot_type} bot:{module_name}')
                     except Exception as e:
                         log_err(f'fail to add plugin bot: {e}')
                         
@@ -164,7 +185,7 @@ class AimiPlugin:
         if len(self.bots):
             for bot_type, bot in self.bots.items():
                 try:
-                    bot.when_exit()
+                    bot.when_exit(self.bot_obj)
                 except Exception as e:
                     log_err(f'fail to exit bot: {bot_type} err: {e}')
 
@@ -172,7 +193,7 @@ class AimiPlugin:
         if len(self.bots):
             for bot_type, bot in self.bots.items():
                 try:
-                    bot.when_init()
+                    bot.when_init(self.bot_obj)
                 except Exception as e:
                     log_err(f'fail to init bot: {bot_type} err: {e}')
     

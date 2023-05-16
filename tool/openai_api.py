@@ -135,28 +135,35 @@ class OpenAIAPI:
         
     def __load_setting(self):
         try:
-            self.max_requestion = config.setting['openai']['max_requestion']
+            setting = config.load_setting(self.type)
+        except Exception as e:
+            log_err(f'fail to load {self.type}: {e}')
+            setting = {}
+            return
+        
+        try:
+            self.max_requestion = setting['max_requestion']
         except Exception as e:
             log_err('fail to load openai config: ' + str(e))
             self.max_requestion = 1024
         try:
-            self.access_token = config.setting['openai']['access_token']
+            self.access_token = setting['access_token']
         except Exception as e:
             log_err('fail to load openai config: ' + str(e))
             self.access_token = ''
         try:
-            self.max_repeat_times = config.setting['openai']['max_repeat_times']
+            self.max_repeat_times = setting['max_repeat_times']
         except Exception as e:
             log_err('fail to load openai config: ' + str(e))
             self.max_repeat_times = 3
         try:
-            self.fackopen_url = config.setting['openai']['fackopen_url']
+            self.fackopen_url = setting['fackopen_url']
         except Exception as e:
             log_err('fail to load openai config: ' + str(e))
             self.fackopen_url = ''
 
         try:
-            self.trigger = config.setting['openai']['trigger']
+            self.trigger = setting['trigger']
         except Exception as e:
             log_err('fail to load openai config: ' + str(e))
             self.trigger = ['@openai', '#openai' ]

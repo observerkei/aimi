@@ -91,22 +91,29 @@ class BardAPI:
 
     def __load_setting(self):
         try:
-            self.max_requestion = config.setting['bard']['max_requestion']
+            setting = config.load_setting(self.type)
+        except Exception as e:
+            log_err(f'fail to load {self.type}: {e}')
+            setting = {}
+            return
+        
+        try:
+            self.max_requestion = setting['max_requestion']
         except Exception as e:
             log_err('fail to load bard config: ' + str(e))
             self.max_requestion = 1024
         try:
-            self.cookie_key = config.setting['bard']['cookie_1psd']
+            self.cookie_key = setting['cookie_1psd']
         except Exception as e:
             log_err('fail to load bard config: ' + str(e))
             self.cookie_key = ''
         try:
-            self.max_repeat_times = config.setting['bard']['max_repeat_times']
+            self.max_repeat_times = setting['max_repeat_times']
         except Exception as e:
             log_err('fail to load bard config: ' + str(e))
             self.max_repeat_times = 3
         try:
-            self.trigger = config.setting['bard']['trigger']
+            self.trigger = setting['trigger']
         except Exception as e:
             log_err('fail to load bard config: ' + str(e))
             self.trigger = [ '@bard', '#bard' ]

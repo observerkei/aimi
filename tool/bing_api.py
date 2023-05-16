@@ -182,44 +182,51 @@ class BingAPI:
         
     def __load_setting(self):
         try:
-            self.max_requestion = config.setting['bing']['max_requestion']
+            setting = config.load_setting(self.type)
+        except Exception as e:
+            log_err(f'fail to load {self.type}: {e}')
+            setting = {}
+            return
+        
+        try:
+            self.max_requestion = setting['max_requestion']
         except Exception as e:
             log_err('fail to load bing config: ' + str(e))
             self.max_requestion = 512
         try:
-            self.max_repeat_times = config.setting['bing']['max_repeat_times']
+            self.max_repeat_times = setting['max_repeat_times']
         except Exception as e:
             log_err('fail to load bing config: ' + str(e))
             self.max_repeat_times = 3
         try:
-            self.cookie_path = config.setting['bing']['cookie_path']
+            self.cookie_path = setting['cookie_path']
         except Exception as e:
             log_err('fail to load bing config: ' + str(e))
             self.cookie_path = ''
 
         try:
-            self.wss_link = config.setting['bing']['wss_link']
+            self.wss_link = setting['wss_link']
         except Exception as e:
             log_err('fail to load bing config: ' + str(e))
             self.wss_link = ''
 
         try:
-            self.trigger['default'] = config.setting['bing']['trigger']['default']
+            self.trigger['default'] = setting['trigger']['default']
         except Exception as e:
             log_err('fail to load bing config: ' + str(e))
             self.trigger['default'] = [ '#bing', '@bing' ]
         try:
-            self.trigger[self.ConversationStyle.creative] = config.setting['bing']['trigger'][self.ConversationStyle.creative]
+            self.trigger[self.ConversationStyle.creative] = setting['trigger'][self.ConversationStyle.creative]
         except Exception as e:
             log_err('fail to load bing config: ' + str(e))
             self.trigger[self.ConversationStyle.creative] = []
         try:
-            self.trigger[self.ConversationStyle.balanced] = config.setting['bing']['trigger'][self.ConversationStyle.balanced]
+            self.trigger[self.ConversationStyle.balanced] = setting['trigger'][self.ConversationStyle.balanced]
         except Exception as e:
             log_err('fail to load bing config: ' + str(e))
             self.trigger[self.ConversationStyle.balanced] = []
         try:
-            self.trigger[self.ConversationStyle.precise] = config.setting['bing']['trigger'][self.ConversationStyle.precise]
+            self.trigger[self.ConversationStyle.precise] = setting['trigger'][self.ConversationStyle.precise]
         except Exception as e:
             log_err('fail to load bing config: ' + str(e))
             self.trigger[self.ConversationStyle.precise] = []
