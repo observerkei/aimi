@@ -182,20 +182,24 @@ class AimiPlugin:
                 log_err(f'fail to ask bot: {e}')
 
     def when_exit(self):
-        if len(self.bots):
-            for bot_type, bot in self.bots.items():
-                try:
-                    bot.when_exit(self.bot_obj)
-                except Exception as e:
-                    log_err(f'fail to exit bot: {bot_type} err: {e}')
+        if not len(self.bots):
+            return 
+        
+        for bot_type, bot in self.bots.items():
+            try:
+                bot.when_exit(self.bot_obj)
+            except Exception as e:
+                log_err(f'fail to exit bot: {bot_type} err: {e}')
 
     def when_init(self):
-        if len(self.bots):
-            for bot_type, bot in self.bots.items():
-                try:
-                    bot.when_init(self.bot_obj)
-                except Exception as e:
-                    log_err(f'fail to init bot: {bot_type} err: {e}')
+        if not len(self.bots):
+            return
+        
+        for bot_type, bot in self.bots.items():
+            try:
+                bot.when_init(self.bot_obj)
+            except Exception as e:
+                log_err(f'fail to init bot: {bot_type} err: {e}')
     
 
 

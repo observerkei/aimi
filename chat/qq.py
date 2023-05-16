@@ -454,21 +454,25 @@ class ChatQQ:
         
         try:
             self.master_id = setting['master_id']
-        except:
+        except Exception as e:
+            log_err(f'fail to load qq: {e}')
             self.master_id = 0
 
         try:
             self.response_user_ids = set(setting['response_user_ids'])
-        except:
+        except Exception as e:
+            log_err(f'fail to load qq: {e}')
             self.response_user_ids = set()        
         try:
             self.response_group_ids = set(setting['response_group_ids'])
-        except:
+        except Exception as e:
+            log_err(f'fail to load qq: {e}')
             self.response_group_ids = set()
 
         try:
             self.type = setting['type']
-        except:
+        except Exception as e:
+            log_err(f'fail to load qq: {e}')
             self.type = GoCQHttp.name
         
 chat_qq = ChatQQ()
