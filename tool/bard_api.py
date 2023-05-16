@@ -20,14 +20,14 @@ class BardAPI:
             if call.lower() in question.lower():
                 return True
         return False
-    
+
     def ask(
         self,
         question: str,
         timeout: int = 360,
     ) -> Generator[dict, None, None]:
         yield from self.web_ask(question, timeout)
-        
+    
     def web_ask(
         self,
         question: str,
@@ -63,6 +63,8 @@ class BardAPI:
                 log_err('fail to ask: ' + str(e))
                 log_info('server fail, sleep 15')
                 time.sleep(15)
+                self.__bot_create()
+                log_info('reload bot')
 
                 answer['message'] = str(e)
                 answer['code'] = -1
@@ -73,11 +75,17 @@ class BardAPI:
                 break
 
     def __bot_create(self):
+    
+        self.init = False
+        
         cookie_key = self.cookie_key
         if cookie_key and len(cookie_key):
-            self.chatbot = Chatbot(cookie_key)
-    
-        self.init = True
+            try: 
+                new_bot = Chatbot(cookie_key)
+                self.chatbot = new_bot
+                self.init = True
+            except Exception as e:
+                log_err(f'fail to create bard: {e}')
     
     def __init__(self) -> None:
 
