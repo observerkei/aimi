@@ -28,7 +28,7 @@ bing:
       - '#bing-p'
 
 bard:
-  cookie_1psd: 
+  cookie_1PSID: 
   max_requestion: 1024
   max_repeat_times: 3
   trigger:

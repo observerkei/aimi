@@ -111,7 +111,7 @@ class BardAPI:
             log_err('fail to load bard config: ' + str(e))
             self.max_requestion = 1024
         try:
-            self.cookie_key = setting['cookie_1psd']
+            self.cookie_key = setting['cookie_1PSID']
         except Exception as e:
             log_err('fail to load bard config: ' + str(e))
             self.cookie_key = ''
