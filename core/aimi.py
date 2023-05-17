@@ -356,14 +356,16 @@ class Aimi:
             link_think = self.make_link_think(question, nickname)
         elif api_type == bard_api.type:
             # set preset
-            link_think = f"preset: {{\n'{self.preset_facts}'\n}}.\n\n"
+            link_think = f"preset: {{\n\"{self.preset_facts}\"\n}}.\n\n"
             # set ask:
             link_think += f"""
-            Please answer the following question based on the settings, 
-            the latest conversation history, and your previous answers, 
-            without starting with '{self.aimi_name}:' 
-            and in the following format:{{\n{nickname} said: '{question}'\n}}
-            """
+Please answer the following question based on the settings, 
+the latest conversation history, and your previous answers.
+and without starting with '{self.aimi_name}:'
+You should extract my question directly from the structure here and answer it directly:{{
+{nickname} said: '{question}'
+}}
+"""
         else:
             link_think = question
 
