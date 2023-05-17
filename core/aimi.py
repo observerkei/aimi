@@ -354,6 +354,16 @@ class Aimi:
         link_think = ''
         if api_type == openai_api.type:
             link_think = self.make_link_think(question, nickname)
+        elif api_type == bard_api.type:
+            # set preset
+            link_think = f"preset: {{\n'{self.preset_facts}'\n}}.\n\n"
+            # set ask:
+            link_think += f"""
+            Please answer the following question based on the settings, 
+            the latest conversation history, and your previous answers, 
+            without starting with '{self.aimi_name}:' 
+            and in the following format:{{\n{nickname} said: '{question}'\n}}
+            """
         else:
             link_think = question
 
