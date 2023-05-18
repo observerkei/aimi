@@ -139,6 +139,9 @@ qq_server_data/
 /run/data
 /run/memory.pt
 /run/bing_cookie.json
+/run/session.token
+/run/preset.yml
+/run/setting.yml.*
 
 # plugin
 /aimi_plugin

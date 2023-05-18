@@ -76,7 +76,7 @@ class Md:
     def has_latex(self, text) -> bool:
         #r'\$\$.*?\$\$|\$.*?\$'
         #r'\$.*?\$|\$\$.*?\$\$|\\\(.*?\\\)|\\\[.*?\\\]'
-        pattern = r'\$.*?\$|\$\$.*?\$\$|\\\((.|\s)*?\\\)|\\\[([\s\S]*?)\\\]|LaTeX|\{\\frac\{.*?\}\{.*?\s*\}\}' 
+        pattern = r'\$.*?\$|\$\$.*?\$\$|\\\((.|\s)*?\\\)|\\\[([\s\S]*?)\\\]|LaTeX|latex|\{\\frac\{.*?\}\{.*?\s*\}\}' 
         return re.search(pattern, text, re.IGNORECASE) is not None
     
     def has_html(self, text) -> bool:
@@ -87,7 +87,7 @@ class Md:
 
             # wkhtmltoimage --encoding UTF-8 ./output.html output.png
             result = subprocess.run(['wkhtmltoimage', '--encoding', 'UTF-8', '--user-style-sheet', self.out_prefix + 'style.css', 
-                                     '--zoom', '1', '--width', '300', 
+                                     '--zoom', '2', '--width', '350', 
                                      img_id + '.html', img_id + '.png'], stdout=subprocess.PIPE)
             log_dbg(result.stdout.decode('utf-8'))
 
@@ -96,6 +96,12 @@ class Md:
     def md_to_img(self, img_id: str, md_source: str) -> str:
         try:
             img_id = self.out_prefix + img_id
+            if 'latex' in md_source.lower():
+                if '```\n$' in md_source:
+                    md_source = md_source.replace('```', '')
+                else:
+                    md_source = md_source.replace('```', '$$')
+                log_dbg(f'md: {md_source}')
             
             # 打开文件，并以写入模式写入字符串
             with open(img_id + '.md', 'w') as f:

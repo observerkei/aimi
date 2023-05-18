@@ -359,7 +359,7 @@ class Aimi:
             link_think = f"preset: {{\n\"{self.preset_facts}\"\n}}.\n\n"
             # set ask:
             link_think += f"""
-Please answer the following question based on the settings, 
+Please answer the following question based on the preset, 
 the latest conversation history, and your previous answers.
 and without starting with '{self.aimi_name}:'
 You should extract my question directly from the structure here and answer it directly:{{

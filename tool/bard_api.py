@@ -57,6 +57,7 @@ class BardAPI:
                 
                 answer['message'] = data['content']
                 answer['code'] = 0
+                log_dbg(f'res: {data}')
                 yield answer
              
             except Exception as e:
