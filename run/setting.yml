@@ -78,6 +78,13 @@ poe:
       trigger:
         - '#poe-neevaai'
 
+manage:
+  day_reply_time_start: # 10:00
+  day_reply_time_end: # 7:00
+  reply_time_limit_s: 3600
+  protect_bot_ids:
+    - 
+
 qq:
   type: go-cqhttp
   config: ./run/config.yml
@@ -85,8 +92,6 @@ qq:
   response_user_ids:
     - 
   response_group_ids:
-    - 
-  protect_bot_ids:
     - 
 
 web:

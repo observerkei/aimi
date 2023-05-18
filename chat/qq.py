@@ -2,7 +2,7 @@ import requests
 import re
 import time
 import threading
-from typing import Set, Any
+from typing import Set, Any, Dict, List
 from flask import Flask, request
 from urllib import parse
 
@@ -164,8 +164,11 @@ class GoCQHttp:
         return api_group_reply
 
 class BotManage:
-    reply_time: Dict[int, int]
+    reply_time: Dict[int, int] = {}
     protect_bot_ids: List[int]
+    reply_time_limit_s: int
+    day_reply_time_start: Any
+    day_reply_time_end: Any
 
     def __init__(self):
         self.__load_setting()
@@ -175,7 +178,7 @@ class BotManage:
 
     def __load_setting(self):
         try:
-            setting = config.load_setting('qq')
+            setting = config.load_setting('manage')
         except Exception as e:
             log_err(f'fail to get qq cfg: {e}')
             return
@@ -185,6 +188,22 @@ class BotManage:
         except Exception as e:
             log_err(f'fail to load protect_bot_ids: {e}')
             self.protect_bot_ids = []
+
+        try:
+            self.reply_time_limit_s = setting['reply_time_limit_s']
+        except Exception as e:
+            log_err(f'fail to load reply_time_limit_s: {e}')
+            self.reply_time_limit_s = 3600
+        try:
+            self.day_reply_time_start = setting['day_reply_time_start']
+        except Exception as e:
+            log_err(f'fail to load day_reply_time_start: {e}')
+            self.day_reply_time_start = None
+        try:
+            self.day_reply_time_end = setting['day_reply_time_end']
+        except Exception as e:
+            log_err(f'fail to load day_reply_time_end: {e}')
+            self.day_reply_time_end = None
 
     def update_reply_time(self, bot_id: int):
         current_time_seconds = int(time.time())
@@ -197,7 +216,7 @@ class BotManage:
     
         current_time_seconds = int(time.time())
         
-        if (self.reply_time[bot_id] + 60*60) < current_time_seconds:
+        if (self.reply_time[bot_id] + self.reply_time_limit_s) > current_time_seconds:
             return True
         return False
 
@@ -211,8 +230,8 @@ class BotManage:
         
         return False
 
-    def is_at_message(self, message: str) -> bool:
-        return '[CQ:' in bot_message
+    def is_at_message(self, bot_message: str) -> bool:
+        return '[CQ:at,qq=' in bot_message
 
     def manage_event(self, bot_id: int, bot_message: str):
         if not self.is_at_message(bot_message):
@@ -226,7 +245,7 @@ class BotManage:
                 log_info(f'update bot:{bot_id} first time.')
                 return ''
             self.reply_time[bot_id] = current_time_seconds
-            return self.manage_action(' 😱 ~ ')
+            return ' 😱 ~ '
 
         return ''
 
@@ -488,7 +507,7 @@ class ChatQQ:
 
     def manage_msg(self, msg):
         group_id = self.get_group_id(msg)
-        if not (group_id in self.response_group_ids)
+        if not (group_id in self.response_group_ids):
             return
         
         user_id = self.get_user_id(msg)
@@ -500,9 +519,7 @@ class ChatQQ:
         if not len(notify_msg):
             return
         
-        at_master = self.go_cqhttp.make_at(self.master_id)
-        self.reply_group(group_id, f'{at_master} {notify_msg}')
-        self.reply_group(group_id, self.master_id, f'{at_master} {notify_msg}')
+        self.reply_group(group_id, self.master_id, f' {notify_msg}')
 
     def __init__(self):
         self.__load_setting()
@@ -533,7 +550,7 @@ class ChatQQ:
                 self.reply_permission_denied(msg)
             elif self.need_check_manage_msg(msg):
                 log_info('need check manage msg')
-                self.manage.manage_msg(msg)
+                self.manage_msg(msg)
             else:
                 log_info('no need reply')
             
