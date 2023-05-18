@@ -73,6 +73,9 @@ class GoCQHttp:
             log_err('failt to check is_group')
             return False
 
+    def get_group_ban(self, goud_id: int, user_id: int, duration_time_s: int):
+        return f"http://{self.post_host}:{self.post_port}/set_group_ban?group_id={group_id}&user_id={user_id}&duration={duration}"
+
     def make_at(self, id: int) -> str:
         return '[CQ:at,qq={}]'.format(id)
 
@@ -520,6 +523,8 @@ class ChatQQ:
             return
         
         self.reply_group(group_id, self.master_id, f' {notify_msg}')
+        ban_api = self.go_cqhttp.get_group_ban(group_id, user_id, self.manage.reply_time_limit_s)
+        return self.reply_url(ban_api)
 
     def __init__(self):
         self.__load_setting()
