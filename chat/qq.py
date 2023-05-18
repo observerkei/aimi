@@ -163,6 +163,73 @@ class GoCQHttp:
 
         return api_group_reply
 
+class BotManage:
+    reply_time: Dict[int, int]
+    protect_bot_ids: List[int]
+
+    def __init__(self):
+        self.__load_setting()
+        
+        for bot_id in self.protect_bot_ids:
+            self.reply_time[bot_id] = 0
+
+    def __load_setting(self):
+        try:
+            setting = config.load_setting('qq')
+        except Exception as e:
+            log_err(f'fail to get qq cfg: {e}')
+            return
+
+        try:
+            self.protect_bot_ids = setting['protect_bot_ids']
+        except Exception as e:
+            log_err(f'fail to load protect_bot_ids: {e}')
+            self.protect_bot_ids = []
+
+    def update_reply_time(self, bot_id: int):
+        current_time_seconds = int(time.time())
+        self.reply_time[bot_id] = current_time_seconds
+
+    def over_reply_time_limit(self, bot_id: int) -> bool:
+
+        if not self.reply_time[bot_id]:
+            return True
+    
+        current_time_seconds = int(time.time())
+        
+        if (self.reply_time[bot_id] + 60*60) < current_time_seconds:
+            return True
+        return False
+
+    def need_manage(self, user_id: int) -> bool:
+
+        if not (user_id in self.protect_bot_ids):
+            return False
+
+        if self.over_reply_time_limit(user_id):
+            return True
+        
+        return False
+
+    def is_at_message(self, message: str) -> bool:
+        return '[CQ:' in bot_message
+
+    def manage_event(self, bot_id: int, bot_message: str):
+        if not self.is_at_message(bot_message):
+            log_dbg('no have at, no need manage')
+            return ''
+
+        if self.over_reply_time_limit(bot_id):
+            current_time_seconds = int(time.time())
+            if not self.reply_time[bot_id]:
+                self.reply_time[bot_id] = current_time_seconds
+                log_info(f'update bot:{bot_id} first time.')
+                return ''
+            self.reply_time[bot_id] = current_time_seconds
+            return self.manage_action(' 😱 ~ ')
+
+        return ''
+
 class ChatQQ:
     response_user_ids: Set[int] = {}
     response_group_ids: Set[int] = {}
@@ -178,6 +245,7 @@ class ChatQQ:
     reply_message: Set[str] = []
     reply_message_size: int = 1024
     running: bool = True
+    manage: BotManage = BotManage()
 
     def __message_append(self, msg):
         if len(self.message) >= self.message_size:
@@ -309,7 +377,7 @@ class ChatQQ:
         if self.is_private(msg):
             return self.reply_private(user_id, reply)
         elif self.is_group(msg):
-            group_id = chat_qq.get_group_id(msg)
+            group_id = self.get_group_id(msg)
             return self.reply_group(group_id, user_id, reply) 
 
         return None
@@ -402,6 +470,40 @@ class ChatQQ:
         
         return False
 
+    def need_check_manage_msg(self, msg) -> bool:
+        if not self.is_group(msg):
+            return False
+        
+        user_id = self.get_user_id(msg)
+        group_id = self.get_group_id(msg)
+        protect_bot_ids = self.manage.protect_bot_ids
+        
+        if not (group_id in self.response_group_ids):
+            return False
+
+        if user_id in protect_bot_ids: 
+            return True
+
+        return False
+
+    def manage_msg(self, msg):
+        group_id = self.get_group_id(msg)
+        if not (group_id in self.response_group_ids)
+            return
+        
+        user_id = self.get_user_id(msg)
+        if not self.manage.need_manage(user_id):
+            return
+
+        message = self.get_message(msg)
+        notify_msg = self.manage.manage_event(user_id, message)
+        if not len(notify_msg):
+            return
+        
+        at_master = self.go_cqhttp.make_at(self.master_id)
+        self.reply_group(group_id, f'{at_master} {notify_msg}')
+        self.reply_group(group_id, self.master_id, f'{at_master} {notify_msg}')
+
     def __init__(self):
         self.__load_setting()
         
@@ -429,6 +531,9 @@ class ChatQQ:
             elif self.is_permission_denied(msg):
                 log_info('user permission_denied')
                 self.reply_permission_denied(msg)
+            elif self.need_check_manage_msg(msg):
+                log_info('need check manage msg')
+                self.manage.manage_msg(msg)
             else:
                 log_info('no need reply')
             

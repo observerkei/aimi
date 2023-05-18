@@ -86,6 +86,8 @@ qq:
     - 
   response_group_ids:
     - 
+  protect_bot_ids:
+    - 
 
 web:
   port: 2464
