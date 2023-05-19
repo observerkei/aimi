@@ -80,13 +80,16 @@ class BardAPI:
         self.init = False
         
         cookie_key = self.cookie_key
-        if cookie_key and len(cookie_key):
-            try: 
-                new_bot = Chatbot(cookie_key)
-                self.chatbot = new_bot
-                self.init = True
-            except Exception as e:
-                log_err(f'fail to create bard: {e}')
+        if (not cookie_key) or (not len(cookie_key)):
+            return -1
+        try: 
+            new_bot = Chatbot(cookie_key)
+            self.chatbot = new_bot
+            self.init = True
+        except Exception as e:
+            log_err(f'fail to create bard: {e}')
+            return -1
+        return 0
     
     def __init__(self) -> None:
 

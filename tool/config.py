@@ -77,7 +77,8 @@ class Config:
                 for iter in mem['pool']:
                     if not iter:
                         continue
-                    iter['label'] = label
+                    iter['idx'] = label
+
                     label += 1
             except Exception as e:
                 log_err('fail to set label: ' + str(e))

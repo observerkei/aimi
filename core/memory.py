@@ -79,7 +79,7 @@ class Memory:
 
         log_dbg('conv_id: ' + str(self.openai_conversation_id))
         log_dbg('size: ' + str(self.size))
-        
+       
     def save_memory(self) -> bool:
 
         save_path = config.memory_config
@@ -236,9 +236,11 @@ class Memory:
             log_info('no need save memory.')
             return
 
+        next_idx = self.__get_next_idx()
         talk_item = {
             'q': q,
-            'a': a
+            'a': a,
+            'idx': next_idx
         }
         log_dbg('append memory: ' + str(talk_item))
         self.pool[self.idx] = talk_item
@@ -257,6 +259,8 @@ class Memory:
         return True
 
     def __get_next_idx(self) -> int:
-        return (self.idx + 1) % self.size
+        if (self.idx >= (self.size - 1)):
+            return 0
+        return self.idx + 1
     
 memory = Memory()

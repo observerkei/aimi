@@ -92,6 +92,7 @@ class BingAPI:
                 ):
                     if not response:
                         continue
+                    log_dbg(f'res: {response}')
                     if not final:
                         answer['message'] = response
                         yield answer
@@ -171,6 +172,9 @@ class BingAPI:
         return self.init
     
     async def __bot_reload(self):
+        if not self.init:
+            self.__bot_create()
+            return
         log_dbg('try reload chatbing bot')
         try:
             await self.chatbot.close()

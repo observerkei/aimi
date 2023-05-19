@@ -371,13 +371,13 @@ You should extract my question directly from the structure here and answer it di
 }}
 """
         elif api_type == bing_api.type:
-            link_think = f"你好,我作为机器人,最近碰到了问题,我需要你的帮助,我先给你介绍背景,Master对我提出了一些设定,设定如下:{{\n\"{self.preset_facts[bing_api.type]}\"\n}}.\n"
+            link_think = f"你好,我作为机器人,最近碰到了问题,目前有以下几个背景,请通过Master给我的问题背景分析我应该怎么回复,问题背景是：{{\n\"{self.preset_facts[bing_api.type]}\"\n}}.\n\n"
             link_think += f"""
-问题来了,Master问我问题,我不知道怎么回答,请帮我结合你的历史回复,帮我思考应该怎么回答,
-回答的时候要用“{self.aimi_name}:”开头,比如“{self.aimi_name}: ? ” , 只需要回复'“' 和 '”' 之间的内容即可,
-回复的时候要把开头的 “Aimi:” 去除，只保留内容.
-Master的问题如下:{{
-{nickname}对{self.aimi_name}说: '{question}'
+如果有历史请帮我结合你的历史回复,问题来了,Master问我问题,我不知道怎么回答,请帮助我思考应该怎么回答,
+回答的时候要用“{self.aimi_name}:”开头,比如“{self.aimi_name}: ? ” .
+你需要只需要回复'“' 和 '”' 之间的内容,不要加任何提示词说我应该怎么回答.
+回复的时候要把开头的 “Aimi:” 去除,只保留内容.Master对我问的问题如下:{{
+{nickname}说: '{question}'
 }}
 """
         else:
