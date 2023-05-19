@@ -73,8 +73,8 @@ class GoCQHttp:
             log_err('failt to check is_group')
             return False
 
-    def get_group_ban(self, goud_id: int, user_id: int, duration_time_s: int):
-        return f"http://{self.post_host}:{self.post_port}/set_group_ban?group_id={group_id}&user_id={user_id}&duration={duration}"
+    def get_group_ban(self, group_id: int, user_id: int, duration_time_s: int):
+        return f"http://{self.post_host}:{self.post_port}/set_group_ban?group_id={group_id}&user_id={user_id}&duration={duration_time_s}"
 
     def make_at(self, id: int) -> str:
         return '[CQ:at,qq={}]'.format(id)
@@ -220,6 +220,7 @@ class BotManage:
         current_time_seconds = int(time.time())
         
         if (self.reply_time[bot_id] + self.reply_time_limit_s) > current_time_seconds:
+            log_dbg(f'bot is limit time {self.reply_time_limit_s}')
             return True
         return False
 
@@ -230,11 +231,14 @@ class BotManage:
 
         if self.over_reply_time_limit(user_id):
             return True
+        self.reply_time[bot_id] = current_time_seconds
+        log_info(f'update bot:{bot_id} new time.')
         
         return False
 
     def is_at_message(self, bot_message: str) -> bool:
-        return '[CQ:at,qq=' in bot_message
+        return True
+        #return '[CQ:at,qq=' in bot_message
 
     def manage_event(self, bot_id: int, bot_message: str):
         if not self.is_at_message(bot_message):
@@ -248,6 +252,7 @@ class BotManage:
                 log_info(f'update bot:{bot_id} first time.')
                 return ''
             self.reply_time[bot_id] = current_time_seconds
+            log_info(f'update bot:{bot_id} new time.')
             return ' 😱 ~ '
 
         return ''
@@ -522,7 +527,7 @@ class ChatQQ:
         if not len(notify_msg):
             return
         
-        self.reply_group(group_id, self.master_id, f' {notify_msg}')
+        #self.reply_group(group_id, self.master_id, f' {notify_msg}')
         ban_api = self.go_cqhttp.get_group_ban(group_id, user_id, self.manage.reply_time_limit_s)
         return self.reply_url(ban_api)
 

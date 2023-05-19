@@ -2,7 +2,7 @@ import atexit
 import signal
 import threading
 import time
-from typing import Generator, List
+from typing import Generator, List, Dict
 import random
 
 from tool.config import config
@@ -126,7 +126,7 @@ class Aimi:
     timeout: int = 360
     master_name: str = ''
     aimi_name: str = 'Aimi'
-    preset_facts: str = ''
+    preset_facts: Dict[str, str] = {}
     max_link_think: int = 1024
     running: bool = True
     api: List = []
@@ -144,6 +144,8 @@ class Aimi:
         except Exception as e:
             log_err(f'fail to init aimi plugin: {e}')
 
+        chat_web.register_ask_hook(self.ask)
+
     def make_link_think(
         self,
         question: str,
@@ -153,7 +155,7 @@ class Aimi:
         nickname = nickname if nickname and len(nickname) else self.master_name
         
         # append setting
-        link_think = '设定: {{\n“{}”\n}}.\n\n'.format(self.preset_facts)
+        link_think = '设定: {{\n“{}”\n}}.\n\n'.format(self.preset_facts['defalut'])
         link_think += '请只关注最新消息,历史如下: {\n'
 
         # cul question
@@ -351,12 +353,14 @@ class Aimi:
 
         api_type = self.__question_api_type(question) 
 
+        nickname = nickname if nickname and len(nickname) else self.master_name
+
         link_think = ''
         if api_type == openai_api.type:
             link_think = self.make_link_think(question, nickname)
         elif api_type == bard_api.type:
             # set preset
-            link_think = f"preset: {{\n\"{self.preset_facts}\"\n}}.\n\n"
+            link_think = f"preset: {{\n\"{self.preset_facts[bard_api.type]}\"\n}}.\n\n"
             # set ask:
             link_think += f"""
 Please answer the following question based on the preset, 
@@ -364,6 +368,16 @@ the latest conversation history, and your previous answers.
 and without starting with '{self.aimi_name}:'
 You should extract my question directly from the structure here and answer it directly:{{
 {nickname} said: '{question}'
+}}
+"""
+        elif api_type == bing_api.type:
+            link_think = f"你好,我作为机器人,最近碰到了问题,我需要你的帮助,我先给你介绍背景,Master对我提出了一些设定,设定如下:{{\n\"{self.preset_facts[bing_api.type]}\"\n}}.\n"
+            link_think += f"""
+问题来了,Master问我问题,我不知道怎么回答,请帮我结合你的历史回复,帮我思考应该怎么回答,
+回答的时候要用“{self.aimi_name}:”开头,比如“{self.aimi_name}: ? ” , 只需要回复'“' 和 '”' 之间的内容即可,
+回复的时候要把开头的 “Aimi:” 去除，只保留内容.
+Master的问题如下:{{
+{nickname}对{self.aimi_name}说: '{question}'
 }}
 """
         else:
@@ -463,19 +477,30 @@ You should extract my question directly from the structure here and answer it di
         self.max_link_think = openai_api.max_requestion
 
         try:
-            self.preset_facts = ''
-            preset_facts: List[str] = setting['preset_facts'][self.api[0]]
-            count = 0
-            for fact in preset_facts:
-                fact = fact.replace('<name>', self.aimi_name)
-                fact = fact.replace('<master>', self.master_name)
-                count += 1
-                if count != len(preset_facts):
-                    fact += '\n'
-                self.preset_facts += fact
+            self.preset_facts = {}
+            for api in self.api:
+                try:
+                    #log_dbg(f"{str(setting['preset_facts'])}")
+                    #log_dbg(f"{str(setting['preset_facts'][api])}")
+                    preset_facts: List[str] = setting['preset_facts'][api]
+                except Exception as e:
+                    log_err(f'no {api} type preset, skip.')
+                    continue
+
+                self.preset_facts[api] = ""
+                count = 0
+                for fact in preset_facts:
+                    fact = fact.replace('<name>', self.aimi_name)
+                    fact = fact.replace('<master>', self.master_name)
+                    count += 1
+                    if count != len(preset_facts):
+                        fact += '\n'
+                    self.preset_facts[api] += fact
+
+            self.preset_facts['default'] = self.preset_facts[self.api[0]]
         except Exception as e:
             log_err('fail to load aimi preset: ' + str(e))
-            self.preset_facts = ''
+            self.preset_facts = {}
 
     def notify_online(self):
         chat_qq.reply_online()

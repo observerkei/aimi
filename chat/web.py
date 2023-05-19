@@ -5,8 +5,6 @@ import time
 from typing import Any
 
 from tool.util import log_info, log_err, log_dbg
-from tool.aimi_plugin import aimi_plugin
-
 
 openai_stream_response = [
     {
@@ -74,10 +72,14 @@ class AimiWebApi:
     api_port: int = 4642
     app: Any
     http_server: Any
+    ask_hook: Any
 
     def __init__(self):
         self.__listen_init()
         log_dbg('web init done')
+    
+    def register_ask_hook(self, ask_hook: Any):
+        self.ask_hook = ask_hook
 
     def __make_stream_reply(self, reply: str) -> str:
         stream = {
@@ -111,7 +113,7 @@ class AimiWebApi:
                     return
 
                 prev_text = ''
-                for answer in aimi_plugin.bot_ask('poe', question):
+                for answer in self.ask_hook(question):
                     message = answer["message"][len(prev_text) :]
                     yield self.__make_stream_reply(message)
                     prev_text = answer["message"]
