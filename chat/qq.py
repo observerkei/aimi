@@ -231,6 +231,7 @@ class BotManage:
 
         if self.over_reply_time_limit(user_id):
             return True
+        current_time_seconds = int(time.time())
         self.reply_time[bot_id] = current_time_seconds
         log_info(f'update bot:{bot_id} new time.')
         

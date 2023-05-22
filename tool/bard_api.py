@@ -2,6 +2,7 @@ import os
 import time
 from typing import Generator, List
 from Bard import Chatbot
+from contextlib import suppress
 
 from tool.util import log_dbg, log_err, log_info
 from tool.config import config
@@ -54,10 +55,21 @@ class BardAPI:
                 log_dbg('try ask: ' + str(question))
 
                 data = self.chatbot.ask(question)
-                
-                answer['message'] = data['content']
-                answer['code'] = 0
                 log_dbg(f'res: {data}')
+                
+                content = data['content']
+                message = content
+                try:
+                    choices = data['choices']
+                    choice1 = choices[0]['content'][0]
+                    choice2 = choices[1]['content'][0]
+                    choice3 = choices[2]['content'][0]
+                    log_dbg(f"0. {content}\n1. {choice1}\n2. {choice2}\n3. {choice3}")
+                    #message = choice3
+                except Exception as e:
+                    log_err(f'fail to get choice:{e}')
+                answer['message'] = message
+                answer['code'] = 0
                 yield answer
              
             except Exception as e:

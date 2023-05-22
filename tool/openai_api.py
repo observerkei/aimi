@@ -14,6 +14,7 @@ class OpenAIAPI:
     max_repeat_times: int = 3
     fackopen_url: str = ''
     trigger: List[str] = []
+    model: str = ''
 
     class InputType:
         SYSTEM = 'system'
@@ -50,6 +51,8 @@ class OpenAIAPI:
            "code": 1
         }
 
+        model = self.model if self.model and len(self.model) else None
+
         req_cnt = 0
         
         while req_cnt < self.max_repeat_times:
@@ -62,8 +65,11 @@ class OpenAIAPI:
                 if conversation_id and len(conversation_id):
                     for data in self.chatbot.ask(
                         question,
-                        conversation_id, None, None,
-                        timeout = 480
+                        conversation_id, 
+                        parent_id=None, 
+                        model=model,
+                        auto_continue=False,
+                        timeout=timeout
                     ):
                         answer['message'] = data["message"]
                         yield answer
@@ -83,8 +89,8 @@ class OpenAIAPI:
              
             except Exception as e:
                 log_err('fail to ask: ' + str(e))
-                log_info('server fail, sleep 15')
-                time.sleep(15)
+                log_info('server fail, sleep 30')
+                time.sleep(30)
 
                 answer['message'] = str(e)
                 answer['code'] = -1
@@ -161,6 +167,11 @@ class OpenAIAPI:
         except Exception as e:
             log_err('fail to load openai config: ' + str(e))
             self.fackopen_url = ''
+        try:
+            self.model = setting['model']
+        except Exception as e:
+            log_err('fail to load openai config: ' + str(e))
+            self.model = ''
 
         try:
             self.trigger = setting['trigger']

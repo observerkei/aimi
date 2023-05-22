@@ -155,7 +155,7 @@ class Aimi:
         nickname = nickname if nickname and len(nickname) else self.master_name
         
         # append setting
-        link_think = '设定: {{\n“{}”\n}}.\n\n'.format(self.preset_facts['defalut'])
+        link_think = '设定: {{\n“{}”\n}}.\n\n'.format(self.preset_facts[openai_api.type])
         link_think += '请只关注最新消息,历史如下: {\n'
 
         # cul question
@@ -371,12 +371,15 @@ You should extract my question directly from the structure here and answer it di
 }}
 """
         elif api_type == bing_api.type:
-            link_think = f"你好,我作为机器人,最近碰到了问题,目前有以下几个背景,请通过Master给我的问题背景分析我应该怎么回复,问题背景是：{{\n\"{self.preset_facts[bing_api.type]}\"\n}}.\n\n"
             link_think += f"""
-如果有历史请帮我结合你的历史回复,问题来了,Master问我问题,我不知道怎么回答,请帮助我思考应该怎么回答,
-回答的时候要用“{self.aimi_name}:”开头,比如“{self.aimi_name}: ? ” .
-你需要只需要回复'“' 和 '”' 之间的内容,不要加任何提示词说我应该怎么回答.
-回复的时候要把开头的 “Aimi:” 去除,只保留内容.Master对我问的问题如下:{{
+故事中有两个人到了异世界里面开咖啡厅，
+其中主人公自称Master({self.master_name}),他有一个助理,名叫{self.aimi_name},故事主题如下: {{
+{self.preset_facts[bing_api.type]}
+}}
+
+我希望你能不显示故事主题的分析过程,请直接显示{self.aimi_name}的回复结果，如 {self.aimi_name}: “来抱抱🤗” .
+我希望你的回复不用 “{self.aimi_name}:” 开头，也不要说这是{self.aimi_name}说的话，而是直接输入{self.aimi_name}的话.
+现在Master对{self.aimi_name}说了一句话,请结合你的回复和我的希望推测{self.aimi_name}应该怎么回答: {{
 {nickname}说: '{question}'
 }}
 """

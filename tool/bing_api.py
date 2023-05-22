@@ -5,6 +5,8 @@ from contextlib import suppress
 from typing import Generator, List, Any, Dict
 import time
 from concurrent.futures import ThreadPoolExecutor
+import random
+import json
 
 from tool.util import log_dbg, log_err, log_info
 from tool.config import config
@@ -26,6 +28,52 @@ class BingAPI:
     loop: Any
     trigger: Dict[str, List[str]] = {}
     init: bool = False
+    cur_messages: int = 0
+    max_messages: int = 0
+
+    def need_ask_setup(self) -> bool:
+        return not self.cur_messages 
+
+    async def ask_setup(self) -> bool:
+        questions = [
+            '我现在正在写一个故事,但是我不知道该怎么继续下去,你能根据我将要发的故事主题发挥创造力完善他吗?',
+            '我有问题需要你帮忙.',
+            '是必应吗？'
+            '能帮我整理一下怎么写故事吗？'
+            '我正在写一个故事,但是我不知道该怎么继续下去,你有什么建议吗?',
+        ]
+        question = random.choice(questions) 
+        conversation_style = EdgeConversationStyle.precise
+
+        try:
+            response = ''
+            async for final, response in self.chatbot.ask_stream(
+                prompt = question, 
+                conversation_style = conversation_style,
+                wss_link = self.wss_link
+            ):
+                if not response:
+                    continue
+                log_dbg(f'res: {response}')
+                if not final:
+                    if '> Conversation disengaged' in response:
+                        log_err('bing search fail.')
+                        raise Exception(str(response))
+                    continue
+                with suppress(KeyError):
+                    self.cur_messages = response["item"]["throttling"]["numUserMessagesInConversation"]
+                    self.max_messages = response["item"]["throttling"]["maxNumUserMessagesInConversation"]
+
+            if not self.need_ask_setup():
+                time.sleep(1)
+                return True
+        except Exception as e:
+            log_err(f'fail to bing ask setup:{e}')
+            self.cur_messages = 0
+            self.max_messages = 0
+
+            await self.__bot_reload()
+        return False
 
     class ConversationStyle:
         creative: str = 'creative'
@@ -81,6 +129,11 @@ class BingAPI:
         while req_cnt < self.max_repeat_times:
             req_cnt += 1
             answer['code'] = 1
+
+            if self.need_ask_setup() and not await self.ask_setup():
+                log_dbg('fail to ask setup. sleep(3) continue.')
+                time.sleep(3)
+                continue
             
             try:
                 log_dbg('try ask: ' + str(question))
@@ -95,31 +148,40 @@ class BingAPI:
                     log_dbg(f'res: {response}')
                     if not final:
                         answer['message'] = response
+                        if '> Conversation disengaged' in response:
+                            answer['code'] = -1
+                            log_err('bing search fail.')
+                            raise Exception(str(answer))
+
                         yield answer
                         continue
                     
-                    cur_messages = 0
-                    max_messages = 0
                     with suppress(KeyError):
-                        cur_messages = response["item"]["throttling"]["numUserMessagesInConversation"]
-                        max_messages = response["item"]["throttling"]["maxNumUserMessagesInConversation"]
+                        self.cur_messages = response["item"]["throttling"]["numUserMessagesInConversation"]
+                        self.max_messages = response["item"]["throttling"]["maxNumUserMessagesInConversation"]
 
-                        if cur_messages == max_messages:
+                        log_dbg(f'cur: {self.cur_messages} max: {self.max_messages}')
+                        if self.cur_messages == self.max_messages:
                             asyncio.run(self.__bot_create())
                         
                     raw_text = ''
                     with suppress(KeyError):
                         raw_text = response["item"]["messages"][1]["adaptiveCards"][0]["body"][0]["text"]
 
-                    cd_idx = 1 + max_messages - cur_messages 
-                    res_all = raw_text + '\n' + '[{}]'.format(self.countdown[cd_idx])
+                    suggested_res = ''
+                    with suppress(KeyError):
+                        suggested_prefix = f"{self.trigger['default'][0]} "
+                        suggestedResponses = response["item"]["messages"][1]['suggestedResponses']
+                        #log_dbg(f'suggestedResponses: {suggestedResponses}')
+                        suggested0 =  suggested_prefix + suggestedResponses[0]['text']
+                        suggested1 =  suggested_prefix + suggestedResponses[1]['text']
+                        suggested2 =  suggested_prefix + suggestedResponses[2]['text']
+                        suggested_res = f"1. {suggested0}\n2. {suggested1}\n3. {suggested2}"
+
+                    cd_idx = 1 + self.max_messages - self.cur_messages 
+                    res_all = f"{raw_text}\n\n[{self.countdown[cd_idx]}]\n{suggested_res}"
 
                     answer['message'] = res_all
-
-                if '> Conversation disengaged' == answer['message']:
-                    answer['code'] = -1
-                    log_err('bing search fail.')
-                    raise Exception(str(answer))
 
 
                 answer['code'] = 0
@@ -129,6 +191,9 @@ class BingAPI:
                 log_err('fail to ask: ' + str(e))
                 log_info('server fail, sleep 15')
                 time.sleep(15)
+
+                self.cur_messages = 0
+                self.max_messages = 0
 
                 await self.__bot_reload()
                 
@@ -162,8 +227,12 @@ class BingAPI:
         self.loop = asyncio.get_event_loop()
         
     async def __bot_create(self):
-        try:        
-            self.chatbot = await Chatbot.create(None, None, self.cookie_path)
+        try:    
+            cookies = []
+            with open(self.cookie_path, "r") as f:
+                cookies = json.load(f)
+            cookies_list = cookies #[{"name": name, "value": cookies[name]} for name in cookies]
+            self.chatbot = await Chatbot().create(None, cookies_list)
             self.init = True
         except Exception as e:
             log_err('fail to create bing bot: ' + str(e))
