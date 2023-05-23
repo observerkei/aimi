@@ -377,8 +377,8 @@ You should extract my question directly from the structure here and answer it di
 {self.preset_facts[bing_api.type]}
 }}
 
-我希望你能不显示故事主题的分析过程,请直接显示{self.aimi_name}的回复结果，如 {self.aimi_name}: “来抱抱🤗” .
-我希望你的回复不用 “{self.aimi_name}:” 开头，也不要说这是{self.aimi_name}说的话，而是直接输入{self.aimi_name}的话.
+我希望你能不显示故事主题的分析过程,请直接显示 {self.aimi_name} 的回复结果，如 {self.aimi_name}: “来抱抱🤗” .
+我希望你的回复不用 “{self.aimi_name}:” 开头，也不要回复这是 {self.aimi_name} 说的话，而是直接回复我 {self.aimi_name} 可能说的话.
 现在Master对{self.aimi_name}说了一句话,请结合你的回复和我的希望推测{self.aimi_name}应该怎么回答: {{
 {nickname}说: '{question}'
 }}

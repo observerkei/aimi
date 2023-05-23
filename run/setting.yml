@@ -1,5 +1,5 @@
 openai:
-  access_token: 
+  access_token:
   fackopen_url: #'https://ai.fakeopen.com/api/'
   max_requestion: 550
   max_repeat_times: 2
@@ -12,7 +12,7 @@ openai:
 
 bing:
   cookie_path: './run/bing_cookie.json'
-  wss_link: #'wss://sydney.bing.com/sydney/ChatHub'
+  wss_link: 'wss://sydney.bing.com/sydney/ChatHub'
   max_requestion: 1024
   max_repeat_times: 2
   trigger:
