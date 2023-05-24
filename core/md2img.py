@@ -73,6 +73,10 @@ class Md:
     def __init__(self):
         self.out_prefix = os.path.abspath(self.out_prefix) + '/'
 
+    def has_md(self, text) -> bool:
+        pattern = r"```[\s\S]*?```"
+        return re.search(pattern, text, re.IGNORECASE) is not None
+
     def has_latex(self, text) -> bool:
         #r'\$\$.*?\$\$|\$.*?\$'
         #r'\$.*?\$|\$\$.*?\$\$|\\\(.*?\\\)|\\\[.*?\\\]'
