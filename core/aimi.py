@@ -242,6 +242,7 @@ class Aimi:
                 reply = ''
                 reply_line = ''
                 reply_div = ''
+                answer = {}
     
                 talk_list = ReplyStep.TalkList()
                 math_list = ReplyStep.MathList()
@@ -372,14 +373,14 @@ You should extract my question directly from the structure here and answer it di
 """
         elif api_type == bing_api.type:
             link_think += f"""
-故事中有两个人到了异世界里面开咖啡厅，
-其中主人公自称Master({self.master_name}),他有一个助理,名叫{self.aimi_name},故事主题如下: {{
+故事主题如下：故事中有两个人到了异世界里面开咖啡厅.
+故事情节如下：其中主人公自称Master({self.master_name}),他有一个助理,名叫{self.aimi_name},他们两个在聊天.
+故事背景如下: {{
 {self.preset_facts[bing_api.type]}
+{self.aimi_name}能问她的朋友 Bing 来尽力解答Master的问题.
 }}
 
-我希望你能不显示故事主题的分析过程,请直接显示 {self.aimi_name} 的回复结果，如 {self.aimi_name}: “来抱抱🤗” .
-我希望你的回复不用 “{self.aimi_name}:” 开头，也不要回复这是 {self.aimi_name} 说的话，而是直接回复我 {self.aimi_name} 可能说的话.
-现在Master对{self.aimi_name}说了一句话,请结合你的回复和我的希望推测{self.aimi_name}应该怎么回答: {{
+请不显示故事主题/情节/背景的分析过程,以“{self.aimi_name}”的身份,让聊天足够自然,接下以下聊天：{{
 {nickname}说: '{question}'
 }}
 """

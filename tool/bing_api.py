@@ -36,9 +36,9 @@ class BingAPI:
 
     async def ask_setup(self) -> bool:
         questions = [
-            '我现在正在写一个故事,但是我不知道该怎么继续下去,你能根据我将要发的故事主题发挥创造力完善他吗?请回答可以或者不可以。',
-            '我有问题需要你帮忙,能帮我分析一下这个故事应该怎么进行吗？请回答可以或者不可以。'
-            '我正在写一个故事,但是我不知道该怎么继续下去,你有什么建议吗?请回答可以或者不可以。',
+            '我现在正在写一个故事,但是我不知道该怎么继续下去,你能根据我将要发的故事主题发挥创造力完善他吗?如果可以，请回答“可以”。',
+            '我有问题需要你帮忙,可以帮我分析一下这个故事应该怎么进行吗？如果可以，请回答“可以”.'
+            '我正在写一个故事,但是我不知道该怎么继续下去,你可以帮我补全他吗?如果可以，请回答“可以”.',
         ]
         question = random.choice(questions) 
         conversation_style = EdgeConversationStyle.precise
@@ -63,7 +63,7 @@ class BingAPI:
                     self.max_messages = response["item"]["throttling"]["maxNumUserMessagesInConversation"]
 
             if not self.need_ask_setup():
-                time.sleep(1)
+                time.sleep(2)
                 return True
         except Exception as e:
             log_err(f'fail to bing ask setup:{e}')
@@ -126,12 +126,14 @@ class BingAPI:
         
         while req_cnt < self.max_repeat_times:
             req_cnt += 1
-            answer['code'] = 1
 
             if self.need_ask_setup() and not await self.ask_setup():
                 log_dbg('fail to ask setup. sleep(3) continue.')
+                answer['code'] = -1
                 time.sleep(3)
                 continue
+
+            answer['code'] = 1
             
             try:
                 log_dbg('try ask: ' + str(question))
@@ -143,8 +145,8 @@ class BingAPI:
                 ):
                     if not response:
                         continue
-                    log_dbg(f'res: {response}')
                     if not final:
+                        log_dbg(f'res: {response}')
                         answer['message'] = response
                         if '> Conversation disengaged' in response:
                             answer['code'] = -1
@@ -163,8 +165,13 @@ class BingAPI:
                             asyncio.run(self.__bot_create())
                         
                     raw_text = ''
-                    with suppress(KeyError):
-                        raw_text = response["item"]["messages"][1]["adaptiveCards"][0]["body"][0]["text"]
+                    try:
+                        with suppress(KeyError):
+                            raw_text = response["item"]["messages"][1]["adaptiveCards"][0]["body"][0]["text"]
+                    except Exception as e:
+                        log_dbg(f"fail to get res: {e}, continue...")
+                        answer['message'] = ''
+                        continue
 
                     suggested_res = ''
                     with suppress(KeyError):
@@ -177,18 +184,19 @@ class BingAPI:
                         suggested_res = f"1. {suggested0}\n2. {suggested1}\n3. {suggested2}"
 
                     cd_idx = 1 + self.max_messages - self.cur_messages 
-                    res_all = f"{raw_text}\n\n[{self.countdown[cd_idx]}]\n{suggested_res}"
+                    res_all = f"{raw_text}\n\n[{self.countdown[cd_idx]}]\n\n{suggested_res}"
 
                     answer['message'] = res_all
 
+                if not len(answer['message']):
+                    raise Exception(f"fail to ask, no message.")
 
                 answer['code'] = 0
-                yield answer
              
             except Exception as e:
                 log_err('fail to ask: ' + str(e))
                 log_info('server fail, sleep 15')
-                time.sleep(15)
+                time.sleep(5)
 
                 self.cur_messages = 0
                 self.max_messages = 0
@@ -202,6 +210,8 @@ class BingAPI:
             # request complate.
             if answer['code'] == 0:
                 break
+
+        yield answer
     
     def __fuck_async(self, async_gen):        
        while True:
