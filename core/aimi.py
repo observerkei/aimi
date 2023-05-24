@@ -13,6 +13,7 @@ from tool.openai_api import openai_api
 from tool.bing_api import bing_api
 from tool.bard_api import bard_api
 from tool.aimi_plugin import aimi_plugin
+from tool.wolfram_api import wolfram_api
 
 from core.md2img import md
 from core.memory import memory
@@ -215,7 +216,9 @@ class Aimi:
             return openai_api.type
         if aimi_plugin.bot_is_call(question):
             return aimi_plugin.bot_get_call_type(question)
-        
+        if wolfram_api.is_call(question):
+            return wolfram_api.type
+
         return self.api[0]
 
     @property
@@ -371,7 +374,7 @@ You should extract my question directly from the structure here and answer it di
 {nickname} said: '{question}'
 }}
 """
-        elif api_type == bing_api.type:
+        elif '' == bing_api.type:
             link_think += f"""
 故事主题如下：故事中有两个人到了异世界里面开咖啡厅.
 故事情节如下：其中主人公自称Master({self.master_name}),他有一个助理,名叫{self.aimi_name},他们两个在聊天.
@@ -419,9 +422,17 @@ You should extract my question directly from the structure here and answer it di
             yield from self.__post_bard(link_think)
         elif aimi_plugin.bot_has_type(api_type):
             yield from aimi_plugin.bot_ask(api_type, link_think)
+        elif api_type == wolfram_api.type:
+            yield from self.__post_wolfram(link_think)
         else:
             log_err('not suppurt api_type: ' + str(api_type))
     
+    def __post_wolfram(
+        self, 
+        question: str
+    )-> Generator[dict, None, None]:
+        yield from wolfram_api.ask(question)
+
     def __post_bard(
         self, 
         question: str

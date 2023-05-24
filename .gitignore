@@ -142,6 +142,7 @@ qq_server_data/
 /run/session.token
 /run/preset.yml
 /run/setting.yml.*
+/run/wolfram*.txt
 
 # plugin
 /aimi_plugin

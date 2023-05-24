@@ -84,6 +84,13 @@ poe:
       trigger:
         - '#poe-neevaai'
 
+wolfram:
+  app_id: 
+  trigger:
+    - '#wolfram'
+    - '@wolfram'
+    - '#sw'
+
 manage:
   day_reply_time_start: # 10:00
   day_reply_time_end: # 7:00
