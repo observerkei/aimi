@@ -32,7 +32,8 @@ class BingAPI:
     max_messages: int = 0
 
     def need_ask_setup(self) -> bool:
-        return not self.cur_messages 
+        return False
+        #return not self.cur_messages 
 
     async def ask_setup(self) -> bool:
         questions = [

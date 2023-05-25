@@ -1,6 +1,8 @@
 import wolframalpha
+import time
 import re
 from typing import List, Any, Generator
+import json
 
 from tool.config import config
 from tool.util import log_dbg, log_info, log_err
@@ -50,45 +52,98 @@ class WolframAPI:
         return False
 
     def get_sub_from_context(self, context, title):
-      for pod in context.pods:
-        if not pod:
-            continue
-        if not pod.subpods:
-            continue
-        for sub in pod.subpods:
-            if not sub:
+        log_dbg(f"type: {str(type(context))}")
+
+    
+        for pod in context.pods:
+            if not pod:
                 continue
-            if title == sub.title:
-                return sub
+            try:
+                if not pod.subpods:
+                    continue
+            except Exception as e:
+                log_dbg(f"no subpods: {e}")
+                continue
+
+            for sub in pod.subpods:
+                if not sub:
+                    continue
+                sub_title = ''
+                try:
+                    sub_title = sub.title
+                except Exception as e:
+                    log_dbg(f"no title: {e}")
+                    continue
+
+                log_dbg(f"sub title: {str(sub.title)}")
+                if title.lower() in sub.title.lower():
+                    return sub
         return None
 
     def get_cq_image(self, context) -> str:
-        img_url = ''
+        res_img = ''
         try:
-            sub = self.get_sub_from_context(context, "Possible intermediate steps")
-            if not sub:
-                raise Exception(f"fail to get sub as: Possible intermediate steps")
-            img_url = sub.img.src
-            if not img_url:
-                raise Exception(f"fail to get sub img_url")
+            for pod in context.pods:
+                pod_title = ''
+
+                try:
+                    if not pod.subpods:
+                        continue
+                    pod_title = pod.title
+                except Exception as e:
+                    log_dbg(f"no subpods: {e}")
+                    continue
+
+                for sub in pod.subpods:
+                    img_url = ''
+                    try:
+                        img_url = sub.img.src
+                    except:
+                        continue
+
+                    cq_image = f'{pod_title}\n[CQ:image,file={img_url}]\n\n'
+                    res_img += cq_image
+
         except Exception as e:
             log_err(f"fail to get img: {e}")
         
-        cq_image = f"[CQ:image,file={img_url}]"
-
-        return cq_image
+        return res_img
     
     def get_plaintext(self, context) -> str:
         plaintext = ''
         try:
-            sub = self.get_sub_from_context(context, "Possible intermediate steps")
-            if not sub:
-                raise Exception(f"fail to get sub as: Possible intermediate steps")
-            plaintext = sub.plaintext
-            if not img_url:
+            line = 0
+            for pod in context.pods:
+                line += 1
+                if line != 2: 
+                    continue
+
+                try:
+                    if not pod.subpods:
+                        continue
+                except Exception as e:
+                    log_dbg(f"no subpods: {e}")
+                    continue
+
+                for sub in pod.subpods:
+                    sub_t = ''
+                    try:
+                        sub_t = sub.plaintext
+                        if not sub_t:
+                            continue
+                    except:
+                        continue
+
+                    plaintext += sub_t + "\n\n"
+
+            if not plaintext:
+                sub = self.get_sub_from_context(context, "Possible intermediate steps")
+                plaintext = sub.plaintext
+
                 raise Exception(f"fail to get sub plaintext")
         except Exception as e:
             log_err(f"fail to get plaintext: {e}")
+            log_dbg(f'res: {str(context)}')
         
         return plaintext
 
@@ -112,6 +167,7 @@ class WolframAPI:
             return
         
         question = self.__del_trigger(question)
+        log_dbg(f'try ask: {question}')
 
         params = (
             ('podstate', 'Step-by-step solution'),
@@ -128,13 +184,30 @@ class WolframAPI:
         
         plaintext = self.get_plaintext(res)
         cq_image = self.get_cq_image(res)
-        
-        message = f"{plaintext}\n\n"
+
+        """
+        message = ''
+        for line in plaintext.splitlines():
+            line += '\n'
+            message += line
+            answer['message'] = message
+            yield answer
+            time.sleep(0.5)
+
+        message += ' \n'
         answer['message'] = message
         yield answer
 
-        message += cq_image
-        answer['message'] = message
+
+        for img in cq_image.splitlines():
+            img += '\n'
+            message += img
+            answer['message'] = message
+            yield answer
+            time.sleep(0.5)
+        """
+
+        answer['message'] = cq_image
         answer['code'] = 0
 
         yield answer

@@ -148,7 +148,7 @@ class GoCQHttp:
     
     def get_reply_private(self, user_id: int, reply: str) -> str:
         reply_quote = parse.quote(reply)
-        
+
         api_private_reply = "http://{}:{}/send_private_msg?user_id={}&message={}".format(
             self.post_host, self.post_port, user_id, reply_quote)
 
@@ -159,7 +159,10 @@ class GoCQHttp:
         if user_id:
             at_user = self.make_at(user_id) + '\n'
         at_reply = at_user + reply
-        at_reply_quote = parse.quote(at_reply)
+
+        reply_quote = parse.quote(at_reply)
+
+        at_reply_quote = reply_quote 
         
         api_group_reply = "http://{}:{}/send_group_msg?group_id={}&message={}".format(
                 self.post_host, self.post_port, group_id, at_reply_quote)
