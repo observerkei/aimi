@@ -136,8 +136,13 @@ class WolframAPI:
 
                     plaintext += sub_t + "\n\n"
 
-            if not plaintext:
+            if (
+                not plaintext or 
+                not len(plaintext) or
+                not ('=' in plaintext)
+            ):
                 sub = self.get_sub_from_context(context, "Possible intermediate steps")
+                #plaintext = "Possible intermediate steps:\n" + sub.plaintext
                 plaintext = sub.plaintext
 
                 raise Exception(f"fail to get sub plaintext")
@@ -181,6 +186,12 @@ class WolframAPI:
             answer['code'] = -1
             yield answer
             return
+        """
+        answer['code'] = 0
+        answer['message'] = str(res)
+        yield answer
+        return
+        """
         
         plaintext = self.get_plaintext(res)
         cq_image = self.get_cq_image(res)
@@ -197,8 +208,19 @@ class WolframAPI:
         message += ' \n'
         answer['message'] = message
         yield answer
+        """
 
+        message = plaintext
+        if (not message or 
+            not len(message) or 
+            'step-by-step solution unavailable' in str(message) or
+            not ("=" in message)
+        ):
+            message = str(res)
+        answer['message'] = message
+        yield answer
 
+        """
         for img in cq_image.splitlines():
             img += '\n'
             message += img
@@ -207,7 +229,7 @@ class WolframAPI:
             time.sleep(0.5)
         """
 
-        answer['message'] = cq_image
+        #answer['message'] += cq_image
         answer['code'] = 0
 
         yield answer

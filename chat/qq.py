@@ -175,6 +175,8 @@ class BotManage:
     reply_time_limit_s: int
     day_reply_time_start: Any
     day_reply_time_end: Any
+    reply_max_cnt: int = 3  # max reply limit
+    reply_cur_cnt: int = 0  # cur reply limit
 
     def __init__(self):
         self.__load_setting()
@@ -530,9 +532,15 @@ class ChatQQ:
         notify_msg = self.manage.manage_event(user_id, message)
         if not len(notify_msg):
             return
+
+        self.manage.reply_cur_cnt += 1
+        if self.manage.reply_cur_cnt < self.manage.reply_max_cnt:
+            log_dbg(f'no need manage: [{self.manage.reply_cur_cnt}/{self.manage.reply_max_cnt}]')
+            return
         
         #self.reply_group(group_id, self.master_id, f' {notify_msg}')
         ban_api = self.go_cqhttp.get_group_ban(group_id, user_id, self.manage.reply_time_limit_s)
+        self.manage.reply_cur_cnt = 0
         return self.reply_url(ban_api)
 
     def __init__(self):

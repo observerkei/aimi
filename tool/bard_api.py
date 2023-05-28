@@ -68,6 +68,17 @@ class BardAPI:
                     #message = choice3
                 except Exception as e:
                     log_err(f'fail to get choice:{e}')
+
+                """
+                message = ''
+                for line in content.splitlines():
+                    line += '\n'
+                    message += line
+                    answer['message'] = message
+                    yield answer
+                    time.sleep(0.3)
+                """
+
                 answer['message'] = message
                 answer['code'] = 0
                 yield answer

@@ -423,7 +423,27 @@ You should extract my question directly from the structure here and answer it di
         elif aimi_plugin.bot_has_type(api_type):
             yield from aimi_plugin.bot_ask(api_type, link_think)
         elif api_type == wolfram_api.type:
-            yield from self.__post_wolfram(link_think)
+            math_html = 'help me caculate math.'
+            for answer in self.__post_wolfram(link_think):
+                if answer['code'] != 0:
+                    continue
+                math_html = answer['message']
+            link_think = f"""question: {link_think}
+1. Use only $$ to wrap latex, like:
+' $$ 
+x_1 
+$$ ' .
+
+2. please replace the "```" to the "$$".
+3. only display the wolfram response of the question as latex.
+4. If the wolfram response contains a derivation(or process or Solve) about the question, They should be shown in full step by step, The more detailed, the better.
+
+the wolfram response: {{
+{math_html}
+}}
+"""
+
+            yield from self.__post_bing(link_think)
         else:
             log_err('not suppurt api_type: ' + str(api_type))
     

@@ -104,7 +104,7 @@ class Md:
                 if '```\n$' in md_source:
                     md_source = md_source.replace('```', '')
                 else:
-                    md_source = md_source.replace('```', '$$')
+                    md_source = md_source.replace('```', '$$ ')
                 log_dbg(f'md: {md_source}')
             
             # 打开文件，并以写入模式写入字符串
