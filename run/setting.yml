@@ -91,6 +91,36 @@ wolfram:
     - '@wolfram'
     - '#sw'
 
+chimeragpt:
+  api_key: 
+  api_base: 'https://chimeragpt.adventblocks.cc/v1'
+  max_requestion: 1024
+  max_repeat_times: 2
+  models:
+    default:
+      model: 'gpt-3.5-turbo'
+      trigger:
+        - '#chimeragpt'
+        - '@chimeragpt'
+        - '#cg'
+    GPT-4:
+      model: 'gpt-4'
+      trigger: # model trigger much has prefix poe
+        - '#chimeragpt-gpt-4'
+        - '#cg-gpt-4'
+    GPT-3.5:
+      model: 'gpt-3.5-turbo'
+      trigger:
+        - '#cg-gpt-3.5'
+    GPT-4-POE:
+      model: 'gpt-4-poe'
+      trigger:
+        - '#cg-gpt-4-poe'
+    GPT-3.5-POE:
+      model: 'gpt-3.5-turbo-poe'
+      trigger:
+        - '#cg-gpt-3.5'
+
 manage:
   day_reply_time_start: # 10:00
   day_reply_time_end: # 7:00

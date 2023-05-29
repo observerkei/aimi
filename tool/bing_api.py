@@ -288,6 +288,8 @@ class BingAPI:
 
         try:
             self.wss_link = setting['wss_link']
+            if not self.wss_link:
+                self.wss_link = ''
         except Exception as e:
             log_err('fail to load bing config: ' + str(e))
             self.wss_link = ''
