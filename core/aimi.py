@@ -130,7 +130,7 @@ class Aimi:
     preset_facts: Dict[str, str] = {}
     max_link_think: int = 1024
     running: bool = True
-    api: List = []
+    api: List[str] = []
 
     def __init__(self):
         self.__load_setting()
@@ -150,23 +150,72 @@ class Aimi:
     def make_link_think(
         self,
         question: str,
-        nickname: str = None
+        nickname: str = None,
+        api_type: str = None,
     ) -> str:
 
         nickname = nickname if nickname and len(nickname) else self.master_name
-        
-        # append setting
-        link_think = '设定: {{\n“{}”\n}}.\n\n'.format(self.preset_facts[openai_api.type])
-        link_think += '请只关注最新消息,历史如下: {\n'
+        api_type = api_type if api_type and len(api_type) else self.api[0]
+        link_think = question
 
-        # cul question
-        question_item = '}}.\n\n请根据设定和最新对话历史和你的历史回答,不用“{}:”开头,回答如下问题: {{\n{}说: “{}”\n}}.'.format(
-            self.aimi_name, nickname, question)
+        if api_type == openai_api.type:
+            # append setting
+            link_think = '设定: {{\n“{}”\n}}.\n\n'.format(self.preset_facts[openai_api.type])
+            link_think += '请只关注最新消息,历史如下: {\n'
 
-        # append history
-        link_think += memory.search(question, self.max_link_think)
-        # append question
-        link_think += question_item
+            # cul question
+            question_item = '}}.\n\n请根据设定和最新对话历史和你的历史回答,不用“{}:”开头,回答如下问题: {{\n{}说: “{}”\n}}.'.format(
+                self.aimi_name, nickname, question)
+
+            # append history
+            link_think += memory.search(question, self.max_link_think)
+            # append question
+            link_think += question_item
+        elif api_type == bard_api.type:
+            link_think += f"""preset: {{
+\"{self.preset_facts[bard_api.type]}\"
+}}.
+
+Please answer the following question based on the preset, 
+the latest conversation history, and your previous answers.
+and without starting with '{self.aimi_name}:'
+You should extract my question directly from the structure here and answer it directly:{{
+{nickname} said: '{question}'
+}}
+"""
+        elif '' == bing_api.type:
+            link_think += f"""
+故事主题如下：故事中有两个人到了异世界里面开咖啡厅.
+故事情节如下：其中主人公自称Master({self.master_name}),他有一个助理,名叫{self.aimi_name},他们两个在聊天.
+故事背景如下: {{
+{self.preset_facts[bing_api.type]}
+{self.aimi_name}能问她的朋友 Bing 来尽力解答Master的问题.
+}}
+
+请不显示故事主题/情节/背景的分析过程,以“{self.aimi_name}”的身份,让聊天足够自然,接下以下聊天：{{
+{nickname}说: '{question}'
+}}
+"""
+        elif api_type == wolfram_api.type:
+            math_html = 'help me caculate math.'
+            for answer in self.__post_wolfram(link_think):
+                if answer['code'] != 0:
+                    continue
+                math_html = answer['message']
+            link_think = f"""question: {link_think}
+1. Use only $$ to wrap latex, like:
+' $$ 
+x_1 
+$$ ' .
+
+2. please replace the "```" to the "$$".
+3. only display the wolfram response of the question as latex.
+4. If the wolfram response contains a derivation(or process or Solve) about the question, They should be shown in full step by step, The more detailed, the better.
+
+the wolfram response: {{
+{math_html}
+}}
+"""
 
         return link_think
 
@@ -356,39 +405,9 @@ class Aimi:
     ) -> Generator[dict, None, None]:
 
         api_type = self.__question_api_type(question) 
-
         nickname = nickname if nickname and len(nickname) else self.master_name
 
-        link_think = ''
-        if api_type == openai_api.type:
-            link_think = self.make_link_think(question, nickname)
-        elif api_type == bard_api.type:
-            # set preset
-            link_think = f"preset: {{\n\"{self.preset_facts[bard_api.type]}\"\n}}.\n\n"
-            # set ask:
-            link_think += f"""
-Please answer the following question based on the preset, 
-the latest conversation history, and your previous answers.
-and without starting with '{self.aimi_name}:'
-You should extract my question directly from the structure here and answer it directly:{{
-{nickname} said: '{question}'
-}}
-"""
-        elif '' == bing_api.type:
-            link_think += f"""
-故事主题如下：故事中有两个人到了异世界里面开咖啡厅.
-故事情节如下：其中主人公自称Master({self.master_name}),他有一个助理,名叫{self.aimi_name},他们两个在聊天.
-故事背景如下: {{
-{self.preset_facts[bing_api.type]}
-{self.aimi_name}能问她的朋友 Bing 来尽力解答Master的问题.
-}}
-
-请不显示故事主题/情节/背景的分析过程,以“{self.aimi_name}”的身份,让聊天足够自然,接下以下聊天：{{
-{nickname}说: '{question}'
-}}
-"""
-        else:
-            link_think = question
+        link_think = self.make_link_think(question, nickname, api_type)
 
         answer = self.__post_question(link_think, api_type)
 
@@ -423,26 +442,7 @@ You should extract my question directly from the structure here and answer it di
         elif aimi_plugin.bot_has_type(api_type):
             yield from aimi_plugin.bot_ask(api_type, link_think)
         elif api_type == wolfram_api.type:
-            math_html = 'help me caculate math.'
-            for answer in self.__post_wolfram(link_think):
-                if answer['code'] != 0:
-                    continue
-                math_html = answer['message']
-            link_think = f"""question: {link_think}
-1. Use only $$ to wrap latex, like:
-' $$ 
-x_1 
-$$ ' .
-
-2. please replace the "```" to the "$$".
-3. only display the wolfram response of the question as latex.
-4. If the wolfram response contains a derivation(or process or Solve) about the question, They should be shown in full step by step, The more detailed, the better.
-
-the wolfram response: {{
-{math_html}
-}}
-"""
-
+            # at mk link think, already set wolfram response.
             yield from self.__post_bing(link_think)
         else:
             log_err('not suppurt api_type: ' + str(api_type))
@@ -476,11 +476,13 @@ the wolfram response: {{
         for message in answer:
             log_dbg('now msg: ' + str(message))
 
-            if (message) and (message['code'] == 0):
-                if message['conversation_id'] and \
-                   message['conversation_id'] != memory.openai_conversation_id:
-                    memory.openai_conversation_id = message['conversation_id']
-                    log_info('set new con_id: ' + str(memory.openai_conversation_id))
+            if ((message) and 
+                (message['code'] == 0) and
+                message['conversation_id'] and
+                (message['conversation_id'] != memory.openai_conversation_id)
+            ):
+                memory.openai_conversation_id = message['conversation_id']
+                log_info('set new con_id: ' + str(memory.openai_conversation_id))
 
             yield message
         
@@ -515,11 +517,9 @@ the wolfram response: {{
             self.preset_facts = {}
             for api in self.api:
                 try:
-                    #log_dbg(f"{str(setting['preset_facts'])}")
-                    #log_dbg(f"{str(setting['preset_facts'][api])}")
                     preset_facts: List[str] = setting['preset_facts'][api]
                 except Exception as e:
-                    log_err(f'no {api} type preset, skip.')
+                    log_info(f'no {api} type preset, skip.')
                     continue
 
                 self.preset_facts[api] = ""

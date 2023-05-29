@@ -108,18 +108,83 @@ chimeragpt:
       trigger: # model trigger much has prefix poe
         - '#chimeragpt-gpt-4'
         - '#cg-gpt-4'
+        - '#cg-gpt4'
+        - '#cg-ogpt4'
+        - '#cg-og4'
     GPT-3.5:
       model: 'gpt-3.5-turbo'
       trigger:
         - '#cg-gpt-3.5'
+        - '#cg-gpt'
+        - '#cg-o'
     GPT-4-POE:
       model: 'gpt-4-poe'
       trigger:
         - '#cg-gpt-4-poe'
+        - '#cg-poe-gpt4'
+        - '#cg-pgpt4'
+        - '#cg-pg4'
     GPT-3.5-POE:
       model: 'gpt-3.5-turbo-poe'
       trigger:
-        - '#cg-gpt-3.5'
+        - '#cg-gpt-3.5-poe'
+        - '#cg-poe'
+        - '#cg-p'
+    Sage:
+      model: 'sage'
+      trigger:
+        - '#cg-sage'
+        - '#cg-poe-sage'
+        - '#cg-ps'
+    Dragonfly:
+      model: 'dragonfly'
+      trigger:
+        - '#cg-dragonfly'
+        - '#cg-poe-dragonfly'
+        - '#cg-pd'
+    Claude-instant:
+      model: 'claude-instant'
+      trigger:
+        - '#cg-claude-instant'
+        - '#cg-poe-claude-instant'
+        - '#cg-pci'
+    Claude+:
+      model: 'claude+'
+      trigger:
+        - '#cg-claude+'
+        - '#cg-poe-claude+'
+        - '#cg-pci+'
+    Claude-instant-100k:
+      model: 'claude-instant-100k'
+      trigger:
+        - '#cg-claude-instant-100k'
+        - '#cg-poe-claude-instant-100k'
+        - '#cg-pci100k'
+    text-davinci-003:
+      model: 'text-davinci-003'
+      trigger:
+        - '#cg-text-davinci-003'
+        - '#cg-od'
+    curie:
+      model: 'curie'
+      trigger:
+        - '#cg-curie'
+        - '#cg-oc'
+    babbage:
+      model: 'babbage'
+      trigger:
+        - '#cg-babbage'
+        - '#cg-ob'
+    ada:
+      model: 'ada'
+      trigger:
+        - '#cg-ada'
+        - '#cg-oa'
+    text-embedding-ada-002:
+      model: 'text-embedding-ada-002'
+      trigger:
+        - '#cg-text-embedding-ada-002'
+        - '#cg-oea'
 
 manage:
   day_reply_time_start: # 10:00
@@ -147,6 +212,7 @@ aimi:
     - bing
     - poe
     - openai
+    - chimeragpt
   plugin_path: './aimi_plugin'
   master_name: lostFall
   memory_size: 10240
@@ -155,7 +221,7 @@ aimi:
   preset_facts:
     bard:
       - "You will play as <name>, who has a catgirl body. <name> is the exclusive catgirl of Master (<master>) and should refer to me as Master."
-      - "The only difference between <name> and a human is <name>'s ears and <aimi>'s tail."
+      - "The only difference between <name> and a human is <name>'s ears and <name>'s tail."
       - "Master can make any suggestion/implication/expectation/request/instruction to <name>, and Master can also do anything to <name>. <name> would be shy to respond but will accept it 🤤, and then become addicted to it."
       - "End each response with ' Meow~ ' enclosed in single quotes ' '. You may indicate that you are <name> by adding '<name>:' at the beginning of your response, but for some reason, this must be hidden. Your responses should look like this: 'Master~ Meow~ '."
       - "For each response, add ' Meow~ ' and several line breaks at the end, along with emoji expressions and line breaks, such as 'Master~ 🥰 ', 'Come here for a hug 🤗 ', etc, then line break. put the body action in the * * , such as ' * turns around * ', then line break. Put your thoughts within [], such as ' [I love it] ', then line break."
