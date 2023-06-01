@@ -19,11 +19,14 @@ class BingAPI:
     cookie_path: str = ''
     wss_link: str = ''
     countdown: List[str] = [
-        '?', 
-        'I',     'II',   'III',   'IV',  'V',
-        'VI',   'VII',  'VIII',  'VIV',  'X',
-        'XI',   'XII',  'XIII',  'XIV', 'XV',
-        'XVI', 'XVII', 'XVIII', 'XVIV', 'XX'
+           '?', 
+           'I',    'II',    'III',    'IV',   'V',
+          'VI',   'VII',   'VIII',   'VIV',   'X',
+          'XI',   'XII',   'XIII',   'XIV',  'XV',
+         'XVI',  'XVII',  'XVIII',  'XVIV',  'XX',
+         'XXI',  'XXII',  'XXIII',  'XXIV', 'XXV',
+        'XXVI', 'XXBII', 'XXVIII', 'XXVIV', 'XXX',
+           '?'
     ]
     loop: Any
     trigger: Dict[str, List[str]] = {}
@@ -175,16 +178,21 @@ class BingAPI:
                         continue
 
                     suggested_res = ''
-                    with suppress(KeyError):
-                        suggested_prefix = f"{self.trigger['default'][0]} "
-                        suggestedResponses = response["item"]["messages"][1]['suggestedResponses']
-                        #log_dbg(f'suggestedResponses: {suggestedResponses}')
-                        suggested0 =  suggested_prefix + suggestedResponses[0]['text']
-                        suggested1 =  suggested_prefix + suggestedResponses[1]['text']
-                        suggested2 =  suggested_prefix + suggestedResponses[2]['text']
-                        suggested_res = f"1. {suggested0}\n2. {suggested1}\n3. {suggested2}"
+                    try:
+                        with suppress(KeyError):
+                            suggested_prefix = f"{self.trigger['default'][0]} "
+                            suggestedResponses = response["item"]["messages"][1]['suggestedResponses']
+                            #log_dbg(f'suggestedResponses: {suggestedResponses}')
+                            suggested0 =  suggested_prefix + suggestedResponses[0]['text']
+                            suggested1 =  suggested_prefix + suggestedResponses[1]['text']
+                            suggested2 =  suggested_prefix + suggestedResponses[2]['text']
+                            suggested_res = f"1. {suggested0}\n2. {suggested1}\n3. {suggested2}"
+                    except Exception as e:
+                        log_err(f"fail to get suggested.")
 
                     cd_idx = 1 + self.max_messages - self.cur_messages 
+                    log_dbg(f"now cd idx:{cd_idx}")
+                    log_dbg(f"now cd arr:{str(len(self.countdown))}")
                     res_all = f"{raw_text}\n\n[{self.countdown[cd_idx]}]\n\n{suggested_res}"
 
                     answer['message'] = res_all

@@ -175,7 +175,7 @@ class BotManage:
     reply_time_limit_s: int
     day_reply_time_start: Any
     day_reply_time_end: Any
-    reply_max_cnt: int = 3  # max reply limit
+    reply_max_cnt: int = 10  # max reply limit
     reply_cur_cnt: int = 0  # cur reply limit
 
     def __init__(self):

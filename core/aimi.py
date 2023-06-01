@@ -159,20 +159,24 @@ class Aimi:
         link_think = question
 
         if api_type == openai_api.type:
-            # append setting
-            link_think = '设定: {{\n“{}”\n}}.\n\n'.format(self.preset_facts[openai_api.type])
-            link_think += '请只关注最新消息,历史如下: {\n'
-
             # cul question
-            question_item = '}}.\n\n请根据设定和最新对话历史和你的历史回答,不用“{}:”开头,回答如下问题: {{\n{}说: “{}”\n}}.'.format(
-                self.aimi_name, nickname, question)
+            history = memory.search(question, self.max_link_think)
+            link_think = f"""
+设定: {{
+“{self.preset_facts[api_type]}”
+}}.
 
-            # append history
-            link_think += memory.search(question, self.max_link_think)
-            # append question
-            link_think += question_item
+请只关注最新消息,历史如下: {{
+{history}
+}}.
+
+请根据设定和最新对话历史和你的历史回答,不用“{self.aimi_name}:”开头,回答如下问题: {{
+{nickname}说: “{question}”
+}}.
+"""
         elif api_type == bard_api.type:
-            link_think += f"""preset: {{
+            link_think = f"""
+preset: {{
 \"{self.preset_facts[bard_api.type]}\"
 }}.
 
@@ -184,7 +188,7 @@ You should extract my question directly from the structure here and answer it di
 }}
 """
         elif '' == bing_api.type:
-            link_think += f"""
+            link_think = f"""
 故事主题如下：故事中有两个人到了异世界里面开咖啡厅.
 故事情节如下：其中主人公自称Master({self.master_name}),他有一个助理,名叫{self.aimi_name},他们两个在聊天.
 故事背景如下: {{
@@ -202,7 +206,8 @@ You should extract my question directly from the structure here and answer it di
                 if answer['code'] != 0:
                     continue
                 math_html = answer['message']
-            link_think = f"""question: {link_think}
+            link_think = f"""
+question: {link_think}
 1. Use only $$ to wrap latex, like:
 ' $$ 
 x_1 
@@ -216,7 +221,32 @@ the wolfram response: {{
 {math_html}
 }}
 """
+        elif api_type == 'chimeragpt':
+            preset = ''
+            try:
+                preset = self.preset_facts[api_type]
+            except:
+                log_dbg(f"api_type:{api_type} no preset")
 
+            # cul question
+            history = memory.search(question, self.max_link_think)
+
+            link_think = f"""
+preset: {{
+“{preset}”
+}}.
+
+Please focus only on the latest news. History follows: {{
+{history}
+}}
+
+Based on the preset and our conversation history, and my previous responses, 
+answer the following question without adding additional descriptions, 
+and without starting with '{self.aimi_name}:'
+the following question: {{
+{nickname} say: “{question}”
+}}.
+"""
         return link_think
 
     def run(self):
@@ -440,10 +470,19 @@ the wolfram response: {{
         elif api_type == bard_api.type:
             yield from self.__post_bard(link_think)
         elif aimi_plugin.bot_has_type(api_type):
-            yield from aimi_plugin.bot_ask(api_type, link_think)
+            preset = ''
+            try:
+                preset = self.preset_facts[api_type]
+            except:
+                log_dbg(f"api_type:{api_type} no preset")
+
+            yield from aimi_plugin.bot_ask(api_type, link_think, preset)
         elif api_type == wolfram_api.type:
             # at mk link think, already set wolfram response.
-            yield from self.__post_bing(link_think)
+            if self.api[0] != wolfram_api.type:
+                yield from self.__post_question(link_think, self.api[0])
+            else:
+                yield from self.__post_bing(link_think)
         else:
             log_err('not suppurt api_type: ' + str(api_type))
     

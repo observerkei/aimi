@@ -44,6 +44,10 @@ class Bot:
     def bot_get_question(self, ask_data):
         return ask_data['question']
 
+    # no need define bot_get_preset
+    def bot_get_preset(self, ask_data):
+        return ask_data['preset']
+
     # no need define bot_set_response
     def bot_set_response(self, code: int, message: str) -> Any:
         return {"code": code, "message": message}
@@ -147,7 +151,10 @@ class AimiPlugin:
 
         return False
 
-    def bot_get_call_type(self, question: Any):
+    def bot_get_call_type(
+        self, 
+        question: Any
+    ):
         if not len(self.bots):
             return None
 
@@ -163,15 +170,24 @@ class AimiPlugin:
 
         return None
 
-    def bot_ask(self, bot_ask_type: str, question: str,  timeout: int = 60) -> Generator[dict, None, None]:
+    def bot_ask(
+        self, 
+        bot_ask_type: str, 
+        question: str, 
+        preset: str, 
+        timeout: int = 60
+    ) -> Generator[dict, None, None]:
         if not len(self.bots):
             yield {
                 message: "no bot",
                 code: -1
             }
             return
-        
-        ask_data = {"question": question}
+
+        ask_data = {
+            "question": question,
+            "preset": preset 
+        }
 
         for bot_type, bot in self.bots.items():
             try:
