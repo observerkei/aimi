@@ -342,7 +342,8 @@ the following question: {{
                     #log_dbg('reply: ' + str(reply))
                     #log_dbg('reply_div: ' + str(reply_div))
                     #log_dbg('message: ' + str(message))
-                    log_dbg(f'code: {str(code)} reply_line: {str(reply_line)}')
+                    reply_div_len = len(reply_div)
+                    log_dbg(f'code: {str(code)} div: {str(reply_div_len)} line: {str(reply_line)}')
 
                     if code == 0 and (len(reply_div) or ((not len(reply_div)) and len(reply_line))):
                         reply_div += reply_line
@@ -482,7 +483,7 @@ the following question: {{
             yield from aimi_plugin.bot_ask(api_type, link_think, preset, history)
         elif api_type == wolfram_api.type:
             # at mk link think, already set wolfram response.
-            if self.api[0] != wolfram_api.type:
+            if False and self.api[0] != wolfram_api.type:
                 yield from self.__post_question(link_think, self.api[0])
             else:
                 yield from self.__post_bing(link_think)

@@ -13,7 +13,7 @@ def log_init():
 
     # 设置日志输出格式
     coler_formatter = colorlog.ColoredFormatter(
-        "%(log_color)s%(levelname)-8s%(reset)s %(message)s",
+        "%(log_color)s%(levelname)-5s%(reset)s %(message)s",
         datefmt = None,
         reset = True,
         log_colors = {
@@ -57,19 +57,19 @@ def log_err(message: str, is_plugin:bool = False):
     caller_file = get_caller_filename(is_plugin)
     caller_func = get_caller_function_name(is_plugin)
     caller_line = get_caller_lineno(is_plugin)
-    logger.error(f"[{caller_file}:{caller_func}:{caller_line}] {message}")
+    logger.error(f"[{caller_file}:{caller_func}:{caller_line}]  {message}")
 
 def log_dbg(message: str, is_plugin:bool = False):
     caller_file = get_caller_filename(is_plugin)
     caller_func = get_caller_function_name(is_plugin)
     caller_line = get_caller_lineno(is_plugin)
-    logger.debug(f"[{caller_file}:{caller_func}:{caller_line}] {message}")
+    logger.debug(f"[{caller_file}:{caller_func}:{caller_line}]  {message}")
 
 def log_info(message: str, is_plugin:bool = False):
     caller_file = get_caller_filename(is_plugin)
     caller_func = get_caller_function_name(is_plugin)
     caller_line = get_caller_lineno(is_plugin)
-    logger.info(f"[{caller_file}:{caller_func}:{caller_line}] {message}")
+    logger.info(f"[{caller_file}:{caller_func}:{caller_line}]  {message}")
 
 def get_caller_filename(is_plugin:bool = False):
     frame = inspect.stack()[2] if not is_plugin else inspect.stack()[3]
