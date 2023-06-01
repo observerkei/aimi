@@ -1,5 +1,5 @@
 import os
-from typing import List, Union, Any
+from typing import List, Union, Any, Dict
 
 from tool.config import config
 from tool.util import log_dbg, log_err, log_info, write_yaml
@@ -138,7 +138,7 @@ class Memory:
         history = ''
 
         # use memory_model
-        talk_history: List[str] = []
+        talk_history: List[Dict] = []
         talk_history_append = 0
         def qa_dict_to_list(pool_qa, talk_list, talk_list_append, max_size=max_size):
             for item in pool_qa:
@@ -158,12 +158,12 @@ class Memory:
                             break
                     
                         log_dbg('replay over limit, append pre question.')
-                        talk_history.insert(talk_list_append, '我说:“{}”\n'.format(q))
+                        talk_history.insert(talk_list_append, {'role': 'user', 'content': q})
                         continue
                     # 0 是设定 先放回答再放提问，这样顺序反过来
-                    talk_history.insert(talk_list_append, '你说:“{}”\n'.format(a))
-                    talk_history.insert(talk_list_append, '我说:“{}”\n'.format(q))
-            return talk_list
+                    talk_history.insert(talk_list_append, { 'role': 'assistant', 'content': a})
+                    talk_history.insert(talk_list_append, { 'role': 'user', 'content': q})
+            return talk_history
 
         # 倒着插入的，所以要把历史放在前面插入
         if self.model_enable:
@@ -176,14 +176,28 @@ class Memory:
         talk_items = self.__get_memory(question)
         talk_history = qa_dict_to_list(reversed(talk_items), talk_history, talk_history_append)
 
-        talk_count = 0
- 
-        for item in talk_history:
-            if '我说' in item:
-                talk_count += 1
-            history += '{} {}'.format(talk_count, item)
+        return talk_history
 
+    def make_history(
+        self,
+        talk_history: List[Dict]
+    ) -> str:
+        history = ''
+
+        talk_count = 0
+        for talk in talk_history:
+            content = ''
+            for k, v in talk.items():
+                if k == 'role' and v == 'user':
+                    talk_count += 1
+                    continue
+                if k != 'content':
+                    continue
+                content = v
+            history += f'{talk_count} {content}'
+        # todo
         return history
+
 
     def __model_enable(self) -> bool:
         return len(self.memory_model_type)

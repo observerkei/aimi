@@ -160,7 +160,8 @@ class Aimi:
 
         if api_type == openai_api.type:
             # cul question
-            history = memory.search(question, self.max_link_think)
+            talk_history = memory.search(question, self.max_link_think)
+            history = memory.make_history(talk_history)
             link_think = f"""
 设定: {{
 “{self.preset_facts[api_type]}”
@@ -229,7 +230,8 @@ the wolfram response: {{
                 log_dbg(f"api_type:{api_type} no preset")
 
             # cul question
-            history = memory.search(question, self.max_link_think)
+            talk_history = memory.search(question, self.max_link_think)
+            history = memory.make_history(talk_history)
 
             link_think = f"""
 preset: {{
@@ -337,11 +339,10 @@ the following question: {{
                     
                     reply = answer['message']
 
-                    log_dbg('code: ' + str(code))
-                    log_dbg('reply: ' + str(reply))
-                    log_dbg('reply_div: ' + str(reply_div))
-                    log_dbg('message: ' + str(message))
-                    log_dbg('reply_line: ' + str(reply_line))
+                    #log_dbg('reply: ' + str(reply))
+                    #log_dbg('reply_div: ' + str(reply_div))
+                    #log_dbg('message: ' + str(message))
+                    log_dbg(f'code: {str(code)} reply_line: {str(reply_line)}')
 
                     if code == 0 and (len(reply_div) or ((not len(reply_div)) and len(reply_line))):
                         reply_div += reply_line
@@ -474,8 +475,11 @@ the following question: {{
                 preset = self.preset_facts[api_type]
             except:
                 log_dbg(f"api_type:{api_type} no preset")
+            history = {}
+            if api_type == 'chatanywhere':
+                history = memory.search(link_think, self.max_link_think)
 
-            yield from aimi_plugin.bot_ask(api_type, link_think, preset)
+            yield from aimi_plugin.bot_ask(api_type, link_think, preset, history)
         elif api_type == wolfram_api.type:
             # at mk link think, already set wolfram response.
             if self.api[0] != wolfram_api.type:

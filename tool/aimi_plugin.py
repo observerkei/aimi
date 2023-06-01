@@ -12,56 +12,100 @@ class Bot:
     trigger: str = '#public_name'
     bot: Any
 
-    def __init__(self):
+    def __init__(
+        self
+    ):
         self.bot = None
 
     # when time call bot
-    def is_call(self, caller: Any, ask_data) -> bool:
+    def is_call(
+        self, 
+        caller: Any, 
+        ask_data
+    ) -> bool:
         question = caller.bot_get_question(ask_data)
         if trigger in question:
             return True
         return False
 
     # ask bot
-    def ask(self, caller: Any, ask_data) -> Generator[dict, None, None]:
+    def ask(
+        self, 
+        caller: Any, 
+        ask_data
+    ) -> Generator[dict, None, None]:
         question = caller.bot_get_question(ask_data)
         yield caller.bot_set_response(code=1, message="o")
         yield caller.bot_set_response(code=0, message="ok.")
         # if error, then: yield caller.bot_set_response(code=-1, message="err")
 
     # exit bot
-    def when_exit(self, caller: Any):
+    def when_exit(
+        self, 
+        caller: Any
+    ):
         pass
 
     # init bot
-    def when_init(self, caller: Any):
+    def when_init(
+        self, 
+        caller: Any
+    ):
         pass
 
     # no need define plugin_prefix
     plugin_prefix = 'bot_'
 
     # no need define bot_get_question
-    def bot_get_question(self, ask_data):
+    def bot_get_question(
+        self, 
+        ask_data
+    ):
         return ask_data['question']
 
     # no need define bot_get_preset
-    def bot_get_preset(self, ask_data):
+    def bot_get_preset(
+        self, 
+        ask_data
+    ):
         return ask_data['preset']
+    
+    def bot_get_history(
+        self,
+        ask_data
+    ):
+        return ask_data['history']
 
     # no need define bot_set_response
-    def bot_set_response(self, code: int, message: str) -> Any:
+    def bot_set_response(
+        self, 
+        code: int, 
+        message: str
+    ) -> Any:
         return {"code": code, "message": message}
 
-    def bot_load_setting(self, type: str):
+    def bot_load_setting(
+        self, 
+        type: str
+    ):
         return config.load_setting(type)
-
-    def bot_log_dbg(self, msg: str):
+    
+    def bot_log_dbg(
+        self, 
+        msg: str
+    ):
         return log_dbg(msg, is_plugin=True)
 
-    def bot_log_err(self, msg: str):
+    def bot_log_err(
+        self, 
+        msg: str
+    ):
         return log_err(msg, is_plugin=True)
 
-    def bot_log_info(self, msg: str):
+    def bot_log_info(
+        self, 
+        msg: str
+    ):
         return log_info(msg, is_plugin=True)
 
 class AimiPlugin:
@@ -70,15 +114,18 @@ class AimiPlugin:
     bot_obj: Bot = Bot()
     plugin_path = './aimi_plugin'
     
-
-    def __init__(self):
+    def __init__(
+        self
+    ):
         self.__load_setting()
 
         self.__load_bot()
         
         self.when_init()
 
-    def __load_setting(self):
+    def __load_setting(
+        self
+    ):
         try:
             setting = config.load_setting('aimi')
         except Exception as e:
@@ -92,7 +139,9 @@ class AimiPlugin:
             log_err(f'fail to get plugin_path: {e}')
             self.plugin_path = './aimi_plugin'
 
-    def __load_bot(self):
+    def __load_bot(
+        self
+    ):
         # 遍历目录中的文件
         for filename in os.listdir(self.plugin_path):
             # skip example 
@@ -122,7 +171,10 @@ class AimiPlugin:
                     except Exception as e:
                         log_err(f'fail to add plugin bot: {e}')
                         
-    def bot_has_type(self, type) -> bool:
+    def bot_has_type(
+        self, 
+        type
+    ) -> bool:
         if not len(self.bots):
             return False
         
@@ -136,7 +188,10 @@ class AimiPlugin:
         return False
         
 
-    def bot_is_call(self, question: str) -> bool:
+    def bot_is_call(
+        self, 
+        question: str
+    ) -> bool:
         if not len(self.bots):
             return False
         
@@ -174,7 +229,8 @@ class AimiPlugin:
         self, 
         bot_ask_type: str, 
         question: str, 
-        preset: str, 
+        preset: str = "", 
+        history: List[Dict] = [],
         timeout: int = 60
     ) -> Generator[dict, None, None]:
         if not len(self.bots):
@@ -186,7 +242,8 @@ class AimiPlugin:
 
         ask_data = {
             "question": question,
-            "preset": preset 
+            "preset": preset,
+            "history": history,
         }
 
         for bot_type, bot in self.bots.items():
@@ -197,7 +254,9 @@ class AimiPlugin:
             except Exception as e:
                 log_err(f'fail to ask bot: {e}')
 
-    def when_exit(self):
+    def when_exit(
+        self
+    ):
         if not len(self.bots):
             return 
         
@@ -207,7 +266,9 @@ class AimiPlugin:
             except Exception as e:
                 log_err(f'fail to exit bot: {bot_type} err: {e}')
 
-    def when_init(self):
+    def when_init(
+        self
+    ):
         if not len(self.bots):
             return
         
