@@ -74,7 +74,7 @@ def log_info(message: str, is_plugin:bool = False):
 def get_caller_filename(is_plugin:bool = False):
     frame = inspect.stack()[2] if not is_plugin else inspect.stack()[3]
     filename = frame[0].f_code.co_filename
-    return os.path.basename(filename)
+    return os.path.splitext(os.path.basename(filename))[0]
 
 def get_caller_function_name(is_plugin:bool = False):
     stack = inspect.stack()
