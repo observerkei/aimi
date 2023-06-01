@@ -1,6 +1,8 @@
 import yaml
 import logging
 import colorlog
+import inspect
+import os
 
 def log_init():
     # 创建一个 logger 对象
@@ -51,14 +53,39 @@ def log_init():
     return logger
 
 
-def log_err(message: str):
-    logger.error(message)
+def log_err(message: str, is_plugin:bool = False):
+    caller_file = get_caller_filename(is_plugin)
+    caller_func = get_caller_function_name(is_plugin)
+    caller_line = get_caller_lineno(is_plugin)
+    logger.error(f"[{caller_file}:{caller_func}:{caller_line}] {message}")
 
-def log_dbg(message: str):
-    logger.debug(message)
+def log_dbg(message: str, is_plugin:bool = False):
+    caller_file = get_caller_filename(is_plugin)
+    caller_func = get_caller_function_name(is_plugin)
+    caller_line = get_caller_lineno(is_plugin)
+    logger.debug(f"[{caller_file}:{caller_func}:{caller_line}] {message}")
 
-def log_info(message: str):
-    logger.info(message)
+def log_info(message: str, is_plugin:bool = False):
+    caller_file = get_caller_filename(is_plugin)
+    caller_func = get_caller_function_name(is_plugin)
+    caller_line = get_caller_lineno(is_plugin)
+    logger.info(f"[{caller_file}:{caller_func}:{caller_line}] {message}")
+
+def get_caller_filename(is_plugin:bool = False):
+    frame = inspect.stack()[2] if not is_plugin else inspect.stack()[3]
+    filename = frame[0].f_code.co_filename
+    return os.path.basename(filename)
+
+def get_caller_function_name(is_plugin:bool = False):
+    stack = inspect.stack()
+    frame = stack[2] if not is_plugin else stack[3]
+    info = inspect.getframeinfo(frame[0])
+    return info.function
+
+def get_caller_lineno(is_plugin:bool = False):
+    lineno = inspect.currentframe().f_back.f_back.f_lineno
+    lineno = lineno if not is_plugin else inspect.currentframe().f_back.f_back.f_back.f_lineno
+    return lineno
 
 def read_yaml(path: str) -> dict:
     with open(path, 'r', encoding='utf-8') as f:

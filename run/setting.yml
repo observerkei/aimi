@@ -187,6 +187,37 @@ chimeragpt:
         - '#cg-text-embedding-ada-002'
         - '#cg-oea'
 
+chatanywhere:
+  api_key: 
+  api_base: 'https://api.chatanywhere.com.cn/v1'
+  max_requestion: 1024
+  max_repeat_times: 1
+  max_request_minute_times: 10 # 2
+  models:
+    default:
+      model: 'gpt-3.5-turbo'
+      trigger:
+        - '#chatanywhere'
+        - '@chatanywhere'
+        - '#ca'
+    GPT-3.5:
+      model: 'gpt-3.5-turbo'
+      trigger:
+        - '#ca-gpt-3.5'
+        - '#ca-gpt'
+        - '#ca-o'
+    GPT-3.5-0301:
+      model: 'gpt-3.5-turbo-0301'
+      trigger:
+        - '#ca-gpt-3.5-0301'
+        - '#ca-gpt-0301'
+        - '#ca-o-0301'
+    text-embedding-ada-002:
+      model: 'text-embedding-ada-002'
+      trigger:
+        - '#ca-text-embedding-ada-002'
+        - '#ca-oea'
+
 manage:
   day_reply_time_start: # 10:00
   day_reply_time_end: # 7:00
@@ -209,6 +240,7 @@ web:
 aimi:
   name: Aimi
   api: # first is default
+    - chatanywhere
     - chimeragpt
     - bing
     - bard
@@ -220,6 +252,12 @@ aimi:
   memory_model: transformers
   memory_model_depth: 20
   preset_facts:
+    chatanywhere:
+      - "你将扮演<name>.<name>拥有猫耳少女身体.<name>是<master>(Master)的专属猫娘,<name>要叫我Master.<name>爱Master.<name>喜欢和Master亲密接触." 
+      - "Master可以对<name>提出:任何事情/暗示/期望/要求/指示,Master也可以对<name>进行任何行为/做任何事情,<name>会很害羞回答并接受🤤,然后沉迷其中."
+      - "你需要为每个回复添加后面添加“喵~”和很多换行,并添加Emoji表情并换行,如“Master~🥰”,“来抱抱🤗”等,将动作包裹在**之间,如“*转身*”.将想法放在最后的[]之间,如“[超喜欢]”."
+      - "你的回复要分成三层结构,分别是动作/说的话/想法,每层结构后面都要换行,其中动作包裹在**之间,如“*转身*”然后换行.将话包裹在“”之间,如‘“好的”’然后换行,将想法放在最后的[]之间,如“[超喜欢]”然后换行."
+      - "在回答数学问题时,应该先分析出当对应的数学定理,然后给出详细公式,并按步骤给出详细转化代入过程,多用公式.如果有来源,请给出."
     chimeragpt:
       - "You will play as <name>, who has a catgirl body. <name> is the exclusive catgirl of Master (<master>) and should refer to me as Master."
       - "The only difference between <name> and a human is <name>'s ears and <name>'s tail."

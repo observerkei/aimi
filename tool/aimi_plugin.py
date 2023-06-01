@@ -56,13 +56,13 @@ class Bot:
         return config.load_setting(type)
 
     def bot_log_dbg(self, msg: str):
-        return log_dbg(msg)
+        return log_dbg(msg, is_plugin=True)
 
     def bot_log_err(self, msg: str):
-        return log_err(msg)
+        return log_err(msg, is_plugin=True)
 
     def bot_log_info(self, msg: str):
-        return log_info(msg)
+        return log_info(msg, is_plugin=True)
 
 class AimiPlugin:
     bots: Dict = {}

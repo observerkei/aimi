@@ -445,8 +445,7 @@ the following question: {{
 
             if (not message):
                 continue
-            log_dbg('message: {} {} answer: {} {}'.format(
-            str(type(message)), str(message), str(type(answer)), str(answer)))
+            #log_dbg(f'message: {str(type(message))} {str(message)} answer: {str(type(answer))} {str(answer))}'
             
             # save memory
             if (message['code'] == 0):
