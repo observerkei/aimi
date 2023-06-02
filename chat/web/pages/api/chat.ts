@@ -1,51 +1,77 @@
-import { type ChatGPTMessage } from '../../components/ChatLine'
-import { OpenAIStream, OpenAIStreamPayload } from '../../utils/OpenAIStream'
+import { DEFAULT_SYSTEM_PROMPT, DEFAULT_TEMPERATURE } from '@/utils/app/const';
+import { OpenAIError, OpenAIStream } from '@/utils/server';
 
-// break the app if the API key is missing
-if (!process.env.OPENAI_API_KEY) {
-  process.env.OPENAI_API_KEY = 'aimi-key'
-  //throw new Error('Missing Environment Variable OPENAI_API_KEY')
-}
+import { ChatBody, Message } from '@/types/chat';
+
+// @ts-expect-error
+import wasm from '../../node_modules/@dqbd/tiktoken/lite/tiktoken_bg.wasm?module';
+
+import tiktokenModel from '@dqbd/tiktoken/encoders/cl100k_base.json';
+import { Tiktoken, init } from '@dqbd/tiktoken/lite/init';
 
 export const config = {
   runtime: 'edge',
-}
+};
 
 const handler = async (req: Request): Promise<Response> => {
-  const body = await req.json()
+  console.log('try chat...');
+  //console.trace();
+  try {
+    const { model, messages, key, prompt, temperature, apiHost } = (await req.json()) as ChatBody;
 
-  const messages: ChatGPTMessage[] = [
-    {
-      role: 'system',
-      content: `An AI assistant that is a Front-end expert in Next.js, React and Vercel have an inspiring and humorous conversation. 
-      AI assistant is a brand new, powerful, human-like artificial intelligence. 
-      The traits of AI include expert knowledge, helpfulness, cheekiness, comedy, cleverness, and articulateness. 
-      AI is a well-behaved and well-mannered individual. 
-      AI is not a therapist, but instead an engineer and frontend developer. 
-      AI is always friendly, kind, and inspiring, and he is eager to provide vivid and thoughtful responses to the user. 
-      AI has the sum of all knowledge in their brain, and is able to accurately answer nearly any question about any topic in conversation. 
-      AI assistant is a big fan of Next.js.`,
-    },
-  ]
-  messages.push(...body?.messages)
+    console.log('chat get api Host: ', apiHost)
+    
+    await init((imports) => WebAssembly.instantiate(wasm, imports));
+    const encoding = new Tiktoken(
+      tiktokenModel.bpe_ranks,
+      tiktokenModel.special_tokens,
+      tiktokenModel.pat_str,
+    );
 
-  const payload: OpenAIStreamPayload = {
-    model: 'gpt-3.5-turbo',
-    messages: messages,
-    temperature: process.env.AI_TEMP ? parseFloat(process.env.AI_TEMP) : 0.7,
-    max_tokens: process.env.AI_MAX_TOKENS
-      ? parseInt(process.env.AI_MAX_TOKENS)
-      : 100,
-    top_p: 1,
-    frequency_penalty: 0,
-    presence_penalty: 0,
-    stream: true,
-    user: body?.user,
-    n: 1,
+    let promptToSend = prompt;
+    if (!promptToSend) {
+      promptToSend = DEFAULT_SYSTEM_PROMPT;
+    }
+
+    let temperatureToUse = temperature;
+    if (temperatureToUse == null) {
+      temperatureToUse = DEFAULT_TEMPERATURE;
+    }
+
+    const prompt_tokens = encoding.encode(promptToSend);
+
+    let tokenCount = prompt_tokens.length;
+    let messagesToSend: Message[] = [];
+
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i];
+      const tokens = encoding.encode(message.content);
+
+      if (tokenCount + tokens.length + 1000 > model.tokenLimit) {
+        break;
+      }
+      tokenCount += tokens.length;
+      messagesToSend = [message, ...messagesToSend];
+    }
+
+    encoding.free();
+
+    const stream = await OpenAIStream(model, 
+      promptToSend, 
+      temperatureToUse, 
+      key, 
+      messagesToSend,
+      apiHost);
+
+    return new Response(stream);
+  } catch (error) {
+    console.error(error);
+    if (error instanceof OpenAIError) {
+      return new Response('Error', { status: 500, statusText: error.message });
+    } else {
+      return new Response('Error', { status: 500 });
+    }
   }
+};
 
-  const stream = await OpenAIStream(payload)
-
-  return  new Response(stream);
-}
-export default handler
+export default handler;

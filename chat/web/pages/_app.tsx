@@ -1,24 +1,25 @@
-import type { AppProps } from 'next/app'
-import { Analytics } from '@vercel/analytics/react'
-import type { LayoutProps } from '@vercel/examples-ui/layout'
+import { Toaster } from 'react-hot-toast';
+import { QueryClient, QueryClientProvider } from 'react-query';
 
-import { getLayout } from '@vercel/examples-ui'
+import { appWithTranslation } from 'next-i18next';
+import type { AppProps } from 'next/app';
+import { Inter } from 'next/font/google';
 
-import '@vercel/examples-ui/globals.css'
+import '@/styles/globals.css';
 
-function App({ Component, pageProps }: AppProps) {
-  const Layout = getLayout<LayoutProps>(Component)
+const inter = Inter({ subsets: ['latin'] });
+
+function App({ Component, pageProps }: AppProps<{}>) {
+  const queryClient = new QueryClient();
 
   return (
-    <Layout
-      title="ai-chatgpt"
-      path="solutions/ai-chatgpt"
-      description="ai-chatgpt"
-    >
-      <Component {...pageProps} />
-      <Analytics />
-    </Layout>
-  )
+    <div className={inter.className}>
+      <Toaster />
+      <QueryClientProvider client={queryClient}>
+        <Component {...pageProps} />
+      </QueryClientProvider>
+    </div>
+  );
 }
 
-export default App
+export default appWithTranslation(App);

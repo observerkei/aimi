@@ -1,47 +1,105 @@
-# AI Chat GPT-3 example
+# Chatbot UI
 
-This example shows how to implement a simple chat bot using Next.js, API Routes, and [OpenAI ChatGPT API](https://beta.openai.com/docs/api-reference/completions/create).
+Chatbot UI is an open source chat UI for AI models.
 
-### Components
+See a [demo](https://twitter.com/mckaywrigley/status/1640380021423603713?s=46&t=AowqkodyK6B4JccSOxSPew).
 
-- Next.js
-- OpenAI API (ChatGPT) - streaming
-- API Routes (Edge runtime) - streaming
+![Chatbot UI](./public/screenshots/screenshot-0402023.jpg)
 
-## How to Use
+## Updates
 
-You can choose from one of the following two methods to use this repository:
+Chatbot UI will be updated over time.
 
-### One-Click Deploy
+Expect frequent improvements.
 
-Deploy the example using [Vercel](https://vercel.com?utm_source=github&utm_medium=readme&utm_campaign=vercel-examples):
+**Next up:**
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/vercel/examples/tree/main/solutions/ai-chatgpt&project-name=ai-chatgpt&repository-name=ai-chatgpt&env=OPENAI_API_KEY)
+- [ ] Sharing
+- [ ] "Bots"
 
-### Clone and Deploy
+## Deploy
 
-Execute [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) with [pnpm](https://pnpm.io/installation) to bootstrap the example:
+**Vercel**
 
-```bash
-pnpm create next-app --example https://github.com/vercel/examples/tree/main/solutions/ai-chatgpt
+Host your own live version of Chatbot UI with Vercel.
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmckaywrigley%2Fchatbot-ui)
+
+**Docker**
+
+Build locally:
+
+```shell
+docker build -t chatgpt-ui .
+docker run -e OPENAI_API_KEY=xxxxxxxx -p 3000:3000 chatgpt-ui
 ```
 
-#### Set up environment variables
+Pull from ghcr:
 
-Rename [`.env.example`](.env.example) to `.env.local`:
-
-```bash
-cp .env.example .env.local
+```
+docker run -e OPENAI_API_KEY=xxxxxxxx -p 3000:3000 ghcr.io/mckaywrigley/chatbot-ui:main
 ```
 
-then, update `OPENAI_API_KEY` with your [OpenAI](https://beta.openai.com/account/api-keys) secret key.
+## Running Locally
 
-Next, run Next.js in development mode:
+**1. Clone Repo**
 
 ```bash
-pnpm dev
+git clone https://github.com/mckaywrigley/chatbot-ui.git
 ```
 
-The app should be up and running at http://localhost:3000.
+**2. Install Dependencies**
 
-Deploy it to the cloud with [Vercel](https://vercel.com/new?utm_source=github&utm_medium=readme&utm_campaign=edge-middleware-eap) ([Documentation](https://nextjs.org/docs/deployment)).
+```bash
+npm i
+```
+
+**3. Provide OpenAI API Key**
+
+Create a .env.local file in the root of the repo with your OpenAI API Key:
+
+```bash
+OPENAI_API_KEY=YOUR_KEY
+```
+
+> You can set `OPENAI_API_HOST` where access to the official OpenAI host is restricted or unavailable, allowing users to configure an alternative host for their specific needs.
+
+> Additionally, if you have multiple OpenAI Organizations, you can set `OPENAI_ORGANIZATION` to specify one.
+
+**4. Run App**
+
+```bash
+npm run dev
+```
+
+**5. Use It**
+
+You should be able to start chatting.
+
+## Configuration
+
+When deploying the application, the following environment variables can be set:
+
+| Environment Variable              | Default value                  | Description                                                                                                                               |
+| --------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| OPENAI_API_KEY                    |                                | The default API key used for authentication with OpenAI                                                                                   |
+| OPENAI_API_HOST                   | `https://api.openai.com`       | The base url, for Azure use `https://<endpoint>.openai.azure.com`                                                                         |
+| OPENAI_API_TYPE                   | `openai`                       | The API type, options are `openai` or `azure`                                                                                             |
+| OPENAI_API_VERSION                | `2023-03-15-preview`           | Only applicable for Azure OpenAI                                                                                                          |
+| AZURE_DEPLOYMENT_ID               |                                | Needed when Azure OpenAI, Ref [Azure OpenAI API](https://learn.microsoft.com/zh-cn/azure/cognitive-services/openai/reference#completions) |
+| OPENAI_ORGANIZATION               |                                | Your OpenAI organization ID                                                                                                               |
+| DEFAULT_MODEL                     | `gpt-3.5-turbo`                | The default model to use on new conversations, for Azure use `gpt-35-turbo`                                                               |
+| NEXT_PUBLIC_DEFAULT_SYSTEM_PROMPT | [see here](utils/app/const.ts) | The default system prompt to use on new conversations                                                                                     |
+| NEXT_PUBLIC_DEFAULT_TEMPERATURE   | 1                              | The default temperature to use on new conversations                                                                                       |
+| GOOGLE_API_KEY                    |                                | See [Custom Search JSON API documentation][GCSE]                                                                                          |
+| GOOGLE_CSE_ID                     |                                | See [Custom Search JSON API documentation][GCSE]                                                                                          |
+
+If you do not provide an OpenAI API key with `OPENAI_API_KEY`, users will have to provide their own key.
+
+If you don't have an OpenAI API key, you can get one [here](https://platform.openai.com/account/api-keys).
+
+## Contact
+
+If you have any questions, feel free to reach out to Mckay on [Twitter](https://twitter.com/mckaywrigley).
+
+[GCSE]: https://developers.google.com/custom-search/v1/overview
