@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "PORT=2464 next dev",
+    "dev": "NODE_OPTIONS='--inspect' PORT=2464 next dev",
     "build": "next build",
     "start": "PORT=2464 next start",
     "lint": "next lint",

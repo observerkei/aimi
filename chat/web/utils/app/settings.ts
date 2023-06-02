@@ -5,7 +5,7 @@ const STORAGE_KEY = 'settings';
 export const getSettings = (): Settings => {
   let settings: Settings = {
     theme: 'dark',
-    apiHost: '',
+    apiHost: 'localhost:4642',
   };
   const settingsJson = localStorage.getItem(STORAGE_KEY);
   if (settingsJson) {

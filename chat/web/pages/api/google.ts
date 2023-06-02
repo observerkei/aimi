@@ -9,13 +9,10 @@ import { Readability } from '@mozilla/readability';
 import endent from 'endent';
 import jsdom, { JSDOM } from 'jsdom';
 
-import { useContext } from 'react';
-import HomeContext from '@/pages/api/home/home.context';
-
 const handler = async (req: NextApiRequest, res: NextApiResponse<any>) => {
  
   try {
-    const { messages, key, model, googleAPIKey, googleCSEId } =
+    const { messages, key, model, googleAPIKey, googleCSEId, apiHost } =
       req.body as GoogleBody;
 
     const userMessage = messages[messages.length - 1];
@@ -112,10 +109,6 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<any>) => {
 
     Response:
     `;
-
-    const {
-      state: { apiHost },
-    } = useContext(HomeContext);
   
     const answerMessage: Message = { role: 'user', content: answerPrompt };
 
