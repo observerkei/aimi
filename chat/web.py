@@ -158,6 +158,22 @@ class AimiWebApi:
           "object": "chat.completion.chunk"
         }
         return 'event: message\ndata:' + json.dumps(stream) + "\n\n"
+
+    def __make_stream_stop(self) -> str:
+        stream = {
+          "choices": [
+            {
+              "delta": {},
+              "finish_reason": "stop",
+              "index": 2
+            }
+          ],
+          "created": 1677825464,
+          "id": "chatcmpl-6ptKyqKOGXZT6iQnqiXAH8adNLUzD",
+          "model": "gpt-3.5-turbo-0301",
+          "object": "chat.completion.chunk"
+        }
+        return 'event: message\ndata:' + json.dumps(stream) + "\n\n"
         
     def __listen_init(self):
     
@@ -214,6 +230,7 @@ class AimiWebApi:
             def event_stream(question: str):
                 if not len(question):
                     yield self.__make_stream_reply('question is empty.')
+                    yield self.__make_stream_stop()
                     yield 'event: end\ndata: [DONE]\n\n'
                     return
 
@@ -223,6 +240,7 @@ class AimiWebApi:
                     yield self.__make_stream_reply(message)
                     prev_text = answer["message"]
 
+                yield self.__make_stream_stop()
                 yield 'event: end\ndata: [DONE]\n\n'
             
             url = request.url
