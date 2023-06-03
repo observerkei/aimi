@@ -100,6 +100,8 @@ https://github.com/LSTM-Kirigaya/go-cqhttp-python-server
 
 https://github.com/vercel/examples
 
+https://github.com/mckaywrigley/chatbot-ui
+
 7. release claims
 
 Development and communication are welcome, final interpretation and copyright are reserved, based on the MIT agreement.
