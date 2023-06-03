@@ -12,6 +12,7 @@ class WolframAPI:
     client: Any
     app_id: str = ''
     trigger: List[str] = []
+    max_repeat_times: int = 1
     init: bool = False
 
     def __init__(self):
@@ -43,6 +44,12 @@ class WolframAPI:
         except Exception as e:
             log_err('fail to load wolfram config: ' + str(e))
             self.trigger = ['@wolfram', '#wolfram' ]
+
+        try:
+            self.max_repeat_times = setting['max_repeat_times']
+        except Exception as e:
+            log_err('fail to load wolfram config: ' + str(e))
+            self.max_repeat_times = 1
 
     def is_call(self, question) -> bool:
         for call in self.trigger:
@@ -172,29 +179,54 @@ class WolframAPI:
             return
         
         question = self.__del_trigger(question)
-        log_dbg(f'try ask: {question}')
 
         params = (
             ('podstate', 'Step-by-step solution'),
         )
 
-        ret = ''
-        try:
-            res = self.client.query(question, params)
-        except Exception as e:
-            log_err(f'fail to query wolfram: {e}')
-            answer['code'] = -1
-            yield answer
-            return
+        req_cnt = 0
+
+        while req_cnt < self.max_repeat_times:
+            req_cnt += 1
+
+            answer['code'] = 1
+
+            try:
+                log_dbg(f'try ask: {question}')
+                res = self.client.query(question, params)
+
+                plaintext = self.get_plaintext(res)
+                cq_image = self.get_cq_image(res)
+
+                message = plaintext
+                if (not message 
+                    or len(message) < 5
+                    or 'step-by-step solution unavailable' in str(message) 
+                    or not ("=" in message)
+                ):
+                    message = str(res)
+                    answer['message'] = message
+                    log_dbg(f'msg fail, res html.')
+                    yield answer
+
+                answer['message'] = message
+                answer['code'] = 0
+
+                yield answer
+                break
+
+            except Exception as e:
+                log_err(f'fail to query wolfram: {e}')
+                answer['code'] = -1
+                yield answer
+                continue
+
         """
         answer['code'] = 0
         answer['message'] = str(res)
         yield answer
         return
         """
-        
-        plaintext = self.get_plaintext(res)
-        cq_image = self.get_cq_image(res)
 
         """
         message = ''
@@ -210,16 +242,6 @@ class WolframAPI:
         yield answer
         """
 
-        message = plaintext
-        if (not message or 
-            not len(message) or 
-            'step-by-step solution unavailable' in str(message) or
-            not ("=" in message)
-        ):
-            message = str(res)
-        answer['message'] = message
-        yield answer
-
         """
         for img in cq_image.splitlines():
             img += '\n'
@@ -230,8 +252,5 @@ class WolframAPI:
         """
 
         #answer['message'] += cq_image
-        answer['code'] = 0
-
-        yield answer
 
 wolfram_api = WolframAPI()
