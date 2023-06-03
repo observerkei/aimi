@@ -2,7 +2,8 @@ from flask import Flask, request, render_template, Response
 import json
 import threading
 import time
-from typing import Any
+from typing import Any, List
+from pydantic import BaseModel
 
 from tool.util import log_info, log_err, log_dbg
 
@@ -67,8 +68,35 @@ openai_stream_response = [
     }
 ]
 
+class ModelInfoPermission(BaseModel):
+    id: str
+    object: str
+    created: int
+    allow_create_engine: bool
+    allow_sampling: bool
+    allow_logprobs: bool
+    allow_search_indices: bool
+    allow_view: bool
+    allow_fine_tuning: bool
+    organization: str
+    group: Any
+    is_blocking: bool 
+
+class ModelInfo(BaseModel):
+    id: str
+    object: str
+    created: int
+    root: str
+    parent: Any
+    owned_by: str
+    permission: ModelInfoPermission
+
+class Models(BaseModel):
+    object: str
+    data: List[ModelInfo]
+
 class AimiWebApi:
-    api_host: str = '127.0.0.1'
+    api_host: str = 'localhost'
     api_port: int = 4642
     app: Any
     http_server: Any
@@ -80,6 +108,38 @@ class AimiWebApi:
     
     def register_ask_hook(self, ask_hook: Any):
         self.ask_hook = ask_hook
+
+    def __make_model_info(self, model) -> ModelInfo:
+        def __make_model_info_permission() -> ModelInfoPermission:
+            return ModelInfoPermission(
+                    id='',
+                    object='',
+                    created=0,
+                    allow_create_engine=False,
+                    allow_sampling=True,
+                    allow_logprobs=True,
+                    allow_search_indices=False,
+                    allow_view=True,
+                    allow_fine_tuning=False,
+                    organization='*',
+                    group=None,
+                    is_blocking=False
+                )
+        mod = ModelInfo(
+            id=model,
+            object='model',
+            created=0,
+            root=model,
+            parent=None,
+            owned_by='openai',
+            permission=__make_model_info_permission()
+        )
+        mod.id = model
+
+        return mod
+    
+    def __make_models(self, models: List[ModelInfo]) -> Models:
+        return Models(object='list', data=models)
 
     def __make_stream_reply(self, reply: str) -> str:
         stream = {
@@ -102,8 +162,53 @@ class AimiWebApi:
     def __listen_init(self):
     
         self.app = Flask(__name__)
+
+        @self.app.route('/v1/models', methods=['GET'])
+        def handle_get_models_request():
+            url = request.url
+            auth_header = ''
+            body = ''
+            try:
+                body = request.get_data().decode('utf-8')
+                # 获取HTTP头部中的 Authorization 值
+                auth_header = request.headers.get('Authorization')
+
+            except:
+                pass
+            log_dbg(f"Received a get request: URL={url}, body={body}")
+            # 输出Authorization值到控制台
+            log_dbg(f"Authorization header value: {auth_header}")
+
+            modelsObj = ''
+            try:
+                mod = self.__make_model_info('gpt-3.5-turbo')
+                log_dbg(f"mod: {str(mod)}")
+
+                models = self.__make_models([mod, ])
+                log_dbg(f"models: {str(models)}")
+
+                modelsObj = models.json()
+
+            except Exception as e:
+                log_err(f"{e}")
+
+            log_dbg(f"models obj: f{str(modelsObj)}")
+
+            return str(modelsObj)
+
+        @self.app.route('/', methods=['POST'])
+        def handle_post_index_request():
+            url = request.url
+            body = ''
+            try:
+                body = request.get_data().decode('utf-8')
+            except:
+                pass
+            log_dbg(f"Received a post index request: URL={url}, body={body}")
+
+            return 'ok'
         
-        @self.app.route('/api', methods=['POST'])
+        @self.app.route('/v1/chat/completions', methods=['POST'])
         def handle_post_api_request():
         
             def event_stream(question: str):
@@ -133,6 +238,10 @@ class AimiWebApi:
                 last_message = web_request["messages"][-1]
                 question = last_message['content']
                 log_dbg(f'get question: {question}')
+
+                # get model
+                model = web_request['model']
+                log_dbg(f"use model: {model}")
             except Exception as e:
                 log_err(f'fail to get requestion: {e}')
                 
