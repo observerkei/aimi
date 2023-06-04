@@ -557,9 +557,11 @@ the following question: {{
     ) -> Dict[str, List[str]]:
         bot_models = {}
 
-        models = bard_api.get_models()
+        bot_models[self.aimi_name] = ['auto']
+
+        models = openai_api.get_models()
         if len(models):
-            bot_models['Google'] = models
+            bot_models[openai_api.type] = models
         
         models = bing_api.get_models()
         if len(models):
@@ -569,16 +571,15 @@ the following question: {{
         if len(models):
             bot_models['Stephen Wolfram'] = models
         
-        models = openai_api.get_models()
+        models = bard_api.get_models()
         if len(models):
-            bot_models[openai_api.type] = models
+            bot_models['Google'] = models
         
         plugin_models = aimi_plugin.bot_get_models()
         for bot_type, models in plugin_models.items():
             if len(models):
                 bot_models[bot_type] = models
         
-        bot_models[self.aimi_name] = ['auto']
         #log_dbg(f"models: {str(bot_models)}")
 
         return bot_models
