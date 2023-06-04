@@ -70,19 +70,20 @@ class Bot:
     ):
         return ask_data['question']
 
-    # no need define bot_get_preset
-    def bot_get_preset(
-        self, 
-        ask_data
-    ):
-        return ask_data['preset']
-    
-    def bot_get_history(
+    # no need define bot_get_model
+    def bot_get_model(
         self,
         ask_data
     ):
-        return ask_data['history']
+        return ask_data['model']
 
+    # no need define bot_get_messages
+    def bot_get_messages(
+        self,
+        ask_data
+    ):
+        return ask_data['messages']
+    
     # no need define bot_set_response
     def bot_set_response(
         self, 
@@ -250,9 +251,9 @@ class AimiPlugin:
     def bot_ask(
         self, 
         bot_ask_type: str, 
-        question: str, 
-        preset: str = "", 
-        history: List[Dict] = [],
+        question: str,
+        model: str = "",
+        messages: List[Dict] = [],
         timeout: int = 60
     ) -> Generator[dict, None, None]:
         if not len(self.bots):
@@ -264,8 +265,8 @@ class AimiPlugin:
 
         ask_data = {
             "question": question,
-            "preset": preset,
-            "history": history,
+            "model": model,
+            "messages": messages,
         }
 
         for bot_type, bot in self.bots.items():

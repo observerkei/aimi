@@ -2,7 +2,7 @@ from flask import Flask, request, render_template, Response
 import json
 import threading
 import time
-from typing import Any, List
+from typing import Any, List, Dict
 from pydantic import BaseModel
 
 from tool.util import log_info, log_err, log_dbg
@@ -204,7 +204,7 @@ class AimiWebApi:
                     for model in models:
                         model_info = self.__make_model_info(model, owned_by)
                         model_infos.append(model_info)
-                        log_dbg(f"mod: {str(model)} owned_by: {str(owned_by)}")
+                        #log_dbg(f"mod: {str(model)} owned_by: {str(owned_by)}")
 
                 models = self.__make_models(model_infos)
                 #log_dbg(f"models: {str(models)}")
@@ -233,7 +233,11 @@ class AimiWebApi:
         @self.app.route('/v1/chat/completions', methods=['POST'])
         def handle_post_api_request():
         
-            def event_stream(question: str):
+            def event_stream(
+                question: str, 
+                model: str, 
+                owned_by: str,
+                context_messages: List[Dict]):
                 if not len(question):
                     yield self.__make_stream_reply('question is empty.')
                     yield self.__make_stream_stop()
@@ -241,7 +245,8 @@ class AimiWebApi:
                     return
 
                 prev_text = ''
-                for answer in self.ask_hook(question):
+
+                for answer in self.ask_hook(question, None, model, owned_by, context_messages):
                     message = answer["message"][len(prev_text) :]
                     yield self.__make_stream_reply(message)
                     prev_text = answer["message"]
@@ -254,23 +259,33 @@ class AimiWebApi:
             log_dbg(f"Received a api request: URL={url}, body={body}")
 
             question = ''
+            model = ''
+            owned_by = ''
+            context_messages = []
             try:
                 # 将json字符串转化为json数据
                 web_request = json.loads(body)
 
                 # 获取message数组的最后一条数据
-                last_message = web_request["messages"][-1]
+                context_messages = web_request["messages"]
+                last_message = context_messages[-1]
                 question = last_message['content']
                 log_dbg(f'get question: {question}')
 
+
                 # get model
                 model = web_request['model']
+                owned_by = web_request['owned_by']
                 log_dbg(f"use model: {model}")
+                log_dbg(f"model owned_by: {owned_by}")
             except Exception as e:
                 log_err(f'fail to get requestion: {e}')
+                model = 'auto'
+                owned_by = 'Aimi'
                 
             # 返回该响应
-            return Response(event_stream(question), mimetype='text/event-stream')
+            return Response(event_stream(question, model, owned_by, context_messages), 
+                            mimetype='text/event-stream')
 
     def server(self):
         from gevent import pywsgi

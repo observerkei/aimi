@@ -106,13 +106,15 @@ class BingAPI:
     def ask(
         self,
         question: str,
+        conversation_style: str,
         timeout: int = 360,
     ) -> Generator[dict, None, None]:
-        yield from self.__fuck_async(self.web_ask(question, timeout))
+        yield from self.__fuck_async(self.web_ask(question, conversation_style, timeout))
 
     async def web_ask(
         self,
         question: str,
+        conversation_style: str = None,
         timeout: int = 360,
     ) -> Generator[dict, None, None]:
         answer = { 
@@ -127,7 +129,8 @@ class BingAPI:
             return
             
         req_cnt = 0
-        conversation_style = self.__get_conversation_style(question)
+        if not conversation_style or not len(conversation_style):
+            conversation_style = self.__get_conversation_style(question)
         
         while req_cnt < self.max_repeat_times:
             req_cnt += 1

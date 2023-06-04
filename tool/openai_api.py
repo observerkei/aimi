@@ -19,6 +19,11 @@ class OpenAIAPI:
     trigger: List[str] = []
     model: str = ''
     models: List[str] = []
+    chat_completions_models: List[str] = [
+        'gpt-4', 'gpt-4-0314', 'gpt-4-32k', 
+        'gpt-4-32k-0314', 'gpt-3.5-turbo', 
+        'gpt-3.5-turbo-0301'
+    ]
     init: bool = False
 
     class InputType:
@@ -42,15 +47,15 @@ class OpenAIAPI:
     def ask(
         self,
         question: str,
-        preset: str = '',
-        history: List[Dict] = [],
+        model: str = '',
+        context_messages: List[Dict] = [],
         conversation_id: str = '',
         timeout: int = 360,
     ) -> Generator[dict, None, None]:
         if self.use_web_ask:
             yield from self.web_ask(question, conversation_id, timeout)
         else:
-            yield from self.api_ask(question, preset, history, timeout)
+            yield from self.api_ask(question, model, context_messages, timeout)
         
     def web_ask(
         self,
@@ -122,8 +127,8 @@ class OpenAIAPI:
     def api_ask(
         self,
         question: str,
-        preset: str = '',
-        history: List[Dict] = [],
+        bot_model: str = '',
+        messages: List[Dict] = [],
         timeout: int = 360,
     ) -> Generator[dict, None, None]:
         answer = { 
@@ -138,12 +143,9 @@ class OpenAIAPI:
         #}
 
         req_cnt = 0
-        bot_model = self.__get_bot_model(question)
+        if not bot_model or not len(bot_model):
+            bot_model = self.__get_bot_model(question)
         log_dbg(f"use model: {bot_model}")
-
-        messages = [{ 'role': 'system', 'content': preset }]
-        messages.extend(history)
-        messages.append({ 'role': 'user', 'content': question })
         log_dbg(f'msg: {str(messages)}')
 
         while req_cnt < self.max_repeat_times:
@@ -235,8 +237,10 @@ class OpenAIAPI:
         if (api_key and len(api_key)):
             openai.api_key = api_key
             try:
-                models = openai.Model.list()
+                models = openai.Model.list(model_type="chat")
                 for model in models['data']:
+                    if not (model.id in self.chat_completions_models):
+                        continue
                     log_dbg(f"avalible model: {str(model.id)}")
                     self.models.append(model.id)
 

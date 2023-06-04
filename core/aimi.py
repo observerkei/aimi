@@ -146,7 +146,7 @@ class Aimi:
         except Exception as e:
             log_err(f'fail to init aimi plugin: {e}')
 
-        chat_web.register_ask_hook(self.ask)
+        chat_web.register_ask_hook(self.web_ask)
         chat_web.register_get_models_hook(self.get_bot_models)
 
     def make_link_think(
@@ -427,13 +427,30 @@ the following question: {{
         
         return reply
     
+    def web_ask(
+        self,
+        question: str,
+        nickname: str = None,
+        model: str = 'auto',
+        owned_by: str = 'Aimi',
+        context_messages: Any = None
+    ) -> Generator[dict, None, None]:
+        if owned_by == self.aimi_name and model == 'auto':
+            return self.ask(question, nickname)
+        else:
+            return self.__post_question(
+                link_think=question, 
+                api_type=owned_by, 
+                model=model,
+                context_messages=context_messages)
+
     def ask(
         self,
         question: str,
         nickname: str = None
     ) -> Generator[dict, None, None]:
 
-        api_type = self.__question_api_type(question) 
+        api_type = self.__question_api_type(question)         
         nickname = nickname if nickname and len(nickname) else self.master_name
 
         preset = ''
@@ -442,8 +459,13 @@ the following question: {{
         talk_history = memory.search(question, self.max_link_think)
 
         link_think = self.make_link_think(question, nickname, api_type, preset, talk_history)
+        context_messages = memory.make_context_messages(question, preset, talk_history)
 
-        answer = self.__post_question(link_think, api_type, preset, talk_history)
+        answer = self.__post_question(
+            link_think=link_think, 
+            api_type=api_type, 
+            model=None,
+            context_messages=context_messages)
 
         for message in answer:
 
@@ -462,24 +484,24 @@ the following question: {{
         self, 
         link_think: str,
         api_type: str,
-        preset: str,
-        talk_history: Any
+        model: str,
+        context_messages: Any
     )-> Generator[dict, None, None]:
 
         log_dbg('use api: ' + str(api_type))
 
         if api_type == openai_api.type:
-            yield from self.__post_openai(link_think, preset, talk_history, memory.openai_conversation_id)
+            yield from self.__post_openai(link_think, model, context_messages, memory.openai_conversation_id)
         elif api_type == bing_api.type:
-            yield from self.__post_bing(link_think)
+            yield from self.__post_bing(link_think, model)
         elif api_type == bard_api.type:
             yield from self.__post_bard(link_think)
         elif aimi_plugin.bot_has_type(api_type):
-            yield from aimi_plugin.bot_ask(api_type, link_think, preset, talk_history)
+            yield from aimi_plugin.bot_ask(api_type, link_think, model, context_messages)
         elif api_type == wolfram_api.type:
             # at mk link think, already set wolfram response.
             if False and self.api[0] != wolfram_api.type:
-                yield from self.__post_question(link_think, self.api[0])
+                yield from self.__post_question(link_think, self.api[0], model, context_messages)
             else:
                 yield from self.__post_bing(link_think)
         else:
@@ -499,19 +521,20 @@ the following question: {{
     
     def __post_bing(
         self, 
-        question: str
+        question: str,
+        model: str = None,
     )-> Generator[dict, None, None]:
-        yield from bing_api.ask(question)
+        yield from bing_api.ask(question, model)
     
     def __post_openai(
         self, 
         question: str,
-        preset: str,
-        history: List[Dict] = [],
+        model: str,
+        context_messages: List[Dict] = [],
         openai_conversation_id: str = None
     )-> Generator[dict, None, None]:
         
-        answer = openai_api.ask(question, preset, history, openai_conversation_id)
+        answer = openai_api.ask(question, model, context_messages, openai_conversation_id)
         # get yield last val
         for message in answer:
             #log_dbg('now msg: ' + str(message))
@@ -555,7 +578,8 @@ the following question: {{
             if len(models):
                 bot_models[bot_type] = models
         
-        log_dbg(f"models: {str(bot_models)}")
+        bot_models[self.aimi_name] = ['auto']
+        #log_dbg(f"models: {str(bot_models)}")
 
         return bot_models
 
