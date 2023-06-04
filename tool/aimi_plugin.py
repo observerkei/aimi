@@ -28,6 +28,13 @@ class Bot:
             return True
         return False
 
+    # get support model
+    def get_models(
+        self,
+        caller: Any
+    ) -> List[str]:
+        return [self.type]
+
     # ask bot
     def ask(
         self, 
@@ -186,7 +193,22 @@ class AimiPlugin:
                 log_err(f'fail to check type bot: {bot_type} err: {e}')
         
         return False
+    
+    def bot_get_models(
+        self
+    ) -> Dict[str, List[str]]:
+        if not len(self.bots):
+            return {}
         
+        bot_models = {}
+
+        for bot_type, bot in self.bots.items():
+            try:
+                bot_models[bot_type] =  bot.get_models(self.bot_obj)
+            except Exception as e:
+                log_err(f'fail to get bot models type: {bot_type} err: {e}')
+
+        return bot_models
 
     def bot_is_call(
         self, 

@@ -33,6 +33,7 @@ class BingAPI:
     init: bool = False
     cur_messages: int = 0
     max_messages: int = 0
+    models: List[str] = []
 
     def need_ask_setup(self) -> bool:
         return False
@@ -233,6 +234,12 @@ class BingAPI:
                log_dbg("fail to get res " + str(e))
                break
 
+    def get_models(self) -> List[str]:
+        if not self.init:
+            return []
+    
+        return self.models
+
     def __init__(self) -> None:
 
         self.__load_setting()
@@ -242,6 +249,12 @@ class BingAPI:
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
         self.loop = asyncio.get_event_loop()
+
+        self.models = [
+            self.ConversationStyle.creative, 
+            self.ConversationStyle.balanced, 
+            self.ConversationStyle.precise
+        ]
         
     async def __bot_create(self):
         try:    

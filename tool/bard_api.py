@@ -22,6 +22,12 @@ class BardAPI:
                 return True
         return False
 
+    def get_models(self) -> List[str]:
+        if not self.init:
+            return []
+    
+        return [self.type]
+
     def ask(
         self,
         question: str,

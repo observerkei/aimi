@@ -58,6 +58,12 @@ class WolframAPI:
         
         return False
 
+    def get_models(self) -> List[str]:
+        if not self.init:
+            return []
+    
+        return [self.type]
+
     def get_sub_from_context(self, context, title):
         log_dbg(f"type: {str(type(context))}")
 

@@ -101,6 +101,7 @@ class AimiWebApi:
     app: Any
     http_server: Any
     ask_hook: Any
+    get_models_hook: Any
 
     def __init__(self):
         self.__listen_init()
@@ -108,8 +109,11 @@ class AimiWebApi:
     
     def register_ask_hook(self, ask_hook: Any):
         self.ask_hook = ask_hook
+    
+    def register_get_models_hook(self, get_models_hook: Any):
+        self.get_models_hook = get_models_hook
 
-    def __make_model_info(self, model) -> ModelInfo:
+    def __make_model_info(self, model, owned_by) -> ModelInfo:
         def __make_model_info_permission() -> ModelInfoPermission:
             return ModelInfoPermission(
                     id='',
@@ -131,7 +135,7 @@ class AimiWebApi:
             created=0,
             root=model,
             parent=None,
-            owned_by='openai',
+            owned_by=owned_by,
             permission=__make_model_info_permission()
         )
         mod.id = model
@@ -195,10 +199,14 @@ class AimiWebApi:
 
             modelsObj = ''
             try:
-                mod = self.__make_model_info('gpt-3.5-turbo')
-                #log_dbg(f"mod: {str(mod)}")
+                model_infos = []
+                for owned_by, models in self.get_models_hook().items():
+                    for model in models:
+                        model_info = self.__make_model_info(model, owned_by)
+                        model_infos.append(model_info)
+                        log_dbg(f"mod: {str(model)} owned_by: {str(owned_by)}")
 
-                models = self.__make_models([mod, ])
+                models = self.__make_models(model_infos)
                 #log_dbg(f"models: {str(models)}")
 
                 modelsObj = models.json()

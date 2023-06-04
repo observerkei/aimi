@@ -18,6 +18,7 @@ class OpenAIAPI:
     api_base: str
     trigger: List[str] = []
     model: str = ''
+    models: List[str] = []
     init: bool = False
 
     class InputType:
@@ -31,6 +32,12 @@ class OpenAIAPI:
                 return True
         
         return False
+
+    def get_models(self) -> List[str]:
+        if not self.init:
+            return []
+    
+        return self.models
 
     def ask(
         self,
@@ -230,7 +237,8 @@ class OpenAIAPI:
             try:
                 models = openai.Model.list()
                 for model in models['data']:
-                    log_dbg(f"avalible model: {str(model['id'])}")
+                    log_dbg(f"avalible model: {str(model.id)}")
+                    self.models.append(model.id)
 
                 self.init = True
                 self.use_web_ask = False

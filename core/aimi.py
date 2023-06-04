@@ -147,6 +147,7 @@ class Aimi:
             log_err(f'fail to init aimi plugin: {e}')
 
         chat_web.register_ask_hook(self.ask)
+        chat_web.register_get_models_hook(self.get_bot_models)
 
     def make_link_think(
         self,
@@ -527,7 +528,37 @@ the following question: {{
                 log_dbg(f"no conv_id")
 
             yield message
+    
+    def get_bot_models(
+        self
+    ) -> Dict[str, List[str]]:
+        bot_models = {}
+
+        models = bard_api.get_models()
+        if len(models):
+            bot_models['Google'] = models
         
+        models = bing_api.get_models()
+        if len(models):
+            bot_models[bing_api.type] = models
+        
+        models = wolfram_api.get_models()
+        if len(models):
+            bot_models['Stephen Wolfram'] = models
+        
+        models = openai_api.get_models()
+        if len(models):
+            bot_models[openai_api.type] = models
+        
+        plugin_models = aimi_plugin.bot_get_models()
+        for bot_type, models in plugin_models.items():
+            if len(models):
+                bot_models[bot_type] = models
+        
+        log_dbg(f"models: {str(bot_models)}")
+
+        return bot_models
+
     def __load_setting(self):
         try:
             setting = config.load_setting('aimi')
