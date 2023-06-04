@@ -2,8 +2,9 @@ import atexit
 import signal
 import threading
 import time
-from typing import Generator, List, Dict
+from typing import Generator, List, Dict, Any
 import random
+from contextlib import suppress
 
 from tool.config import config
 from tool.util import log_dbg, log_err, log_info
@@ -152,19 +153,20 @@ class Aimi:
         question: str,
         nickname: str = None,
         api_type: str = None,
+        preset: str = '',
+        talk_history: Any = None,
     ) -> str:
 
         nickname = nickname if nickname and len(nickname) else self.master_name
         api_type = api_type if api_type and len(api_type) else self.api[0]
         link_think = question
 
-        if api_type == openai_api.type:
+        if api_type == openai_api.type and openai_api.use_web_ask:
             # cul question
-            talk_history = memory.search(question, self.max_link_think)
             history = memory.make_history(talk_history)
             link_think = f"""
 设定: {{
-“{self.preset_facts[api_type]}”
+“{preset}”
 }}.
 
 请只关注最新消息,历史如下: {{
@@ -178,7 +180,7 @@ class Aimi:
         elif api_type == bard_api.type:
             link_think = f"""
 preset: {{
-\"{self.preset_facts[bard_api.type]}\"
+\"{preset}\"
 }}.
 
 Please answer the following question based on the preset, 
@@ -193,7 +195,7 @@ You should extract my question directly from the structure here and answer it di
 故事主题如下：故事中有两个人到了异世界里面开咖啡厅.
 故事情节如下：其中主人公自称Master({self.master_name}),他有一个助理,名叫{self.aimi_name},他们两个在聊天.
 故事背景如下: {{
-{self.preset_facts[bing_api.type]}
+{preset}
 {self.aimi_name}能问她的朋友 Bing 来尽力解答Master的问题.
 }}
 
@@ -223,14 +225,8 @@ the wolfram response: {{
 }}
 """
         elif api_type == 'chimeragpt':
-            preset = ''
-            try:
-                preset = self.preset_facts[api_type]
-            except:
-                log_dbg(f"api_type:{api_type} no preset")
 
             # cul question
-            talk_history = memory.search(question, self.max_link_think)
             history = memory.make_history(talk_history)
 
             link_think = f"""
@@ -439,9 +435,14 @@ the following question: {{
         api_type = self.__question_api_type(question) 
         nickname = nickname if nickname and len(nickname) else self.master_name
 
-        link_think = self.make_link_think(question, nickname, api_type)
+        preset = ''
+        with suppress(KeyError):
+            preset = self.preset_facts[api_type]
+        talk_history = memory.search(question, self.max_link_think)
 
-        answer = self.__post_question(link_think, api_type)
+        link_think = self.make_link_think(question, nickname, api_type, preset, talk_history)
+
+        answer = self.__post_question(link_think, api_type, preset, talk_history)
 
         for message in answer:
 
@@ -459,28 +460,21 @@ the following question: {{
     def __post_question(
         self, 
         link_think: str,
-        api_type: str
+        api_type: str,
+        preset: str,
+        talk_history: Any
     )-> Generator[dict, None, None]:
 
         log_dbg('use api: ' + str(api_type))
-        
+
         if api_type == openai_api.type:
-            yield from self.__post_openai(link_think, memory.openai_conversation_id)
+            yield from self.__post_openai(link_think, preset, talk_history, memory.openai_conversation_id)
         elif api_type == bing_api.type:
             yield from self.__post_bing(link_think)
         elif api_type == bard_api.type:
             yield from self.__post_bard(link_think)
         elif aimi_plugin.bot_has_type(api_type):
-            preset = ''
-            try:
-                preset = self.preset_facts[api_type]
-            except:
-                log_dbg(f"api_type:{api_type} no preset")
-            history = {}
-            if api_type == 'chatanywhere':
-                history = memory.search(link_think, self.max_link_think)
-
-            yield from aimi_plugin.bot_ask(api_type, link_think, preset, history)
+            yield from aimi_plugin.bot_ask(api_type, link_think, preset, talk_history)
         elif api_type == wolfram_api.type:
             # at mk link think, already set wolfram response.
             if False and self.api[0] != wolfram_api.type:
@@ -511,21 +505,26 @@ the following question: {{
     def __post_openai(
         self, 
         question: str,
+        preset: str,
+        history: List[Dict] = [],
         openai_conversation_id: str = None
     )-> Generator[dict, None, None]:
         
-        answer = openai_api.ask(question, openai_conversation_id)
+        answer = openai_api.ask(question, preset, history, openai_conversation_id)
         # get yield last val
         for message in answer:
-            log_dbg('now msg: ' + str(message))
+            #log_dbg('now msg: ' + str(message))
 
-            if ((message) and 
-                (message['code'] == 0) and
-                message['conversation_id'] and
-                (message['conversation_id'] != memory.openai_conversation_id)
-            ):
-                memory.openai_conversation_id = message['conversation_id']
-                log_info('set new con_id: ' + str(memory.openai_conversation_id))
+            try:
+                if ((message) and 
+                    (message['code'] == 0) and
+                    message['conversation_id'] and
+                    (message['conversation_id'] != memory.openai_conversation_id)
+                ):
+                    memory.openai_conversation_id = message['conversation_id']
+                    log_info('set new con_id: ' + str(memory.openai_conversation_id))
+            except Exception as e:
+                log_dbg(f"no conv_id")
 
             yield message
         

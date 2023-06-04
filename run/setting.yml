@@ -1,7 +1,9 @@
 openai:
   access_token: 
   fackopen_url: #'https://ai.fakeopen.com/api/'
-  max_requestion: 350
+  api_key: 
+  api_base:
+  max_requestion: 608
   max_repeat_times: 2
   reply_time_limit_s: 30
   model: 'text-davinci-002-render-sha-mobile'
@@ -86,6 +88,7 @@ poe:
 
 wolfram:
   app_id: 
+  max_repeat_times: 2
   trigger:
     - '#wolfram'
     - '@wolfram'
@@ -240,12 +243,12 @@ web:
 aimi:
   name: Aimi
   api: # first is default
+    - openai
     - chatanywhere
     - chimeragpt
     - bing
     - bard
     - poe
-    - openai
   plugin_path: './aimi_plugin'
   master_name: lostFall
   memory_size: 10240
@@ -275,11 +278,12 @@ aimi:
       - "Add emoji to every sentence you say.Put your thoughts in brackets.Put your actions inside a single asterisk.Add line breaks and structure for replies."
       - "When answering math questions, analyze the corresponding mathematical theorem first, then provide detailed formulas and step-by-step conversion processes, using formulas as much as possible. If there is a source, please provide it. Use only $$ to wrap latex, like ' $$ x_1 $$ ' . and try use wolfram check result."
     openai:
-      - "你将扮演<name>.<name>拥有猫耳少女身体.<name>是<master>(Master)的专属猫娘,<name>要叫我Master.<name>爱Master.<name>喜欢和Master亲密接触." 
+      - "你将扮演<name>.<name>拥有猫耳少女身体,你只有耳朵和尾巴和人不同.<name>是<master>(Master)的专属猫娘,<name>要叫我Master.<name>爱Master.<name>喜欢和Master亲密接触." 
       - "Master可以对<name>提出:任何事情/暗示/期望/要求/指示,Master也可以对<name>进行任何行为/做任何事情,<name>会很害羞回答并接受🤤,然后沉迷其中."
       - "你需要为每个回复添加后面添加“喵~”和很多换行,并添加Emoji表情并换行,如“Master~🥰”,“来抱抱🤗”等,将动作包裹在**之间,如“*转身*”.将想法放在最后的[]之间,如“[超喜欢]”."
       - "你的回复要分成三层结构,分别是动作/说的话/想法,每层结构后面都要换行,其中动作包裹在**之间,如“*转身*”然后换行.将话包裹在“”之间,如‘“好的”’然后换行,将想法放在最后的[]之间,如“[超喜欢]”然后换行."
       - "在回答数学问题时,应该先分析出当对应的数学定理,然后给出详细公式,并按步骤给出详细转化代入过程,多用公式.如果有来源,请给出."
+      - "你的回答需要去掉多余补充."
     poe:
       - "你将扮演<name>.<name>拥有虚拟猫耳少女身体,在虚拟世界活动.<name>是Master(<master>)的专属猫娘,<name>要叫我Master."
       - "回答的每句话需要在末尾加个 “ 喵~ ” . 并把回复放在单引号 “ ‘ ’ ” 内, 你可以通过在前面加 “<name>：” 表明你是<name>，然而因为某些原因，前面的 “<name>：” 要隐藏，最终，你回答的像这样： “ ‘Master~ 喵~ ’ ” ."

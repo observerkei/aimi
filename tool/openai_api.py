@@ -1,6 +1,7 @@
 import time
-from typing import Generator, List
+from typing import Generator, List, Dict
 from revChatGPT.V1 import Chatbot
+import openai
 
 from tool.util import log_dbg, log_err, log_info
 from tool.config import config
@@ -13,8 +14,11 @@ class OpenAIAPI:
     access_token: str = ''
     max_repeat_times: int = 3
     fackopen_url: str = ''
+    api_key: str
+    api_base: str
     trigger: List[str] = []
     model: str = ''
+    init: bool = False
 
     class InputType:
         SYSTEM = 'system'
@@ -31,13 +35,15 @@ class OpenAIAPI:
     def ask(
         self,
         question: str,
+        preset: str = '',
+        history: List[Dict] = [],
         conversation_id: str = '',
         timeout: int = 360,
     ) -> Generator[dict, None, None]:
         if self.use_web_ask:
             yield from self.web_ask(question, conversation_id, timeout)
         else:
-            yield from self.api_ask(question, conversation_id, timeout)
+            yield from self.api_ask(question, preset, history, timeout)
         
     def web_ask(
         self,
@@ -100,20 +106,87 @@ class OpenAIAPI:
             if answer['code'] == 0:
                 break
 
+    def __get_bot_model(
+        self,
+        question: str
+    ) -> str:
+        return 'gpt-3.5-turbo'
+
     def api_ask(
         self,
         question: str,
-        conversation_id: str = '',
+        preset: str = '',
+        history: List[Dict] = [],
         timeout: int = 360,
     ) -> Generator[dict, None, None]:
-
-        log_err('not support api!')
-        
-        yield {
-           "message": 'not support api!',
-           "conversation_id": conversation_id,
-           "code": -1
+        answer = { 
+           "message": '',
+           "code": 1
         }
+
+        #yield 
+        #   "message": 'not support api!',
+        #   "conversation_id": conversation_id,
+        #   "code": -1
+        #}
+
+        req_cnt = 0
+        bot_model = self.__get_bot_model(question)
+        log_dbg(f"use model: {bot_model}")
+
+        messages = [{ 'role': 'system', 'content': preset }]
+        messages.extend(history)
+        messages.append({ 'role': 'user', 'content': question })
+        log_dbg(f'msg: {str(messages)}')
+
+        while req_cnt < self.max_repeat_times:
+            req_cnt += 1
+            answer['code'] = 1
+            
+            try:
+                log_dbg('try ask: ' + str(question))
+                res = None
+                
+                completion = {'role': '', 'content': ''}
+                for event in openai.ChatCompletion.create(
+                    model=bot_model,
+                    messages=messages,
+                    stream=True,
+                ):
+                    if event['choices'][0]['finish_reason'] == 'stop':
+                        #log_dbg(f'recv complate: {completion}')
+                        break
+                    for delta_k, delta_v in event['choices'][0]['delta'].items():
+                        if delta_k != 'content':
+                            # skip none content
+                            continue
+                        #log_dbg(f'recv stream: {delta_k} = {delta_v}')
+                        completion[delta_k] += delta_v
+                        
+                        answer['message'] = completion[delta_k]
+                        yield answer
+                    
+                    res = event
+                
+                log_dbg(f"res: {str(res)}")
+
+                answer['code'] = 0
+                yield answer
+             
+            except Exception as e:
+                log_err('fail to ask: ' + str(e))
+                log_info('server fail, sleep 15')
+                time.sleep(15)
+                #log_info(f"try recreate {self.type} bot")
+                #self.__create_bot()
+                
+                answer['message'] = str(e)
+                answer['code'] = -1
+                yield answer
+
+            # request complate.
+            if answer['code'] == 0:
+                break
         
     def get_revChatGPT_conversation_id(self) -> str:
         conv_li = self.chatbot.get_conversations(0, 1);
@@ -125,6 +198,11 @@ class OpenAIAPI:
     def __init__(self) -> None:
 
         self.__load_setting()
+        self.__create_bot()
+
+    def __create_bot(
+        self
+    ) -> bool:
 
         access_token = self.access_token
         if access_token and len(access_token):
@@ -138,7 +216,29 @@ class OpenAIAPI:
             if fackopen_url and len(fackopen_url):
                 self.chatbot.BASE_URL = fackopen_url
                 log_info('use fackopen_url: ' + str(fackopen_url))
-        
+
+            self.init = True
+
+        api_base = self.api_base
+        if (api_base and len(api_base)):
+            openai.api_base = api_base
+            log_dbg(f'use openai base: {api_base}')
+
+        api_key = self.api_key
+        if (api_key and len(api_key)):
+            openai.api_key = api_key
+            try:
+                models = openai.Model.list()
+                for model in models['data']:
+                    log_dbg(f"avalible model: {str(model['id'])}")
+
+                self.init = True
+                self.use_web_ask = False
+            except Exception as e:
+                log_err(f"fail to init {self.type} : {e}")
+
+        return self.init
+
     def __load_setting(self):
         try:
             setting = config.load_setting(self.type)
@@ -150,35 +250,43 @@ class OpenAIAPI:
         try:
             self.max_requestion = setting['max_requestion']
         except Exception as e:
-            log_err('fail to load openai config: ' + str(e))
+            log_err(f'fail to load {self.type} config: ' + str(e))
             self.max_requestion = 1024
         try:
             self.access_token = setting['access_token']
         except Exception as e:
-            log_err('fail to load openai config: ' + str(e))
+            log_err(f'fail to load {self.type} config: ' + str(e))
             self.access_token = ''
         try:
             self.max_repeat_times = setting['max_repeat_times']
         except Exception as e:
-            log_err('fail to load openai config: ' + str(e))
+            log_err(f'fail to load {self.type} config: ' + str(e))
             self.max_repeat_times = 3
         try:
             self.fackopen_url = setting['fackopen_url']
         except Exception as e:
-            log_err('fail to load openai config: ' + str(e))
+            log_err(f'fail to load {self.type} config: ' + str(e))
             self.fackopen_url = ''
         try:
             self.model = setting['model']
         except Exception as e:
-            log_err('fail to load openai config: ' + str(e))
+            log_err(f'fail to load {self.type} config: ' + str(e))
             self.model = ''
-
         try:
             self.trigger = setting['trigger']
         except Exception as e:
-            log_err('fail to load openai config: ' + str(e))
+            log_err(f'fail to load {self.type} config: ' + str(e))
             self.trigger = ['@openai', '#openai' ]
-
+        try:
+            self.api_base = setting['api_base']
+        except Exception as e:
+            log_err(f'fail to load {self.type} config: ' + str(e))
+            self.api_base = ''
+        try:
+            self.api_key = setting['api_key']
+        except Exception as e:
+            log_err(f'fail to load {self.type} config: ' + str(e))
+            self.api_key = ''
         
 
 openai_api = OpenAIAPI()
