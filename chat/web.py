@@ -191,24 +191,22 @@ class AimiWebApi:
 
             except:
                 pass
-            log_dbg(f"Received a get request: URL={url}, body={body}")
-            # 输出Authorization值到控制台
-            log_dbg(f"Authorization header value: {auth_header}")
+            log_dbg(f"Received a get request: URL={url}, Authorization={auth_header}, body={body}")
 
             modelsObj = ''
             try:
                 mod = self.__make_model_info('gpt-3.5-turbo')
-                log_dbg(f"mod: {str(mod)}")
+                #log_dbg(f"mod: {str(mod)}")
 
                 models = self.__make_models([mod, ])
-                log_dbg(f"models: {str(models)}")
+                #log_dbg(f"models: {str(models)}")
 
                 modelsObj = models.json()
 
             except Exception as e:
                 log_err(f"{e}")
 
-            log_dbg(f"models obj: f{str(modelsObj)}")
+            #log_dbg(f"models obj: f{str(modelsObj)}")
 
             return str(modelsObj)
 
