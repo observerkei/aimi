@@ -21,6 +21,7 @@ export const ModelSelect = () => {
       handleUpdateConversation(selectedConversation, {
         key: 'model',
         value: models.find(
+          /* 这里需要注意，id要和选项对应上，才能更新选中的模型 */
           (model) => model.id === e.target.value,
         ) as OpenAIModel,
       });
@@ -46,7 +47,7 @@ export const ModelSelect = () => {
             >
               {model.id === defaultModelId
                 ? `Default (${model.name})`
-                : model.name}
+                : `[${model.owned_by}] ${model.name}`}
             </option>
           ))}
         </select>

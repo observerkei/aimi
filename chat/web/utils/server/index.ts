@@ -51,7 +51,7 @@ export const OpenAIStream = async (
     },
     method: 'POST',
     body: JSON.stringify({
-      ...(OPENAI_API_TYPE === 'openai' && {model: model.id}),
+      ...(OPENAI_API_TYPE === 'openai' && {model: model.name, owned_by: model.owned_by }),
       messages: [
         {
           role: 'system',

@@ -20,6 +20,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { model, messages, key, prompt, temperature, apiHost } = (await req.json()) as ChatBody;
 
     console.log('chat get api Host: ', apiHost)
+    console.log('chat model: ', JSON.stringify(model))
     
     await init((imports) => WebAssembly.instantiate(wasm, imports));
     const encoding = new Tiktoken(

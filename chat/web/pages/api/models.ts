@@ -63,8 +63,9 @@ const handler = async (req: Request): Promise<Response> => {
           } else */
           {
             return {
-              id: model.id,
-              name: `[${model.category}] ${model.id}`,
+              id: `[${model.owned_by}] ${model.id}`,
+              name: model.id,
+              owned_by: model.owned_by,
             };
           }
         }

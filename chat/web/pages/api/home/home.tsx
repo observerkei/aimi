@@ -353,6 +353,7 @@ const Home = ({
 
   useEffect(() => {
     if (data) dispatch({ field: 'models', value: data });
+    //console.log('getmodels: ', JSON.stringify(data))
   }, [data, dispatch]);
 
   
