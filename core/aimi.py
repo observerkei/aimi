@@ -242,7 +242,7 @@ Please focus only on the latest news. History follows: {{
 Based on the preset and our conversation history, and my previous responses, 
 answer the following question without adding additional descriptions, 
 and without starting with '{self.aimi_name}:'
-the following question: {{
+answer this following question: {{
 {nickname} say: “{question}”
 }}.
 """
@@ -438,8 +438,17 @@ the following question: {{
         if owned_by == self.aimi_name and model == 'auto':
             return self.ask(question, nickname)
         else:
+            preset = context_messages[0]['content']
+            talk_history = context_messages[1:]
+            link_think = self.make_link_think(
+                    question=question, 
+                    nickname=None, 
+                    api_type=owned_by, 
+                    preset=preset, 
+                    talk_history=talk_history)
+
             return self.__post_question(
-                link_think=question, 
+                link_think=link_think, 
                 api_type=owned_by, 
                 model=model,
                 context_messages=context_messages)
@@ -569,11 +578,11 @@ the following question: {{
         
         models = wolfram_api.get_models()
         if len(models):
-            bot_models['Stephen Wolfram'] = models
+            bot_models[wolfram_api.type] = models
         
         models = bard_api.get_models()
         if len(models):
-            bot_models['Google'] = models
+            bot_models[bard_api.type] = models
         
         plugin_models = aimi_plugin.bot_get_models()
         for bot_type, models in plugin_models.items():

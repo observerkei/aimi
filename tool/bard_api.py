@@ -26,7 +26,7 @@ class BardAPI:
         if not self.init:
             return []
     
-        return [self.type]
+        return [f"Google {self.type}"]
 
     def ask(
         self,

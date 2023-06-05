@@ -247,7 +247,30 @@ class OpenAIAPI:
                 self.init = True
                 self.use_web_ask = False
             except Exception as e:
-                log_err(f"fail to init {self.type} : {e}")
+                log_err(f"fail to get model {self.type} : {e}")
+
+        if not self.init:
+            try:
+                hello = '状态正常?请回答‘是’或‘否’.'
+                bot_model=self.__get_bot_model(hello)
+                for event in openai.ChatCompletion.create(
+                    model=bot_model,
+                    messages=[{'role': 'user', 'content': hello}],
+                    stream=True,
+                ):
+                    if event['choices'][0]['finish_reason'] == 'stop':
+                        #log_dbg(f'recv complate: {completion}')
+                        break;
+                    log_dbg(f'{str(event)}')
+
+                self.models.append(bot_model)
+                self.init = True
+                self.use_web_ask = False
+            except Exception as e:
+                log_err(f"fail to ask {self.type}: {e}")
+
+
+            
 
         return self.init
 

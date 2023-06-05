@@ -62,7 +62,7 @@ class WolframAPI:
         if not self.init:
             return []
     
-        return [self.type]
+        return [f"Stephen Wolfram {self.type}alpha"]
 
     def get_sub_from_context(self, context, title):
         log_dbg(f"type: {str(type(context))}")
