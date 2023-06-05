@@ -9,7 +9,7 @@ from tool.config import config
 class OpenAIAPI:
     type: str = 'openai'
     chatbot: Chatbot
-    use_web_ask: bool = True
+    use_web_ask: bool = False
     max_requestion: int = 1024
     access_token: str = ''
     max_repeat_times: int = 3

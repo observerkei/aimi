@@ -66,6 +66,7 @@ const handler = async (req: Request): Promise<Response> => {
               id: `[${model.owned_by}] ${model.id}`,
               name: model.id,
               owned_by: model.owned_by,
+              tokenLimit: model.tokenLimit ? model.tokenLimit : 4000,
             };
           }
         }
