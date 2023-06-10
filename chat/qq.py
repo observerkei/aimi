@@ -538,10 +538,10 @@ class ChatQQ:
             log_dbg(f'no need manage: [{self.manage.reply_cur_cnt}/{self.manage.reply_max_cnt}]')
             return
         
-        #self.reply_group(group_id, self.master_id, f' {notify_msg}')
-        ban_api = self.go_cqhttp.get_group_ban(group_id, user_id, self.manage.reply_time_limit_s)
+        self.reply_group(group_id, self.master_id, f' {notify_msg}')
         self.manage.reply_cur_cnt = 0
-        return self.reply_url(ban_api)
+        #ban_api = self.go_cqhttp.get_group_ban(group_id, user_id, self.manage.reply_time_limit_s)
+        #return self.reply_url(ban_api)
 
     def __init__(self):
         self.__load_setting()

@@ -25,7 +25,7 @@ class BingAPI:
           'XI',   'XII',   'XIII',   'XIV',  'XV',
          'XVI',  'XVII',  'XVIII',  'XVIV',  'XX',
          'XXI',  'XXII',  'XXIII',  'XXIV', 'XXV',
-        'XXVI', 'XXBII', 'XXVIII', 'XXVIV', 'XXX',
+        'XXVI', 'XXVII', 'XXVIII', 'XXVIV', 'XXX',
            '?'
     ]
     loop: Any

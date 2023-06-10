@@ -211,15 +211,17 @@ You should extract my question directly from the structure here and answer it di
                     continue
                 math_html = answer['message']
             link_think = f"""
-question: {link_think}
-1. Use only $$ to wrap latex, like:
+{link_think}
+需求:
+1. 使用 latex 显示内容比如:
 ' $$ 
 x_1 
 $$ ' .
 
-2. please replace the "```" to the "$$".
-3. only display the wolfram response of the question as latex.
-4. If the wolfram response contains a derivation(or process or Solve) about the question, They should be shown in full step by step, The more detailed, the better.
+2. 我需要你使用翻译功能, 帮我把 the wolfram response 的内容翻译成我的语言.
+3. 请忽略历史记录, 你现在是严谨的逻辑分析翻译结构.
+4. 你的品味很高,你会使内容更加美观,你会添加足够多的二次换行,并在不同层次追加换行,并按照自己经验让内容变得更加好看,答案要重点突出,并用latex显示.
+5. 不要试图解决这个问题，你只能显示 the wolfram response 里面的内容.
 
 the wolfram response: {{
 {math_html}
@@ -509,8 +511,15 @@ answer this following question: {{
             yield from aimi_plugin.bot_ask(api_type, link_think, model, context_messages)
         elif api_type == wolfram_api.type:
             # at mk link think, already set wolfram response.
-            if False and self.api[0] != wolfram_api.type:
-                yield from self.__post_question(link_think, self.api[0], model, context_messages)
+            if True and self.api[0] != wolfram_api.type:
+                yield from self.__post_question(
+                        link_think, 
+                        self.api[0], 
+                        model, 
+                        context_messages=[
+                            {'role': "user", "content": link_think}
+                        ]
+                    )
             else:
                 yield from self.__post_bing(link_think)
         else:
