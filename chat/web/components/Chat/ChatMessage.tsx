@@ -19,9 +19,10 @@ import HomeContext from '@/pages/api/home/home.context';
 import { CodeBlock } from '../Markdown/CodeBlock';
 import { MemoizedReactMarkdown } from '../Markdown/MemoizedReactMarkdown';
 
-import rehypeMathjax from 'rehype-mathjax';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
+import remarkBreaks from "remark-breaks";
+import rehypeKatex from "rehype-katex";
 
 export interface Props {
   message: Message;
@@ -210,16 +211,22 @@ export const ChatMessage: FC<Props> = memo(({ message, messageIndex, onEdit }) =
           ) : (
             <div className="flex flex-row">
               <MemoizedReactMarkdown
-                className="prose dark:prose-invert flex-1 whitespace-pre-wrap"
-                remarkPlugins={[remarkGfm, remarkMath]}
-                rehypePlugins={[rehypeMathjax]}
+                className="prose dark:prose-invert flex-1"
+                remarkPlugins={[remarkMath, remarkGfm, remarkBreaks]}
+                rehypePlugins={[
+                  [
+                    rehypeKatex,
+                    {
+                      output:  "mathml"
+                    }
+                  ]
+                ]}
                 components={{
                   code({ node, inline, className, children, ...props }) {
                     if (children.length) {
                       if (children[0] == '▍') {
                         return <span className="animate-pulse cursor-default mt-1">▍</span>
                       }
-
                       children[0] = (children[0] as string).replace("`▍`", "▍")
                     }
 
