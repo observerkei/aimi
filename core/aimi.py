@@ -7,7 +7,7 @@ import random
 from contextlib import suppress
 
 from tool.config import config
-from tool.util import log_dbg, log_err, log_info
+from tool.util import log_dbg, log_err, log_info, make_context_messages
 from chat.qq import chat_qq
 from chat.web import chat_web
 from tool.openai_api import openai_api
@@ -18,6 +18,7 @@ from tool.wolfram_api import wolfram_api
 
 from core.md2img import md
 from core.memory import memory
+from core.task import task
 
 class ReplyStep:
     class TalkList:
@@ -162,7 +163,9 @@ class Aimi:
         api_type = api_type if api_type and len(api_type) else self.api[0]
         link_think = question
 
-        if api_type == openai_api.type and openai_api.use_web_ask:
+        if api_type == openai_api:
+            link_think = task.make_task(self.aimi_name, preset, question)
+        elif api_type == openai_api.type and openai_api.use_web_ask:
             # cul question
             history = memory.make_history(talk_history)
             link_think = f"""
@@ -439,6 +442,9 @@ answer this following question: {{
     ) -> Generator[dict, None, None]:
         if owned_by == self.aimi_name and model == 'auto':
             return self.ask(question, nickname)
+        elif owned_by == self.aimi_name and model == 'task':
+            preset = context_messages[0]['content']
+            return task.ask(owned_by, preset, question)
         else:
             preset = context_messages[0]['content']
             talk_history = context_messages[1:]
@@ -470,7 +476,7 @@ answer this following question: {{
         talk_history = memory.search(question, self.max_link_think)
 
         link_think = self.make_link_think(question, nickname, api_type, preset, talk_history)
-        context_messages = memory.make_context_messages(question, preset, talk_history)
+        context_messages = make_context_messages(question, preset, talk_history)
 
         answer = self.__post_question(
             link_think=link_think, 
@@ -575,7 +581,7 @@ answer this following question: {{
     ) -> Dict[str, List[str]]:
         bot_models = {}
 
-        bot_models[self.aimi_name] = ['auto']
+        bot_models[self.aimi_name] = ['auto', 'task']
 
         models = openai_api.get_models()
         if len(models):

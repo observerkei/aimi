@@ -1,6 +1,5 @@
 import time
-from typing import Generator, List, Dict
-from revChatGPT.V1 import Chatbot
+from typing import Generator, List, Dict, Any
 import openai
 
 from tool.util import log_dbg, log_err, log_info
@@ -8,7 +7,7 @@ from tool.config import config
 
 class OpenAIAPI:
     type: str = 'openai'
-    chatbot: Chatbot
+    chatbot: Any
     use_web_ask: bool = False
     max_requestion: int = 1024
     access_token: str = ''
@@ -215,6 +214,9 @@ class OpenAIAPI:
 
         access_token = self.access_token
         if access_token and len(access_token):
+            from revChatGPT.V1 import Chatbot
+            # 这个库有封号风险, 设置才导入这个包.
+
             self.chatbot = Chatbot({
                 "access_token": access_token
             })

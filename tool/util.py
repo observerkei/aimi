@@ -4,6 +4,8 @@ import colorlog
 import inspect
 import os
 
+from typing import Dict, List
+
 def log_init():
     # 创建一个 logger 对象
     logger = logging.getLogger(__name__)
@@ -95,5 +97,21 @@ def read_yaml(path: str) -> dict:
 def write_yaml(path: str, obj: dict):
     with open(path, 'w', encoding='utf-8') as fp:
         yaml.dump(obj, fp, encoding='utf-8', allow_unicode=True)
+
+def make_context_messages(
+    question: str,
+    preset: str = '',
+    talk_history: List[Dict] = []
+) -> List[Dict]:
+    if not preset:
+        preset = ''
+    if not talk_history:
+        talk_history = []
+    
+    context_messages = [{ 'role': 'system', 'content': preset }]
+    context_messages.extend(talk_history)
+    context_messages.append({ 'role': 'user', 'content': question })
+
+    return context_messages
 
 logger = log_init()

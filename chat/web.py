@@ -249,6 +249,8 @@ class AimiWebApi:
                 for answer in self.ask_hook(question, None, model, owned_by, context_messages):
                     message = answer["message"][len(prev_text) :]
                     yield self.__make_stream_reply(message)
+                    if answer["code"] == -1:
+                        yield self.__make_stream_reply('\n')
                     prev_text = answer["message"]
 
                 yield self.__make_stream_stop()
