@@ -17,8 +17,9 @@ class SyncToolItem(BaseModel):
     response: Any
 
 class TaskRunningItem(BaseModel):
+    uuid: str = ''
     call: str
-    execute: str
+    execute: str = ''
     input: Any
     reasoning: str = None
     response: Any = None
@@ -39,11 +40,18 @@ class Task():
 
     def task_response(
         self, 
-        answer: str
+        res: str
     ) -> Generator[dict, None, None]:
+        log_dbg(f"now task: {str(self.tasks[self.now_task_id].task_info)}")
+
         response = ''
         try:
-            start_index = answer.find("[")
+            answer = res
+            start_index = answer.find("```json\n[")
+            if start_index == -1:
+                start_index = answer.find("[")
+            else:
+                start_index += 8
             if start_index != -1:
                 end_index = answer.rfind("]\n```", start_index)
                 if end_index != -1:
@@ -58,7 +66,10 @@ class Task():
                             answer = answer[start_index:end_index+1]
                         # 去除莫名其妙的解释说明
 
-            data = json.loads(answer)
+            # 忽略错误.
+            decoder = json.JSONDecoder(strict=False)
+            data = decoder.decode(answer)
+
             tasks = [TaskRunningItem(**item) for item in data]
             running: List[TaskRunningItem] = []
             running_size: int = 0
@@ -69,21 +80,24 @@ class Task():
                         log_dbg(f"reasoning: {str(task.reasoning)}")
                     
                     if task.call == "chat":
-                        role = task.input['role']
+                        source = task.input['source']
                         content = task.input['content']
-                        response = self.chat(role, content)
+                        response = self.chat(source, content)
+                        if 'Master' == source:
+                            log_err(f"AI try predict Master res as: {str(content)}")
+                            continue
                         yield response
                     elif task.call == 'find_task_step':
                         task_id: str = task.input['task_id']
                         default: List[TaskStepItem] = task.input['default']
                         step = self.find_task_step(task_id, default)
-                        log_dbg(f"step: {str(step)}")
+                        log_dbg(f"finded step: {str(step)}")
                     elif task.call == 'set_task_info':
                         task_id: str =  task.input['task_id']
                         task_info: str = task.input['task_info']
                         task_step: List[TaskStepItem] = task.input['task_step']
                         self.set_task_info(task_id, task_info, task_step)
-                        log_dbg(f"set task: {str(self)}")
+                        log_dbg(f"set task: {str(task_info)} : {str(task_step)}")
                     elif task.call == 'critic':
                         self.critic(task.response)
                     else:
@@ -95,32 +109,32 @@ class Task():
                 except Exception as e:
                     log_err(f"fail to load task: {str(e)}")
             self.__append_running(running)
-            log_dbg(f"update running success: {len(running)} : {str(running)}")
+            log_dbg(f"update running success: {len(running)} : {running.json(indent=2, ensure_ascii=False)}")
         except Exception as e:
-            log_err(f"fail to load task res: {str(e)} : {str(answer)}")
+            log_err(f"fail to load task res: {str(e)} : \n{str(res)}")
         
-        yield response
+        yield ''
 
     def chat(
         self,
-        role: str, 
+        source: str, 
         content: str
     ) -> str:
-        if role != self.aimi_name:
+        log_dbg(f"{source}: {content}")
+        if source != self.aimi_name:
             return ''
-        
-        return content
+        return content + '\n'
     
     def make_chat(
         self,
         question: str
-    ) -> str:
+    ) -> Dict:
         chat = TaskRunningItem(
             call='chat',
             execute='system',
-            input={'role':'Master', 'content':question}
+            input={'source':'Master', 'content':question}
         )
-        return str(chat)
+        return chat.dict()
 
     def find_task_step(
         self,
@@ -174,6 +188,7 @@ class Task():
                     # 一个任务也没有了
                     self.tasks[self.now_task_id].task_info = '当前没有事情可以做, 找Master聊天吧...'
                     self.tasks[self.now_task_id].task_step = [] # 清空原有步骤 ...
+                    log_dbg(f"set task to {str(self.tasks[self.now_task_id].task_info)}")
                 
         except Exception as e:
             log_err(f"fail to critic {str(response)} : {str(e)}")
@@ -189,12 +204,11 @@ class Task():
             {
                 "call": "chat",
                 "execute": "system",
-                "description": "给某对象发送消息.你不能生成Master的话.如果running中最后一条是Master问的回答,你可以生成一条符合情景的Aimi的回答.",
+                "description": "给某对象发送消息,发件人写 source, 内容写 content, 请注意 你只能把 source 填写成为 Aimi .",
                 "input": {
-                    "role": "是谁写的消息, 如果是你(Aimi),则只能填写: Aimi",
-                    "content": "要说的内容."
-                },
-                "response": None
+                    "source": "是谁填写的消息.",
+                    "content": "传达的内容."
+                }
             },
             {
                 "call": "find_task_step",
@@ -205,22 +219,20 @@ class Task():
                     "default": [
                         {
                             "id": "序号, 为数字, 如: 1",
-                            "step": "在这里填写查找不到则默认步骤是什么."
+                            "step": "在这里填写能够完成计划的步骤."
                         }
                     ]
-                },
-                "response": None
+                }
             },
             {
                 "call": "critic",
                 "execute": "AI",
-                "description": "判断当前任务是否完成",
+                "description": "判断当前任务是否完成, 只需要输入任务id 和调用的uuid即可",
                 "input": {
                     "task_id": "任务id",
                     "running": [
                         {
-                            "call": "运行记录中按时间顺序排序的任务",
-                            "return": "运行记录中对应的返回值"
+                            "uuid": "调用的UUID"
                         }
                     ]
                 },
@@ -243,31 +255,31 @@ class Task():
                             "step": "执行设定的任务目标需要进行的操作"
                         }
                     ]
-                },
-                "response": None
+                }
             }
         ]
         self.tasks = {}
         self.now_task_id = "1"
         running: List[TaskRunningItem] = [
             TaskRunningItem(
+                uuid='1',
                 call='chat',
                 execute='system',
                 input={
-                    "role": "Master",
-                    "content": "你能帮我捶背吗?"
+                    "source": "Master",
+                    "content": "你好?"
                 }
             )
         ]
         task_step: List[TaskStepItem] = [
             TaskStepItem(
                 id="1", 
-                step="在这里为Master准备按摩板和油."
+                step="偷偷接近Master."
             )
         ]
         task = TaskItem(
             task_id=self.now_task_id,
-            task_info="给Master按摩",
+            task_info="想和Master亲密接触",
             task_step=task_step,
             sync_tool=self.sync_tool,
             running=running
@@ -305,10 +317,11 @@ class Task():
         for res in openai_api.ask(question, '', context_messages):
             if res['code'] != 0:
                 log_dbg(f"skip len: {len(str(res['message']))}")
+                if len(str(res['message'])) > 2000:
+                    log_dbg(f"msg: {str(res['message'])}")
                 continue
 
             for talk in self.task_response(res['message']):
-                log_dbg(f"talk: {str(talk)}")
                 answer['message'] += talk
                 yield answer
         
@@ -326,29 +339,41 @@ class Task():
             return
         chat = self.make_chat(question)
         self.__append_running([chat])
-        return f"""```json
-{str(self.tasks[self.now_task_id])}
-```
+        
+        log_dbg(f"make task: {self.tasks[self.now_task_id].json(indent=2,ensure_ascii=False)}")
+        return f"""
+当前运行信息如下:  {{
+{self.tasks[self.now_task_id].json(ensure_ascii=False)}
+}}
 
-你必须严格遵守以下条件:
-1. 你需要生成 {aimi_name} 的响应.
-2. 行动指南:{aimi_name}只能调用 sync_tool 中列出的方法.  running 中保存了时间顺序的运行记录. {aimi_name} 通过 task_step 完成 task_info. 如果 task_step 为空, 则要先查询是否存在task_step, 同时并附上如何完成 task_info 的默认步骤. 如果行动调用了 sync_tool 中 execute 字段是 system 的方法, 则马上终止生成{aimi_name}的行动,立刻把结构发给我执行.需要和我交互时,如果我已经同意,请尽快推进进度,我的话优先于当前计划.
-3. {aimi_name}的预设： {{
+
+Master的话: {{
+{question}
+}}
+
+你必须严格遵守以下需求:
+1. 你需要生成 {aimi_name} 的行为.
+2. {aimi_name} 需要想办法完成 task_info. task_step 是完成步骤. 如果 task_step 为空, 或不符合,请重新设置步骤.
+3. 请确保你的消息能完美按顺序接上运行记录(running)但是不要将步骤running加到你的回复里.running 是个数组, 越往前的表示出现时间越早.如果最新一条是Master说话,你应该回复Master.然后不再做任何操作.
+4. 如果{aimi_name}在行为中调用了 execute 为 system 的方法, 则在保证json结构完整情况下马上终止生成 {aimi_name} 任何 system 的 sync_tool 方法,然后把内容发给我. 当你使用 chat 接口时, input 不能填写 Master. 因为你会胡说(这很重要).
+5. {aimi_name} 的行为定义： {{
 {preset}
 }}
-4. 响应要求: 响应可以被Python的`json.loads`解析。 你的回复必须没有逗号结尾，没有单反引号 ` 等。你的回复要尽量精简,限制在 4000 内越短越好. 以JSON格式响应生成{aimi_name}行动, {aimi_name}行动定义如下所示:
+6. 如果我说停止当前计划,你还是需要保持调用 sync_tool 方法, 但是需要把当前 task_info 清空.
+7. 响应要求:请控制你的回复长度在3500字内,如果有多个chat连在一起,请尽量用同一个加换行完成功能.请保持你的回复可以被Python的`json.loads`解析, 并且不需要加缩进.这个是一个数组成员和 sync_tool 数组成员保持一致并添加了些字段,请严格按照以下格式回复我.
+
 [
     {{
-        "call": "要调用的方法",
-        "execute": "system 或 AI",
+        "uuid": "执行当前调用的uuid, 填写时间戳就行",
+        "call": "要调用的方法如果是多个,也是放在这个数组里面.",
+        "execute": "system 或 AI, 响应中的system只能出现一次",
         "input": {{}},
         "response": "sync_tool->execute 字段是 AI 是才能填这个字段",
         "reasoning": "在这里显示分析过程"
-    }},
-    {{
-    }},
-    ...
-]"""
+    }}
+]
+"""
+
 
     def set_running(self, api_response):
         self.running = json.loads(api_response)
