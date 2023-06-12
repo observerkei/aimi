@@ -39,7 +39,7 @@ class Task():
     now_task_id: str
     aimi_name: str = 'Aimi'
     running: List[TaskRunningItem] = []
-    max_running_size: int = 1024
+    max_running_size: int = 2048
 
     def task_response(
         self, 
@@ -141,8 +141,14 @@ class Task():
         self,
         question: str
     ) -> TaskRunningItem:
+        now_idx = f"{len(self.running) + 1}"
+        try:
+            last_uuid = self.running[-1].uuid
+            now_idx = f"{int(last_uuid)+1}"
+        except Exception as e:
+            log_err(f"fail to get run idx: {str(e)}")
         chat = TaskRunningItem(
-            uuid=f"{len(self.running) + 1}",
+            uuid=now_idx,
             call='chat',
             execute='system',
             input={'source':'Master', 'content':question}
@@ -305,14 +311,16 @@ class Task():
         if not (self.now_task_id in self.tasks):
             log_dbg(f"no now_task ... {str(self.now_task_id)}")
             return
-            
+        
         for run in reversed(self.running):
             if len(str(running)) > self.max_running_size:
                 break
             running.insert(0, run)
         self.running = running
+        idx = 1
         for run in self.running:
-            log_dbg(f"type: {str(type(run))}")
+            run.uuid = f"{idx}"
+            idx += 1
     
     def get_running(self) -> str:
         run_dict = [item.dict() for item in self.running]
@@ -378,7 +386,7 @@ class Task():
             f"如果{aimi_name}在行为中调用了 execute 为 system 的方法, 则在保证json结构完整情况下马上终止生成 {aimi_name} 任何 system 的 sync_tool 方法,然后把内容发给我. 当你使用 chat 接口时, input 的 source 不能填写 Master. 因为你会胡说(这很重要).",
             f"preset 是 {aimi_name} 的行为定义,只能对sync_tool生效.",
             f"如果我说停止当前计划,你还是需要保持调用 sync_tool 方法, 但是需要把当前 task_info 清空.",
-            f"响应要求:请控制你的回复长度在3500字内,请减少调用次数.请保持内容连续,不需要完整复制我的回复而是继续补充后续仅限{aimi_name}的内容.",
+            f"响应要求:请控制你的回复长度在3500字内,请减少调用次数.请保持内容连续,你不需要复制我的回复,而是继续补充后续仅限{aimi_name}身份和动作的内容.",
             f"请保持你的回复可以被Python的`json.loads`解析,json外部不需要反引号包裹.json的参数内部不要有双引号,请严格按照以下格式回复我.(请用 [{{}},{{}}] 方式回复我):{response_format}"
         ]
         setting = '\n'.join(setting)
