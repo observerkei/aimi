@@ -109,7 +109,7 @@ class Task():
                 except Exception as e:
                     log_err(f"fail to load task: {str(e)}")
             self.__append_running(running)
-            log_dbg(f"update running success: {len(running)} : {running.json(indent=2, ensure_ascii=False)}")
+            log_dbg(f"update running success: {len(running)} : {json.dumps(str(running), indent=2, ensure_ascii=False)}")
         except Exception as e:
             log_err(f"fail to load task res: {str(e)} : \n{str(res)}")
         
@@ -360,11 +360,11 @@ Master的话: {{
 {preset}
 }}
 6. 如果我说停止当前计划,你还是需要保持调用 sync_tool 方法, 但是需要把当前 task_info 清空.
-7. 响应要求:请控制你的回复长度在3500字内,如果有多个chat连在一起,请尽量用同一个加换行完成功能.请保持你的回复可以被Python的`json.loads`解析, 并且不需要加缩进.这个是一个数组成员和 sync_tool 数组成员保持一致并添加了些字段,请严格按照以下格式回复我.
+7. 响应要求:请控制你的回复长度在3500字内,如果有多个chat连在一起,请尽量用同一个加换行都放在一个content里面完成功能.请保持你的回复可以被Python的`json.loads`解析, 并且不需要加缩进.这个是一个数组成员和 sync_tool 数组成员保持一致并添加了些字段,请严格按照以下格式回复我.
 
 [
     {{
-        "uuid": "执行当前调用的uuid, 填写时间戳就行",
+        "uuid": "执行当前调用的uuid, 填写唯一的递增调用序号就行",
         "call": "要调用的方法如果是多个,也是放在这个数组里面.",
         "execute": "system 或 AI, 响应中的system只能出现一次",
         "input": {{}},
