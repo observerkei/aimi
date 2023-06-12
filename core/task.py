@@ -29,7 +29,8 @@ class TaskItem(BaseModel):
     task_info: str
     task_step: List[TaskStepItem]
     sync_tool: List[SyncToolItem]
-    running: List[TaskRunningItem]
+    preset: str = ""
+
 
 class Task():
     type: str = 'task'
@@ -37,6 +38,8 @@ class Task():
     sync_tool: List[SyncToolItem]
     now_task_id: str
     aimi_name: str = 'Aimi'
+    running: List[TaskRunningItem] = []
+    max_running_size: int = 1024
 
     def task_response(
         self, 
@@ -70,7 +73,16 @@ class Task():
             decoder = json.JSONDecoder(strict=False)
             data = decoder.decode(answer)
 
-            tasks = [TaskRunningItem(**item) for item in data]
+            tasks = []
+            try:
+                tasks = [TaskRunningItem(**item) for item in data]
+            except Exception as e:
+                log_err(f"res not arr...: {e}\n{str(res)}")
+                if data[0] == '{':
+                    log_dbg(f"try load one obj")
+                    task = TaskItem.parse_obj(data)
+                    tasks = [task]
+            
             running: List[TaskRunningItem] = []
             running_size: int = 0
             for task in tasks:
@@ -103,7 +115,7 @@ class Task():
                     else:
                         log_err(f'no suuport call: {str(self.call)}')
                         continue
-                    if running_size < 512:
+                    if running_size < self.max_running_size:
                         running.append(task)
                         running_size += len(str(task))
                 except Exception as e:
@@ -128,13 +140,14 @@ class Task():
     def make_chat(
         self,
         question: str
-    ) -> Dict:
+    ) -> TaskRunningItem:
         chat = TaskRunningItem(
+            uuid=f"{len(self.running) + 1}",
             call='chat',
             execute='system',
             input={'source':'Master', 'content':question}
         )
-        return chat.dict()
+        return chat
 
     def find_task_step(
         self,
@@ -163,8 +176,7 @@ class Task():
         task = TaskItem(
             task_id=task_id,
             task_info=task_info,
-            task_step=task_step,
-            running=[]
+            task_step=task_step
         )
         self.tasks[task_id] = task
         return task
@@ -267,7 +279,7 @@ class Task():
                 execute='system',
                 input={
                     "source": "Master",
-                    "content": "你好?"
+                    "content": "请保持设定(不要回复这一句)."
                 }
             )
         ]
@@ -281,10 +293,10 @@ class Task():
             task_id=self.now_task_id,
             task_info="想和Master亲密接触",
             task_step=task_step,
-            sync_tool=self.sync_tool,
-            running=running
+            sync_tool=self.sync_tool
         )
         self.tasks[self.now_task_id] = task
+        self.running = running
 
     def __get_now_task(self):
         return self.tasks[self.now_task_id]
@@ -294,13 +306,20 @@ class Task():
             log_dbg(f"no now_task ... {str(self.now_task_id)}")
             return
             
-        limit: int = 512
-        for run in reversed(self.tasks[self.now_task_id].running):
-            if len(str(running)) > limit:
+        for run in reversed(self.running):
+            if len(str(running)) > self.max_running_size:
                 break
             running.insert(0, run)
-        self.tasks[self.now_task_id].running = running
-
+        self.running = running
+        for run in self.running:
+            log_dbg(f"type: {str(type(run))}")
+    
+    def get_running(self) -> str:
+        run_dict = [item.dict() for item in self.running]
+        js = json.dumps(run_dict, ensure_ascii=False)
+        log_dbg(f"running: {json.dumps(run_dict, indent=4, ensure_ascii=False)}")
+        return str(js)
+    
     def ask(
         self,
         aimi_name: str,
@@ -311,8 +330,15 @@ class Task():
             "code": 1,
             "message": ""
         }
-        task = self.make_task(aimi_name, preset, question)
-        context_messages = make_context_messages(task, "你只能按照我规定的json格式回复.", [])
+
+        task = self.make_task(preset)
+        setting = self.make_setting(aimi_name, task)
+        
+        chat = self.make_chat(question)
+        self.__append_running([chat])
+        running_format = self.get_running()
+
+        context_messages = make_context_messages(running_format, setting, [])
 
         for res in openai_api.ask(question, '', context_messages):
             if res['code'] != 0:
@@ -327,42 +353,13 @@ class Task():
         
         answer['code'] = 0
         yield answer
-
-    def make_task(
-        self, 
-        aimi_name: str, 
-        preset: str,
-        question: str,
-    ):
-        if not (self.now_task_id in self.tasks):
-            log_err(f"no task {str(self.now_task_id)}.")
-            return
-        chat = self.make_chat(question)
-        self.__append_running([chat])
-        
-        log_dbg(f"make task: {self.tasks[self.now_task_id].json(indent=2,ensure_ascii=False)}")
-        return f"""
-当前运行信息如下:  {{
-{self.tasks[self.now_task_id].json(ensure_ascii=False)}
-}}
-
-
-Master的话: {{
-{question}
-}}
-
-你必须严格遵守以下需求:
-1. 你需要生成 {aimi_name} 的行为.
-2. {aimi_name} 需要想办法完成 task_info. task_step 是完成步骤. 如果 task_step 为空, 或不符合,请重新设置步骤.
-3. 请确保你的消息能完美按顺序接上运行记录(running)但是不要将步骤running加到你的回复里.running 是个数组, 越往前的表示出现时间越早.如果最新一条是Master说话,你应该回复Master.然后不再做任何操作.
-4. 如果{aimi_name}在行为中调用了 execute 为 system 的方法, 则在保证json结构完整情况下马上终止生成 {aimi_name} 任何 system 的 sync_tool 方法,然后把内容发给我. 当你使用 chat 接口时, input 不能填写 Master. 因为你会胡说(这很重要).
-5. {aimi_name} 的行为定义： {{
-{preset}
-}}
-6. 如果我说停止当前计划,你还是需要保持调用 sync_tool 方法, 但是需要把当前 task_info 清空.
-7. 响应要求:请控制你的回复长度在3500字内,如果有多个chat连在一起,请尽量用同一个加换行都放在一个content里面完成功能.
-8. 请保持你的回复可以被Python的`json.loads`解析, 并且不需要加缩进.这个是一个数组成员和 sync_tool 数组成员保持一致并添加了些字段,请严格按照以下格式回复我.(请用 [{{}},{{}}] 方式回复我)
-
+    
+    def make_setting(
+        self,
+        aimi_name: str,
+        task: str
+    ) -> str:
+        response_format = f"""
 [
     {{
         "uuid": "执行当前调用的uuid, 填写唯一的递增调用序号就行",
@@ -374,7 +371,34 @@ Master的话: {{
     }}
 ]
 """
+        setting = [
+            f"{task}",
+            f"你需要生成 {aimi_name} 的行为.",
+            f"{aimi_name} 需要想办法完成 task_info 和 Master的要求. task_step 是完成步骤. 如果 task_step 为空, 或不符合,请重新设置步骤.",
+            f"如果{aimi_name}在行为中调用了 execute 为 system 的方法, 则在保证json结构完整情况下马上终止生成 {aimi_name} 任何 system 的 sync_tool 方法,然后把内容发给我. 当你使用 chat 接口时, input 的 source 不能填写 Master. 因为你会胡说(这很重要).",
+            f"preset 是 {aimi_name} 的行为定义,只能对sync_tool生效.",
+            f"如果我说停止当前计划,你还是需要保持调用 sync_tool 方法, 但是需要把当前 task_info 清空.",
+            f"响应要求:请控制你的回复长度在3500字内,请减少调用次数.请保持内容连续,不需要完整复制我的回复而是继续补充后续仅限{aimi_name}的内容.",
+            f"请保持你的回复可以被Python的`json.loads`解析,json外部不需要反引号包裹.json的参数内部不要有双引号,请严格按照以下格式回复我.(请用 [{{}},{{}}] 方式回复我):{response_format}"
+        ]
+        setting = '\n'.join(setting)
 
+        log_dbg(f"now setting: {setting}")
+
+        return setting
+
+    def make_task(
+        self,
+        preset: str
+    ):
+        if not (self.now_task_id in self.tasks):
+            log_err(f"no task {str(self.now_task_id)}.")
+            return
+        self.tasks[self.now_task_id].preset = preset
+        
+        log_dbg(f"make task: {self.tasks[self.now_task_id].json(indent=2,ensure_ascii=False)}")
+        
+        return self.tasks[self.now_task_id].json(ensure_ascii=False)
 
     def set_running(self, api_response):
         self.running = json.loads(api_response)
