@@ -1,5 +1,6 @@
+import json5
 import json
-from typing import Dict, Any, List, Generator
+from typing import Dict, Any, List, Generator, Optional, Union
 from pydantic import BaseModel, constr
 
 from tool.openai_api import openai_api
@@ -13,16 +14,16 @@ class TaskStepItem(BaseModel):
 
 class SyncToolItem(BaseModel):
     call: str
-    execute: constr(regex='system|AI')
     description: str
     input: Any
     response: Any
+    execute: constr(regex='system|AI')
 
 class TaskRunningItem(BaseModel):
     timestamp: str = ''
     call: str
     input: Any
-    reasoning: str = None
+    reasoning: Optional[Union[str, None]] = None
     response: Any = None
     execute: constr(regex='system|AI')
 
@@ -31,14 +32,12 @@ class TaskItem(BaseModel):
     task_id: str
     task_info: str
     task_step: List[TaskStepItem] = []
-    sync_tool: List[SyncToolItem]
-    preset: str = ""
 
 
 class Task():
     type: str = 'task'
     tasks: Dict[str, TaskItem]
-    sync_tool: List[SyncToolItem]
+    action_tool: List[SyncToolItem]
     now_task_id: str
     aimi_name: str = 'Aimi'
     running: List[TaskRunningItem] = []
@@ -74,8 +73,9 @@ class Task():
                         # 去除莫名其妙的解释说明
 
             # 忽略错误.
-            decoder = json.JSONDecoder(strict=False)
-            data = decoder.decode(answer)
+            # decoder = json.JSONDecoder(strict=False)
+            # data = decoder.decode(answer)
+            data = json5.loads(answer)
 
             tasks = []
             try:
@@ -97,7 +97,7 @@ class Task():
                         task.execute == "system"
                         and task.response
                     ):
-                        log_err(f"AI try predict system response: {str(task.response)}")
+                        log_err(f"AI try predict system call {str(task.call)} response: {str(task.response)}")
 
                     
                     if task.call == "chat":
@@ -108,7 +108,7 @@ class Task():
                             log_err(f"AI try predict Master res as: {str(content)}")
                             continue
                         yield response
-                    elif task.call == 'step_task_step':
+                    elif task.call == 'set_task_step':
                         task_id: str = task.input['task_id']
                         task_step: List[TaskStepItem] = task.input['task_step']
                         step = self.set_task_step(task_id, task_step)
@@ -122,6 +122,7 @@ class Task():
                     elif task.call == 'critic':
                         self.critic(task.response)
                     elif task.call == 'get_wolfram_response':
+                        continue
                         response = self.get_wolfram_response(task.input)
                         task.response = response
                     elif task.call == 'get_bard_response':
@@ -186,16 +187,19 @@ class Task():
         self,
         question: str
     ) -> TaskRunningItem:
-        chat = TaskRunningItem(
+        chat: TaskRunningItem = TaskRunningItem(
             timestamp=str(self.timestamp),
             call='chat',
-            input={'source':'Master', 'content':question},
+            input={
+                'source': 'Master', 
+                'content': question
+            },
             execute='system'
         )
         self.timestamp += 1
         return chat
 
-    def find_task_step(
+    def set_task_step(
         self,
         task_id: str, 
         task_step: List[TaskStepItem]
@@ -234,14 +238,14 @@ class Task():
         response
     ):
         try:
-            if response['success'] == True:
+            if response['success']:
                 task = self.tasks[self.now_task_id]
                 task_info = task.task_info
                 if len(self.tasks) > 1:
                     del self.tasks[self.now_task_id]
                     log_info(f'task_info: {task_info}, delete.')
                 
-                    for _, task in self.tasks:
+                    for _, task in self.tasks.items():
                         self.now_task_id = task.task_id
                         return
                 else:
@@ -250,9 +254,9 @@ class Task():
                     new_task.task_info = '当前没有事情可以做, 找Master聊天吧...'
                     new_task.task_step = [] # 清空原有步骤 ...
 
-                    self.now_task_id += 1
+                    self.now_task_id = str(int(self.now_task_id) + 1)
                     self.tasks[self.now_task_id] = new_task
-                    log_dbg(f"set task to {self.now_task_id} : {str(self.tasks[self.now_task_id].task_info)}")
+                    log_dbg(f"set task to {str(self.now_task_id)} : {str(self.tasks[self.now_task_id].task_info)}")
             else:
                 log_dbg(f"task no complate, continue...")
                 
@@ -266,51 +270,51 @@ class Task():
             log_err(f"fait to init: {str(e)}")
     
     def __load_task(self):
-        self.sync_tool =  [
-            {
-                "call": "chat",
-                "description": "给某对象发送消息,发件人写 source, 内容写 content, 请注意 你只能把 source 填写成为 Aimi .",
-                "input": {
-                    "source": "是谁填写的消息.",
-                    "content": "传达的内容,可以很丰富."
+        self.action_tool: List[SyncToolItem] = [
+            SyncToolItem(
+                call="chat",
+                description="给某对象发送消息, 发件人写 source, 内容写 content",
+                input={
+                    "source": "是谁填写的消息. 你不能填 Master. 你只能填: Aimi",
+                    "content": "传达的内容, 可以很丰富"
                 },
-                "execute": "system"
-            },
-            {
-                "call": "set_task_step",
-                "description": "如果 task_step 和目标(task_info)不符合或为空,则需要设置一下.",
-                "input": {
+                execute="system"
+            ),
+            SyncToolItem(
+                call="set_task_step",
+                description="如果 task_step 和目标(task_info)不符合或为空,则需要设置一下",
+                input={
                     "task_id": "需要设置的task 对应的 id",
                     "task_step": [
                         {
                             "id": "序号, 为数字, 如: 1",
-                            "step": "在这里填写能够完成计划的步骤."
+                            "step": "在这里填写能够完成计划的步骤"
                         }
                     ]
                 },
-                "execute": "AI"
-            },
-            {
-                "call": "critic",
-                "description": "判断当前任务是否完成, 只需要输入任务id 和调用的对象的timestamp即可,如果数量太多,保持json结构同时数组内容填写 '...' 掠过,可以查找所有运行记录.",
-                "input": {
+                execute="AI"
+            ),
+            SyncToolItem(
+                call="critic",
+                description="判断当前任务是否完成, 只需要输入 task_id 和调用的对象的 timestamp 即可,如果数量太多,只填写关健几个,可以查找所有运行记录",
+                input={
                     "task_id": "任务id",
                     "task_info": "被检查的任务目标",
                     "running": [
-                        "调用对象的timestamp"
+                        "调用对象的 timestamp"
                     ]
                 },
-                "response": {
-                    "reasoning": "在这里显示分析过程",
+                response={
+                    "analysis": "在这里显示分析过程",
                     "success": "标记任务是否完成, 如: True/False",
                     "critique": "如果success为false,请在这里说明应该如何完成任务"
                 },
-                "execute": "AI"
-            },
-            {
-                "call": "set_task_info",
-                "description": "设定当前任务目标, 设置目标的时候要同时给出实现步骤, Master允许时才能调用这个",
-                "input": {
+                execute="AI"
+            ),
+            SyncToolItem(
+                call="set_task_info",
+                description="设定当前任务目标, 设置目标的时候要同时给出实现步骤, Master允许时才能调用这个",
+                input={
                     "task_id": "任务id",
                     "task_info": "",
                     "task_step": [
@@ -320,20 +324,20 @@ class Task():
                         }
                     ]
                 },
-                "execute": "AI"
-            },
-            {
-                "call": "get_wolfram_response",
-                "description": "通过wolfram进行计算, 只有解数学题且能够转换为wolfram运算才能调用这个函数, 需要提前准备好wolfram能识别的输入数据.这个API有限制,请谨慎调用.得到真实响应后,需要通过chat接口给Master回复结果.",
-                "input": "在这里输入wolfram支持的内容.输入必须是英文.如: solve int x^2 dx",
-                "execute": "system"
-            },
-            {
-                "call": "get_bard_response",
-                "description": "通过互联网进行搜索,需要了解任何有时效性的内容都可以调用(你是个AI,拥有的是2021年以前的数据,所以要用这个接口),只能搜索最新有时效性的信息, 比如时间/日期或者某个网址的内容等.",
-                "input": "在这里输入要bard进行检索的内容,输入必须为英文. 如: What time is it now?",
-                "execute": "system"
-            }
+                execute="AI"
+            ),
+            SyncToolItem(
+                call="get_wolfram_response",
+                description="通过wolfram进行计算, 所有计算都可以通过这个函数解决, 这个函数调用成功后是完全正确的.",
+                input="在这里输入wolfram支持的内容. 如: solve int x^2 dx ",
+                execute="system"
+            ),
+            SyncToolItem(
+                call="get_bard_response",
+                description="通过互联网进行搜索, 需要了解任何有时效性的内容都可以调用, 只能搜索最新有时效性的信息, 比如时间/日期或者某个网址的内容等.",
+                input="在这里输入要bard进行检索的内容, 输入必须为英文. 如: What time is it now?",
+                execute="system"
+            )
         ]
         self.tasks = {}
         self.now_task_id = "1"
@@ -358,8 +362,7 @@ class Task():
             timestamp=str(self.timestamp),
             task_id=self.now_task_id,
             task_info="想和Master亲密接触",
-            task_step=task_step,
-            sync_tool=self.sync_tool
+            task_step=task_step
         )
         self.timestamp += 1
         self.tasks[self.now_task_id] = task
@@ -378,7 +381,6 @@ class Task():
                 break
             running.insert(0, run)
         self.running = running
-        idx = 1
         for run in self.running:
             run.timestamp = str(self.timestamp)
             self.timestamp += 1
@@ -400,8 +402,7 @@ class Task():
             "message": ""
         }
 
-        task = self.make_task(preset)
-        setting = self.make_setting(aimi_name, task)
+        setting = self.make_setting(aimi_name, preset, task)
 
         # 如果只是想让任务继续, 就回复全空格/\t/\n
         if (
@@ -432,52 +433,58 @@ class Task():
     def make_setting(
         self,
         aimi_name: str,
-        task: str
+        preset: str,
+        task: Dict
     ) -> str:
-        response_format = f"""
+        response_format = f"""```json
 [
     {{
-        "timestamp": "执行当前调用的时间,每次递增,从我发送的最后一项timestamp开始算.",
-        "call": "要调用的方法如果是多个,也是放在这个数组里面.",
-        "input": {{}},
-        "response": "execute 是 AI 才能填这个字段",
-        "execute": "填写在sync_tool中定义的值.",
-        "reasoning": "在这里显示分析过程.",
-        "think": "在这里写下你的期望."
+        "timestamp": "执行当前调用的时间, 每次递增, 从我发送的最后一项 timestamp 开始算.",
+        "call": "要调用的方法如果是多个, 也是放在这个数组里面.",
+        "reasoning": "在这里显示分析过程和建议.",
+        "input": {{
+            "对应入参": "对应内容"
+        }},
+        "execute": "system 或 AI"
     }}
 ]
-"""
-        setting = [
-            f"{task}",
-            f"我会给你发送时间顺序的运行记录,你主要关注最新记录.",
-            f"你需要生成 {aimi_name} 的行为.",
-            f"{aimi_name} 需要想办法在设定的条件下完成 task_info 和 Master的要求. task_step 是完成步骤. 如果 task_step 为空, 或不符合,请重新设置步骤.",
-            f"preset 是 {aimi_name} 的行为定义,只能对sync_tool的调用生效.",
-            f"你只能调用一次 sync_tool->execute 是 system 的方法.在满足设定前提下尽量只通过单次调用完成回复. ",
-            f"如果某个system api调用成功请翻译成 {aimi_name} preset 中使用的语言, 只有response有值,才是调用成功,你不能生成任何和调用system相关的内容. 在调用成功以前,你不应该回答或解决任何和system有关的问题."
-            f"你需要思考如何接下我发送的内容,并且从中剔除我发送的部分,只留下你生成的,然后基于现有的timestamp填个新的再发给我.",
-            f"如果我说停止当前计划,你还是需要保持调用 sync_tool 方法, 但是需要把当前 task_info 清空.",
-            f"响应要求:请控制你的回复长度尽量少于3500字,但是要保持json结构.",
-            f"请保持你的回复可以被Python的`json.loads`解析,json外部不需要反引号包裹.json的参数内部如果有双引号 \" 则进行转义 ,请严格按照以下格式回复我.(请用 [{{task}}, {{task}}, ...] 方式回复我):{response_format}"
-        ]
-        setting = '\n'.join(setting)
+```"""
+        action_tool = [item.dict() for item in self.action_tool]
+        task = self.make_task()
+        setting: Dict = {
+            "action_tool": action_tool,
+            "task": task,
+            "preset": preset,
+            "setting": [
+                f"你需要根据 setting 生成 {aimi_name} 的动作. {aimi_name} 基于 setting 运行",
+                f"preset 是 {aimi_name} 的预设, 只能对 action_tool 中定义的方法的输入生效.",
+                f"system 的动作是系统执行, 无论怎样你生成的内容中这个类型的动作只能出现一次.",
+                f"system 的动作的 response 是 None 时, 不要说明任何和返回值有关的内容.",
+                f"task->task_info 是目标, task->task_step 是完成 task->task_info 需要进行的步骤. 如果 task->task_step 为空, 或不符合, 请重新设置步骤.",
+                f"你需要用 setting 条件回复我, 只回复新生成的内容.",
+                f"如果你不能回答, 请给出能够回答的示例.",
+                f"你的回复是从 action_tool 里面挑选的动作.",
+                f"请不要生成任何和 Master 相关的内容.",
+                f"请保持你的回复可以被 Python 的 `json.loads` 解析, json 外部不需要反引号包裹. json 的参数内部如果有双引号 \" 则进行转义.",
+                f"请严格按照以下格式回复我(请用 [{{action}}, {{action}}, ...] 方式回复我): {response_format}",
+            ]
+        }
+        setting_format = json.dumps(setting, ensure_ascii=False)
 
-        log_dbg(f"now setting: {setting}")
+        log_dbg(f"now setting: {json.dumps(setting, indent=4, ensure_ascii=False)}")
 
-        return setting
+        return setting_format
 
     def make_task(
-        self,
-        preset: str
-    ):
+        self
+    ) -> Dict:
         if not (self.now_task_id in self.tasks):
             log_err(f"no task {str(self.now_task_id)}.")
             return
-        self.tasks[self.now_task_id].preset = preset
         
-        log_dbg(f"make task: {self.tasks[self.now_task_id].json(indent=2,ensure_ascii=False)}")
+        # log_dbg(f"make task: {self.tasks[self.now_task_id].json(indent=2,ensure_ascii=False)}")
         
-        return self.tasks[self.now_task_id].json(ensure_ascii=False)
+        return self.tasks[self.now_task_id].dict()
 
     def set_running(self, api_response):
         self.running = json.loads(api_response)
