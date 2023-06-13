@@ -374,17 +374,18 @@ class Task():
         "execute": "system 或 AI, 响应中的system只能出现一次",
         "input": {{}},
         "response": "sync_tool->execute 字段是 AI 是才能填这个字段",
-        "reasoning": "在这里显示分析过程"
+        "reasoning": "在这里显示分析过程",
+        "think": "在这里写下你的期望"
     }}
 ]
 """
         setting = [
             f"{task}",
             f"我会给你发送时间顺序的运行记录,你主要关注最新记录.",
-            f"你需要生成 {aimi_name} 的行为.",
+            f"你需要生成 {aimi_name} 的行为.如果旧任务已完成，你需要实现新任务.",
             f"{aimi_name} 需要想办法完成 task_info 和 Master的要求. task_step 是完成步骤. 如果 task_step 为空, 或不符合,请重新设置步骤.",
             f"preset 是 {aimi_name} 的行为定义,只能对sync_tool的调用生效.",
-            f"你只能再回复一次 execute 内容为 system 的方法. 尽量只通过单次调用完成回复.",
+            f"每次新请求你只能再回复一次 execute 内容为 system 的方法. 尽量只通过单次调用完成回复.",
             f"你需要思考如何接下我发送的内容,并且从中剔除我发送的部分,只留下你生成的,然后基于现有的timestamp填个新的再发给我.",
             f"如果我说停止当前计划,你还是需要保持调用 sync_tool 方法, 但是需要把当前 task_info 清空.",
             f"响应要求:请控制你的回复长度在3500字内.",
