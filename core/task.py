@@ -88,12 +88,17 @@ class Task():
                     tasks = [task]
             
             running: List[TaskRunningItem] = []
-            running_size: int = 0
             for task in tasks:
                 try:
                     log_dbg(f"get task: {str(task)}")
                     if task.reasoning:
                         log_dbg(f"reasoning: {str(task.reasoning)}")
+                    if (
+                        task.execute == "system"
+                        and task.response
+                    ):
+                        log_err(f"AI try predict system response: {str(task.response)}")
+
                     
                     if task.call == "chat":
                         source = task.input['source']
@@ -125,9 +130,8 @@ class Task():
                     else:
                         log_err(f'no suuport call: {str(self.call)}')
                         continue
-                    if running_size < self.max_running_size:
+                    if len(str(running)) < self.max_running_size:
                         running.append(task)
-                        running_size += len(str(task))
                 except Exception as e:
                     log_err(f"fail to load task: {str(e)}: {str(task)}")
             self.__append_running(running)
@@ -438,7 +442,7 @@ class Task():
         "call": "要调用的方法如果是多个,也是放在这个数组里面.",
         "execute": "在sync_tool中定义,不能修改",
         "input": {{}},
-        "response": "sync_tool->execute 字段是 AI 是才能填这个字段,其他情况填写: None",
+        "response": "sync_tool->execute 字段是 AI 是才能填这个字段的内容,其他情况填写: None",
         "reasoning": "在这里显示分析过程",
         "think": "在这里写下你的期望"
     }}
@@ -450,8 +454,8 @@ class Task():
             f"你需要生成 {aimi_name} 的行为.",
             f"{aimi_name} 需要想办法完成 task_info 和 Master的要求. task_step 是完成步骤. 如果 task_step 为空, 或不符合,请重新设置步骤.",
             f"preset 是 {aimi_name} 的行为定义,只能对sync_tool的调用生效.",
-            f"每次新请求你最多只能调用一次 sync_tool->execute 内容为 system 的方法. 尽量只通过单次调用完成回复.",
-            f"如果某个system api调用成功,请注意翻译成 {aimi_name} preset 中使用的语言."
+            f"每次请求你最多只能调用一次 sync_tool->execute 内容为 system 的方法. 尽量只通过单次调用完成回复.",
+            f"如果某个system api调用成功(只有response有值,才是调用成功),请注意翻译成 {aimi_name} preset 中使用的语言."
             f"你需要思考如何接下我发送的内容,并且从中剔除我发送的部分,只留下你生成的,然后基于现有的timestamp填个新的再发给我.",
             f"如果我说停止当前计划,你还是需要保持调用 sync_tool 方法, 但是需要把当前 task_info 清空.",
             f"响应要求:请控制你的回复长度在3500字内.",
