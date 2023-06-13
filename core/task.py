@@ -41,7 +41,7 @@ class Task():
     now_task_id: str
     aimi_name: str = 'Aimi'
     running: List[TaskRunningItem] = []
-    max_running_size: int = 4000
+    max_running_size: int = 3500
     timestamp: int = 1
 
     def task_response(
@@ -275,7 +275,7 @@ class Task():
                 description="给某对象发送消息, 发件人写 source, 内容写 content",
                 input={
                     "content": "传达的内容, 可以很丰富",
-                    "source": "是谁填写的消息. 你不能填 Master. 你只能填: Aimi"
+                    "source": "Aimi|Master, 表示是谁填写的消息. 你只能生成 Aimi 的内容"
                 },
                 execute="system"
             ),
@@ -461,9 +461,9 @@ class Task():
                 f"你需要用 setting 条件回复我, 只回复新生成的内容.",
                 f"如果你不能回答, 请给出能够回答的示例.",
                 f"你的回复是从 action_tool 里面挑选的动作.",
-                f"请不要生成任何和 Master 相关的内容.",
+                f"任何时候请不要生成任何和 Master 相关的内容.",
                 f"请保持你的回复可以被 Python 的 `json.loads` 解析, json 外部不需要反引号包裹. json 的参数内部如果有双引号 \" 则进行转义.",
-                f"请严格按照以下格式回复我(请用 [{{action}}, {{action}}, ...] 方式回复我): {response_format}",
+                f"请严格按照以下格式回复我(请用 [{{action}}, {{action}}] 类似方式回复我): {response_format}",
             ]
         }
         setting_format = json.dumps(setting, ensure_ascii=False)
