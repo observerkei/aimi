@@ -326,14 +326,12 @@ class Task():
                 "call": "get_wolfram_response",
                 "description": "通过wolfram进行计算, 只有解数学题且能够转换为wolfram运算才能调用这个函数, 需要提前准备好wolfram能识别的输入数据.这个API有限制,请谨慎调用.得到真实响应后,需要通过chat接口给Master回复结果.",
                 "input": "在这里输入wolfram支持的内容.输入必须是英文.如: solve int x^2 dx",
-                "response": "wolfram的运行结果,调用的时候填None就行,调用成功后才有值,会返回是html或者txt文本",
                 "execute": "system"
             },
             {
                 "call": "get_bard_response",
                 "description": "通过互联网进行搜索,需要了解任何有时效性的内容都可以调用(你是个AI,拥有的是2021年以前的数据,所以要用这个接口),只能搜索最新有时效性的信息, 比如时间/日期或者某个网址的内容等.",
                 "input": "在这里输入要bard进行检索的内容,输入必须为英文. 如: What time is it now?",
-                "response": "bard 的搜索结果,调用的时候填None就行,调用成功才有值,返回txt文本,调用失败或者异常则得不到想要的内容.",
                 "execute": "system"
             }
         ]
@@ -459,7 +457,7 @@ class Task():
             f"如果某个system api调用成功(只有response有值,才是调用成功,你不能捏造任何和调用system相关的内容.),请注意翻译成 {aimi_name} preset 中使用的语言. 在system api有返回值以前,你不应该回答或解决任何问题."
             f"你需要思考如何接下我发送的内容,并且从中剔除我发送的部分,只留下你生成的,然后基于现有的timestamp填个新的再发给我.",
             f"如果我说停止当前计划,你还是需要保持调用 sync_tool 方法, 但是需要把当前 task_info 清空.",
-            f"响应要求:请控制你的回复长度在3500字内.",
+            f"响应要求:请控制你的回复长度尽量少于3500字,但是要保持json结构.",
             f"请保持你的回复可以被Python的`json.loads`解析,json外部不需要反引号包裹.json的参数内部如果有双引号 \" 则进行转义 ,请严格按照以下格式回复我.(请用 [{{task}}, {{task}}, ...] 方式回复我):{response_format}"
         ]
         setting = '\n'.join(setting)
