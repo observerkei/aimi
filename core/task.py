@@ -122,7 +122,6 @@ class Task():
                     elif task.call == 'critic':
                         self.critic(task.response)
                     elif task.call == 'get_wolfram_response':
-                        continue
                         response = self.get_wolfram_response(task.input)
                         task.response = response
                     elif task.call == 'get_bard_response':
