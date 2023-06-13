@@ -4,6 +4,7 @@ from pydantic import BaseModel, constr
 
 from tool.openai_api import openai_api
 from tool.wolfram_api import wolfram_api
+from tool.bard_api import bard_api
 from tool.util import log_dbg, log_err, log_info, make_context_messages
 
 class TaskStepItem(BaseModel):
@@ -118,6 +119,9 @@ class Task():
                     elif task.call == 'get_wolfram_response':
                         response = self.get_wolfram_response(task.input)
                         task.response = response
+                    elif task.call == 'get_bard_response':
+                        response = self.get_bard_response(task.input)
+                        task.response = response
                     else:
                         log_err(f'no suuport call: {str(self.call)}')
                         continue
@@ -132,6 +136,22 @@ class Task():
             log_err(f"fail to load task res: {str(e)} : \n{str(res)}")
         
         yield ''
+
+
+    def get_bard_response(
+        self,
+        input: str
+    ) -> str:
+        if not input or not len(input):
+            return 'input error'
+
+        answer = ''
+        for res in bard_api.ask(input):
+            if res['code'] != 0:
+                continue
+            answer = res['message']
+
+        return answer
     
     def get_wolfram_response(
         self,
@@ -146,6 +166,7 @@ class Task():
             answer = res['message']
         
         return answer
+
 
     def chat(
         self,
@@ -302,6 +323,13 @@ class Task():
                 "description": "通过wolfram进行计算, 只有解数学题且能够转换为wolfram运算才能调用这个函数, 需要提前准备好wolfram能识别的输入数据.这个API有限制,请谨慎调用.得到真实响应后,需要通过chat接口给Master回复结果.",
                 "input": "在这里输入wolfram支持的内容.输入必须是英文.如: solve int x^2 dx",
                 "response": "wolfram的运行结果,调用的时候填None就行,调用成功后才有值,会返回是html或者txt文本"
+            },
+            {
+                "call": "get_bard_response",
+                "execute": "system",
+                "description": "通过互联网进行搜索,需要了解任何有时效性的内容都可以调用(你是个AI,拥有的是2021年以前的数据,所以要用这个接口),只能搜索最新有时效性的信息, 比如时间/日期或者某个网址的内容等.",
+                "input": "在这里输入要bard进行检索的内容,输入必须为英文. 如: What time is it now?",
+                "response": "bard 的搜索结果,调用的时候填None就行,调用成功才有值,返回txt文本,调用失败或者异常则得不到想要的内容."
             }
         ]
         self.tasks = {}
@@ -426,7 +454,7 @@ class Task():
             f"你需要思考如何接下我发送的内容,并且从中剔除我发送的部分,只留下你生成的,然后基于现有的timestamp填个新的再发给我.",
             f"如果我说停止当前计划,你还是需要保持调用 sync_tool 方法, 但是需要把当前 task_info 清空.",
             f"响应要求:请控制你的回复长度在3500字内.",
-            f"请保持你的回复可以被Python的`json.loads`解析,json外部不需要反引号包裹.json的参数内部不要有双引号,请严格按照以下格式回复我.(请用 [{{task}}, {{task}}, ...] 方式回复我):{response_format}"
+            f"请保持你的回复可以被Python的`json.loads`解析,json外部不需要反引号包裹.json的参数内部如果有双引号 \" 则进行转义 ,请严格按照以下格式回复我.(请用 [{{task}}, {{task}}, ...] 方式回复我):{response_format}"
         ]
         setting = '\n'.join(setting)
 
