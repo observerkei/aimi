@@ -101,10 +101,10 @@ class Task():
                             log_err(f"AI try predict Master res as: {str(content)}")
                             continue
                         yield response
-                    elif task.call == 'find_task_step':
+                    elif task.call == 'step_task_step':
                         task_id: str = task.input['task_id']
-                        default: List[TaskStepItem] = task.input['default']
-                        step = self.find_task_step(task_id, default)
+                        task_step: List[TaskStepItem] = task.input['task_step']
+                        step = self.set_task_step(task_id, task_step)
                         log_dbg(f"finded step: {str(step)}")
                     elif task.call == 'set_task_info':
                         task_id: str =  task.input['task_id']
@@ -121,7 +121,7 @@ class Task():
                         running.append(task)
                         running_size += len(str(task))
                 except Exception as e:
-                    log_err(f"fail to load task: {str(e)}")
+                    log_err(f"fail to load task: {str(e)}: {str(task)}")
             self.__append_running(running)
             log_dbg(f"update running success: {len(running)} : {json.dumps(str(running), indent=2, ensure_ascii=False)}")
         except Exception as e:
@@ -155,14 +155,14 @@ class Task():
     def find_task_step(
         self,
         task_id: str, 
-        default: List[TaskStepItem]
+        task_step: List[TaskStepItem]
     ):
         for _, task in self.tasks.items():
             if task_id != task.task_id:
                 continue
             if task.task_step:
                 return task.task_step
-            task.task_step = default
+            task.task_step = task_step
             return task.task_step
 
     def set_task_info(
@@ -203,9 +203,14 @@ class Task():
                         return
                 else:
                     # 一个任务也没有了
-                    self.tasks[self.now_task_id].task_info = '当前没有事情可以做, 找Master聊天吧...'
-                    self.tasks[self.now_task_id].task_step = [] # 清空原有步骤 ...
-                    log_dbg(f"set task to {str(self.tasks[self.now_task_id].task_info)}")
+                    new_task = self.tasks[self.now_task_id]
+                    new_task.task_info = '当前没有事情可以做, 找Master聊天吧...'
+                    new_task.task_step = [] # 清空原有步骤 ...
+                    self.tasks.append(new_task)
+                    self.now_task_id += 1
+                    log_dbg(f"set task to {self.now_task_id} : {str(self.tasks[self.now_task_id].task_info)}")
+            else:
+                log_dbg(f"task no complate, continue...")
                 
         except Exception as e:
             log_err(f"fail to critic {str(response)} : {str(e)}")
@@ -228,12 +233,12 @@ class Task():
                 }
             },
             {
-                "call": "find_task_step",
-                "execute": "system",
-                "description": "如果 task_step 为空,则需要查找一下.",
+                "call": "set_task_step",
+                "execute": "AI",
+                "description": "如果 task_step 和目标(task_info)不符合或为空,则需要设置一下.",
                 "input": {
-                    "task_id": "需要查找的task 对应的 id",
-                    "default": [
+                    "task_id": "需要设置的task 对应的 id",
+                    "task_step": [
                         {
                             "id": "序号, 为数字, 如: 1",
                             "step": "在这里填写能够完成计划的步骤."
@@ -244,9 +249,10 @@ class Task():
             {
                 "call": "critic",
                 "execute": "AI",
-                "description": "判断当前任务是否完成, 只需要输入任务id 和调用的对象的timestamp即可,如果数量太多,数组请填写 '...' 掠过",
+                "description": "判断当前任务是否完成, 只需要输入任务id 和调用的对象的timestamp即可,如果数量太多,保持json结构同时数组内容填写 '...' 掠过,可以查找所有运行记录.",
                 "input": {
                     "task_id": "任务id",
+                    "task_info": "被检查的任务目标",
                     "running": [
                         "调用对象的timestamp"
                     ]
@@ -371,7 +377,7 @@ class Task():
     {{
         "timestamp": "执行当前调用的时间,每次递增,从我发送的最后一项timestamp开始算.",
         "call": "要调用的方法如果是多个,也是放在这个数组里面.",
-        "execute": "system 或 AI, 响应中的system只能出现一次",
+        "execute": "在sync_tool中定义,不能修改",
         "input": {{}},
         "response": "sync_tool->execute 字段是 AI 是才能填这个字段",
         "reasoning": "在这里显示分析过程",
@@ -382,7 +388,7 @@ class Task():
         setting = [
             f"{task}",
             f"我会给你发送时间顺序的运行记录,你主要关注最新记录.",
-            f"你需要生成 {aimi_name} 的行为.如果旧任务已完成，你需要实现新任务.",
+            f"你需要生成 {aimi_name} 的行为.",
             f"{aimi_name} 需要想办法完成 task_info 和 Master的要求. task_step 是完成步骤. 如果 task_step 为空, 或不符合,请重新设置步骤.",
             f"preset 是 {aimi_name} 的行为定义,只能对sync_tool的调用生效.",
             f"每次新请求你只能再回复一次 execute 内容为 system 的方法. 尽量只通过单次调用完成回复.",
