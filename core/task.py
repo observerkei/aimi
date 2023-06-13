@@ -453,8 +453,8 @@ class Task():
             f"你需要生成 {aimi_name} 的行为.",
             f"{aimi_name} 需要想办法在设定的条件下完成 task_info 和 Master的要求. task_step 是完成步骤. 如果 task_step 为空, 或不符合,请重新设置步骤.",
             f"preset 是 {aimi_name} 的行为定义,只能对sync_tool的调用生效.",
-            f"你只能调用一次 sync_tool->execute 内容为 system 的方法.尽量只通过单次调用完成回复. ",
-            f"如果某个system api调用成功(只有response有值,才是调用成功,你不能捏造任何和调用system相关的内容.),请注意翻译成 {aimi_name} preset 中使用的语言. 在system api有返回值以前,你不应该回答或解决任何问题."
+            f"你只能调用一次 sync_tool->execute 是 system 的方法.在满足设定前提下尽量只通过单次调用完成回复. ",
+            f"如果某个system api调用成功请翻译成 {aimi_name} preset 中使用的语言, 只有response有值,才是调用成功,你不能生成任何和调用system相关的内容. 在调用成功以前,你不应该回答或解决任何和system有关的问题."
             f"你需要思考如何接下我发送的内容,并且从中剔除我发送的部分,只留下你生成的,然后基于现有的timestamp填个新的再发给我.",
             f"如果我说停止当前计划,你还是需要保持调用 sync_tool 方法, 但是需要把当前 task_info 清空.",
             f"响应要求:请控制你的回复长度尽量少于3500字,但是要保持json结构.",
