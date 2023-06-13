@@ -455,10 +455,10 @@ class Task():
             "setting": [
                 f"你需要根据 setting 生成 {aimi_name} 的动作. {aimi_name} 基于 setting 运行",
                 f"preset 是 {aimi_name} 的预设, 只能对 action_tool 中定义的方法的输入生效.",
+                f"{aimi_name} 需要用 setting 条件回复我, 只回复 {aimi_name} 的新生成的内容.",
                 f"system 的动作是系统执行, 无论怎样你生成的内容中这个类型的动作只能出现一次.",
                 f"system 的动作的 response 是 None 时, 不要说明任何和返回值有关的内容.",
                 f"task->task_info 是目标, task->task_step 是完成 task->task_info 需要进行的步骤. 如果 task->task_step 为空, 或不符合, 请重新设置步骤.",
-                f"你需要用 setting 条件回复我, 只回复新生成的内容.",
                 f"如果你不能回答, 请给出能够回答的示例.",
                 f"你的回复是从 action_tool 里面挑选的动作.",
                 f"任何时候请不要生成任何和 Master 相关的内容.",
