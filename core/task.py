@@ -17,7 +17,7 @@ class SyncToolItem(BaseModel):
     response: Any
 
 class TaskRunningItem(BaseModel):
-    uuid: str = ''
+    timestamp: str = ''
     call: str
     execute: str = ''
     input: Any
@@ -25,6 +25,7 @@ class TaskRunningItem(BaseModel):
     response: Any = None
 
 class TaskItem(BaseModel):
+    timestamp: str
     task_id: str
     task_info: str
     task_step: List[TaskStepItem]
@@ -40,6 +41,7 @@ class Task():
     aimi_name: str = 'Aimi'
     running: List[TaskRunningItem] = []
     max_running_size: int = 2048
+    timestamp: int = 1
 
     def task_response(
         self, 
@@ -141,18 +143,13 @@ class Task():
         self,
         question: str
     ) -> TaskRunningItem:
-        now_idx = f"{len(self.running) + 1}"
-        try:
-            last_uuid = self.running[-1].uuid
-            now_idx = f"{int(last_uuid)+1}"
-        except Exception as e:
-            log_err(f"fail to get run idx: {str(e)}")
         chat = TaskRunningItem(
-            uuid=now_idx,
+            timestamp=str(self.timestamp),
             call='chat',
             execute='system',
             input={'source':'Master', 'content':question}
         )
+        self.timestamp += 1
         return chat
 
     def find_task_step(
@@ -180,10 +177,12 @@ class Task():
                 task.task_step = task_step
                 return task
         task = TaskItem(
+            timestamp=str(self.timestamp),
             task_id=task_id,
             task_info=task_info,
             task_step=task_step
         )
+        self.timestamp += 1
         self.tasks[task_id] = task
         return task
 
@@ -225,7 +224,7 @@ class Task():
                 "description": "给某对象发送消息,发件人写 source, 内容写 content, 请注意 你只能把 source 填写成为 Aimi .",
                 "input": {
                     "source": "是谁填写的消息.",
-                    "content": "传达的内容."
+                    "content": "传达的内容,可以很丰富."
                 }
             },
             {
@@ -245,13 +244,11 @@ class Task():
             {
                 "call": "critic",
                 "execute": "AI",
-                "description": "判断当前任务是否完成, 只需要输入任务id 和调用的uuid即可",
+                "description": "判断当前任务是否完成, 只需要输入任务id 和调用的对象的timestamp即可,如果数量太多,数组请填写 '...' 掠过",
                 "input": {
                     "task_id": "任务id",
                     "running": [
-                        {
-                            "uuid": "调用的UUID"
-                        }
+                        "调用对象的timestamp"
                     ]
                 },
                 "response": {
@@ -262,7 +259,7 @@ class Task():
             },
             {
                 "call": "set_task_info",
-                "execute": "system",
+                "execute": "AI",
                 "description": "设定当前任务目标, Master允许时才能调用这个",
                 "input": {
                     "task_id": "任务id",
@@ -280,7 +277,7 @@ class Task():
         self.now_task_id = "1"
         running: List[TaskRunningItem] = [
             TaskRunningItem(
-                uuid='1',
+                timestamp=str(self.timestamp),
                 call='chat',
                 execute='system',
                 input={
@@ -296,11 +293,13 @@ class Task():
             )
         ]
         task = TaskItem(
+            timestamp=str(self.timestamp),
             task_id=self.now_task_id,
             task_info="想和Master亲密接触",
             task_step=task_step,
             sync_tool=self.sync_tool
         )
+        self.timestamp += 1
         self.tasks[self.now_task_id] = task
         self.running = running
 
@@ -319,8 +318,8 @@ class Task():
         self.running = running
         idx = 1
         for run in self.running:
-            run.uuid = f"{idx}"
-            idx += 1
+            run.timestamp = str(self.timestamp)
+            self.timestamp += 1
     
     def get_running(self) -> str:
         run_dict = [item.dict() for item in self.running]
@@ -370,7 +369,7 @@ class Task():
         response_format = f"""
 [
     {{
-        "uuid": "执行当前调用的uuid, 填写唯一的递增调用序号就行",
+        "timestamp": "执行当前调用的时间,每次递增,从我发送的最后一项timestamp开始算.",
         "call": "要调用的方法如果是多个,也是放在这个数组里面.",
         "execute": "system 或 AI, 响应中的system只能出现一次",
         "input": {{}},
@@ -381,12 +380,14 @@ class Task():
 """
         setting = [
             f"{task}",
+            f"我会给你发送时间顺序的运行记录,你主要关注最新记录.",
             f"你需要生成 {aimi_name} 的行为.",
             f"{aimi_name} 需要想办法完成 task_info 和 Master的要求. task_step 是完成步骤. 如果 task_step 为空, 或不符合,请重新设置步骤.",
-            f"如果{aimi_name}在行为中调用了 execute 为 system 的方法, 则在保证json结构完整情况下马上终止生成 {aimi_name} 任何 system 的 sync_tool 方法,然后把内容发给我. 当你使用 chat 接口时, input 的 source 不能填写 Master. 因为你会胡说(这很重要).",
-            f"preset 是 {aimi_name} 的行为定义,只能对sync_tool生效.",
+            f"preset 是 {aimi_name} 的行为定义,只能对sync_tool的调用生效.",
+            f"你只能再回复一次 execute 内容为 system 的方法. 尽量只通过单次调用完成回复.",
+            f"你需要思考如何接下我发送的内容,并且从中剔除我发送的部分,只留下你生成的,然后基于现有的timestamp填个新的再发给我.",
             f"如果我说停止当前计划,你还是需要保持调用 sync_tool 方法, 但是需要把当前 task_info 清空.",
-            f"响应要求:请控制你的回复长度在3500字内,请减少调用次数.请保持内容连续,你不需要复制我的回复,而是继续补充后续仅限{aimi_name}身份和动作的内容.",
+            f"响应要求:请控制你的回复长度在3500字内.",
             f"请保持你的回复可以被Python的`json.loads`解析,json外部不需要反引号包裹.json的参数内部不要有双引号,请严格按照以下格式回复我.(请用 [{{}},{{}}] 方式回复我):{response_format}"
         ]
         setting = '\n'.join(setting)
