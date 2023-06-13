@@ -41,7 +41,7 @@ class Task():
     now_task_id: str
     aimi_name: str = 'Aimi'
     running: List[TaskRunningItem] = []
-    max_running_size: int = 2048
+    max_running_size: int = 4000
     timestamp: int = 1
 
     def task_response(
@@ -130,7 +130,7 @@ class Task():
                     else:
                         log_err(f'no suuport call: {str(self.call)}')
                         continue
-                    if len(str(running)) < self.max_running_size:
+                    if (len(str(running)) + len(str(task))) < self.max_running_size:
                         running.append(task)
                 except Exception as e:
                     log_err(f"fail to load task: {str(e)}: {str(task)}")
@@ -190,8 +190,8 @@ class Task():
             timestamp=str(self.timestamp),
             call='chat',
             input={
-                'source': 'Master', 
-                'content': question
+                'content': question,
+                'source': 'Master'
             },
             execute='system'
         )
@@ -274,8 +274,8 @@ class Task():
                 call="chat",
                 description="给某对象发送消息, 发件人写 source, 内容写 content",
                 input={
-                    "source": "是谁填写的消息. 你不能填 Master. 你只能填: Aimi",
-                    "content": "传达的内容, 可以很丰富"
+                    "content": "传达的内容, 可以很丰富",
+                    "source": "是谁填写的消息. 你不能填 Master. 你只能填: Aimi"
                 },
                 execute="system"
             ),
@@ -376,7 +376,7 @@ class Task():
             return
         
         for run in reversed(self.running):
-            if len(str(running)) > self.max_running_size:
+            if (len(str(running)) + len(str(run))) > self.max_running_size:
                 break
             running.insert(0, run)
         self.running = running
@@ -441,9 +441,7 @@ class Task():
         "timestamp": "执行当前调用的时间, 每次递增, 从我发送的最后一项 timestamp 开始算.",
         "call": "要调用的方法如果是多个, 也是放在这个数组里面.",
         "reasoning": "在这里显示分析过程和建议.",
-        "input": {{
-            "对应入参": "对应内容"
-        }},
+        "input": {{ "对应入参": "对应内容" }},
         "execute": "system 或 AI"
     }}
 ]
