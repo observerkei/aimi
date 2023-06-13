@@ -21,10 +21,10 @@ class SyncToolItem(BaseModel):
 class TaskRunningItem(BaseModel):
     timestamp: str = ''
     call: str
-    execute: str = ''
     input: Any
     reasoning: str = None
     response: Any = None
+    execute: constr(regex='system|AI')
 
 class TaskItem(BaseModel):
     timestamp: str
@@ -189,8 +189,8 @@ class Task():
         chat = TaskRunningItem(
             timestamp=str(self.timestamp),
             call='chat',
-            execute='system',
-            input={'source':'Master', 'content':question}
+            input={'source':'Master', 'content':question},
+            execute='system'
         )
         self.timestamp += 1
         return chat
@@ -249,8 +249,9 @@ class Task():
                     new_task = self.tasks[self.now_task_id]
                     new_task.task_info = '当前没有事情可以做, 找Master聊天吧...'
                     new_task.task_step = [] # 清空原有步骤 ...
-                    self.tasks.append(new_task)
+
                     self.now_task_id += 1
+                    self.tasks[self.now_task_id] = new_task
                     log_dbg(f"set task to {self.now_task_id} : {str(self.tasks[self.now_task_id].task_info)}")
             else:
                 log_dbg(f"task no complate, continue...")
@@ -268,16 +269,15 @@ class Task():
         self.sync_tool =  [
             {
                 "call": "chat",
-                "execute": "system",
                 "description": "给某对象发送消息,发件人写 source, 内容写 content, 请注意 你只能把 source 填写成为 Aimi .",
                 "input": {
                     "source": "是谁填写的消息.",
                     "content": "传达的内容,可以很丰富."
-                }
+                },
+                "execute": "system"
             },
             {
                 "call": "set_task_step",
-                "execute": "AI",
                 "description": "如果 task_step 和目标(task_info)不符合或为空,则需要设置一下.",
                 "input": {
                     "task_id": "需要设置的task 对应的 id",
@@ -287,11 +287,11 @@ class Task():
                             "step": "在这里填写能够完成计划的步骤."
                         }
                     ]
-                }
+                },
+                "execute": "AI"
             },
             {
                 "call": "critic",
-                "execute": "AI",
                 "description": "判断当前任务是否完成, 只需要输入任务id 和调用的对象的timestamp即可,如果数量太多,保持json结构同时数组内容填写 '...' 掠过,可以查找所有运行记录.",
                 "input": {
                     "task_id": "任务id",
@@ -304,11 +304,11 @@ class Task():
                     "reasoning": "在这里显示分析过程",
                     "success": "标记任务是否完成, 如: True/False",
                     "critique": "如果success为false,请在这里说明应该如何完成任务"
-                }
+                },
+                "execute": "AI"
             },
             {
                 "call": "set_task_info",
-                "execute": "AI",
                 "description": "设定当前任务目标, Master允许时才能调用这个",
                 "input": {
                     "task_id": "任务id",
@@ -319,21 +319,22 @@ class Task():
                             "step": "执行设定的任务目标需要进行的操作"
                         }
                     ]
-                }
+                },
+                "execute": "AI"
             },
             {
                 "call": "get_wolfram_response",
-                "execute": "system",
                 "description": "通过wolfram进行计算, 只有解数学题且能够转换为wolfram运算才能调用这个函数, 需要提前准备好wolfram能识别的输入数据.这个API有限制,请谨慎调用.得到真实响应后,需要通过chat接口给Master回复结果.",
                 "input": "在这里输入wolfram支持的内容.输入必须是英文.如: solve int x^2 dx",
-                "response": "wolfram的运行结果,调用的时候填None就行,调用成功后才有值,会返回是html或者txt文本"
+                "response": "wolfram的运行结果,调用的时候填None就行,调用成功后才有值,会返回是html或者txt文本",
+                "execute": "system"
             },
             {
                 "call": "get_bard_response",
-                "execute": "system",
                 "description": "通过互联网进行搜索,需要了解任何有时效性的内容都可以调用(你是个AI,拥有的是2021年以前的数据,所以要用这个接口),只能搜索最新有时效性的信息, 比如时间/日期或者某个网址的内容等.",
                 "input": "在这里输入要bard进行检索的内容,输入必须为英文. 如: What time is it now?",
-                "response": "bard 的搜索结果,调用的时候填None就行,调用成功才有值,返回txt文本,调用失败或者异常则得不到想要的内容."
+                "response": "bard 的搜索结果,调用的时候填None就行,调用成功才有值,返回txt文本,调用失败或者异常则得不到想要的内容.",
+                "execute": "system"
             }
         ]
         self.tasks = {}
@@ -440,11 +441,11 @@ class Task():
     {{
         "timestamp": "执行当前调用的时间,每次递增,从我发送的最后一项timestamp开始算.",
         "call": "要调用的方法如果是多个,也是放在这个数组里面.",
-        "execute": "在sync_tool中定义,不能修改",
         "input": {{}},
-        "response": "sync_tool->execute 字段是 AI 是才能填这个字段的内容,其他情况填写: None",
-        "reasoning": "在这里显示分析过程",
-        "think": "在这里写下你的期望"
+        "response": "execute 是 AI 才能填这个字段",
+        "execute": "填写在sync_tool中定义的值.",
+        "reasoning": "在这里显示分析过程.",
+        "think": "在这里写下你的期望."
     }}
 ]
 """
@@ -452,10 +453,10 @@ class Task():
             f"{task}",
             f"我会给你发送时间顺序的运行记录,你主要关注最新记录.",
             f"你需要生成 {aimi_name} 的行为.",
-            f"{aimi_name} 需要想办法完成 task_info 和 Master的要求. task_step 是完成步骤. 如果 task_step 为空, 或不符合,请重新设置步骤.",
+            f"{aimi_name} 需要想办法在设定的条件下完成 task_info 和 Master的要求. task_step 是完成步骤. 如果 task_step 为空, 或不符合,请重新设置步骤.",
             f"preset 是 {aimi_name} 的行为定义,只能对sync_tool的调用生效.",
-            f"每次请求你最多只能调用一次 sync_tool->execute 内容为 system 的方法. 尽量只通过单次调用完成回复.",
-            f"如果某个system api调用成功(只有response有值,才是调用成功),请注意翻译成 {aimi_name} preset 中使用的语言."
+            f"你最多只能调用一次 sync_tool->execute 内容为 system 的方法.尽量只通过单次调用完成回复. ",
+            f"如果某个system api调用成功(只有response有值,才是调用成功,你不能捏造任何和调用system相关的内容.),请注意翻译成 {aimi_name} preset 中使用的语言. 在system api有返回值以前,你不应该回答或解决任何问题."
             f"你需要思考如何接下我发送的内容,并且从中剔除我发送的部分,只留下你生成的,然后基于现有的timestamp填个新的再发给我.",
             f"如果我说停止当前计划,你还是需要保持调用 sync_tool 方法, 但是需要把当前 task_info 清空.",
             f"响应要求:请控制你的回复长度在3500字内.",
