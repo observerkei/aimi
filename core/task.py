@@ -41,7 +41,7 @@ class Task():
     now_task_id: str
     aimi_name: str = 'Aimi'
     running: List[TaskRunningItem] = []
-    max_running_size: int = 3500
+    max_running_size: int = 3000
     timestamp: int = 1
 
     def task_response(
