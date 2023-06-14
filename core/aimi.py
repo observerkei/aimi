@@ -163,8 +163,8 @@ class Aimi:
         api_type = api_type if api_type and len(api_type) else self.api[0]
         link_think = question
 
-        if api_type == openai_api:
-            link_think = task.make_task(self.aimi_name, preset, question)
+        if api_type == task.type:
+            link_think = task.make_link_think(question, self.aimi_name, preset)
         elif api_type == openai_api.type and openai_api.use_web_ask:
             # cul question
             history = memory.make_history(talk_history)
@@ -301,6 +301,8 @@ answer this following question: {{
             return aimi_plugin.bot_get_call_type(question)
         if wolfram_api.is_call(question):
             return wolfram_api.type
+        if task.is_call(question):
+            return task.type
 
         return self.api[0]
 
@@ -440,17 +442,20 @@ answer this following question: {{
         owned_by: str = 'Aimi',
         context_messages: Any = None
     ) -> Generator[dict, None, None]:
-        if owned_by == self.aimi_name and model == 'auto':
+        if ((owned_by == self.aimi_name) and (model == 'auto')):
             return self.ask(question, nickname)
         elif owned_by == self.aimi_name and model == 'task':
             preset = context_messages[0]['content']
-            return task.ask(owned_by, preset, question)
+            task_link_think = task.make_link_think(
+                question, self.aimi_name, preset)
+
+            return task.ask(task_link_think)
         else:
             preset = context_messages[0]['content']
             talk_history = context_messages[1:]
             link_think = self.make_link_think(
                     question=question, 
-                    nickname=None, 
+                    nickname=self.master_name, 
                     api_type=owned_by, 
                     preset=preset, 
                     talk_history=talk_history)
@@ -509,6 +514,8 @@ answer this following question: {{
 
         if api_type == openai_api.type:
             yield from self.__post_openai(link_think, model, context_messages, memory.openai_conversation_id)
+        elif api_type == task.type:
+            yield from task.ask(link_think)
         elif api_type == bing_api.type:
             yield from self.__post_bing(link_think, model)
         elif api_type == bard_api.type:

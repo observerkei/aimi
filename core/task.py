@@ -374,33 +374,34 @@ class Task():
         js = json.dumps(run_dict, ensure_ascii=False)
         log_dbg(f"running: {json.dumps(run_dict, indent=4, ensure_ascii=False)}")
         return str(js)
-    
+
+    def is_call(
+        self, 
+        question
+    ) -> bool:
+        calls = [
+            '#task',
+            '#aimi-task',
+            '#at'
+        ]
+        for call in calls:
+            if call in question.lower():
+                return True
+
+        return False
+
     def ask(
         self,
-        aimi_name: str,
-        preset: str,
-        question: str
+        link_think: str
     ) -> Generator[dict, None, None]:
         answer = {
             "code": 1,
             "message": ""
         }
 
+        context_messages = make_context_messages(link_think, '', [])
 
-        # 如果只是想让任务继续, 就回复全空格/\t/\n
-        if (
-            len(question)
-            and not question.isspace()
-        ):
-            chat = self.make_chat('Master', question)
-            self.__append_running([chat])
-
-        # running_format = self.get_running()
-        task_messages = self.make_task_messages(aimi_name, preset, task)
-
-        context_messages = make_context_messages(task_messages, '', [])
-
-        for res in openai_api.ask(question, 'gpt-3.5-turbo-16k', context_messages):
+        for res in openai_api.ask('', 'gpt-3.5-turbo-16k', context_messages):
             if res['code'] != 0:
                 log_dbg(f"skip len: {len(str(res['message']))}")
                 if len(str(res['message'])) > 2000:
@@ -415,12 +416,21 @@ class Task():
         answer['code'] = 0
         yield answer
     
-    def make_task_messages(
+    def make_link_think(
         self,
+        question: str,
         aimi_name: str,
-        preset: str,
-        task: Dict
+        preset: str
     ) -> str:
+        # 如果只是想让任务继续, 就回复全空格/\t/\n
+        if (
+            len(question)
+            and not question.isspace()
+        ):
+            chat = self.make_chat('Master', question)
+            self.__append_running([chat])
+            log_dbg(f"set chat {(str(question))}")
+
         response_format = f"""```json
 [
     {{
@@ -433,7 +443,7 @@ class Task():
 ]
 ```"""
         action_tool = [item.dict() for item in self.action_tool]
-        task = self.make_task()
+        task = self.__make_task()
         settings: Dict = {
             "settings": [
                 f"action_tool 里面定义了所有你能调用的 方法(action).",
@@ -464,7 +474,8 @@ class Task():
 
         return setting_format
 
-    def make_task(
+
+    def __make_task(
         self
     ) -> Dict:
         if not (self.now_task_id in self.tasks):
