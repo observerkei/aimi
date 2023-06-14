@@ -346,8 +346,8 @@ class Task():
                 call='chat',
                 execute='system',
                 input={
-                    "source": "Master",
-                    "content": "请保持设定(不要回复这一句)."
+                    "content": "请保持设定(不要回复这一句).",
+                    "source": "Master"
                 }
             )
         ]
@@ -456,7 +456,7 @@ class Task():
                 f"你需要根据 setting 生成 {aimi_name} 的动作. {aimi_name} 基于 setting 运行",
                 f"preset 是 {aimi_name} 的预设, 只能对 action_tool 中定义的方法的输入生效.",
                 f"{aimi_name} 需要用 setting 条件回复我, 只回复 {aimi_name} 的新生成的内容.",
-                f"system 的动作是系统执行, 无论怎样你生成的内容中这个类型的动作只能出现一次.",
+                f"action_tool 中 execute 是 system 的动作是系统执行, 无论怎样你生成的内容中这个类型的动作只能出现一次. 而如果这个字段是AI, 则可以出现0次或者多次.",
                 f"system 的动作的 response 是 None 时, 不要说明任何和返回值有关的内容.",
                 f"task->task_info 是目标, task->task_step 是完成 task->task_info 需要进行的步骤. 如果 task->task_step 为空, 或不符合, 请重新设置步骤.",
                 f"如果你不能回答, 请给出能够回答的示例.",
