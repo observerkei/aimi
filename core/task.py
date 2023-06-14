@@ -389,10 +389,16 @@ class Task():
                 return True
 
         return False
+    
+    def get_model(self, select) -> str:
+        if '16k' in select.lower():
+            return 'gpt-3.5-turbo-16k'
+        return 'gpt-3.5-turbo'
 
     def ask(
         self,
-        link_think: str
+        link_think: str,
+        model: str
     ) -> Generator[dict, None, None]:
         answer = {
             "code": 1,
@@ -401,7 +407,7 @@ class Task():
 
         context_messages = make_context_messages(link_think, '', [])
 
-        for res in openai_api.ask('', 'gpt-3.5-turbo-16k', context_messages):
+        for res in openai_api.ask('', model, context_messages):
             if res['code'] != 0:
                 log_dbg(f"skip len: {len(str(res['message']))}")
                 if len(str(res['message'])) > 2000:
