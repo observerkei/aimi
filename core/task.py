@@ -11,6 +11,8 @@ from tool.util import log_dbg, log_err, log_info, make_context_messages
 class TaskStepItem(BaseModel):
     id: str
     step: str
+    check: str
+    call: str
 
 class SyncToolItem(BaseModel):
     call: str
@@ -112,13 +114,10 @@ class Task():
                         task_id: str = task.input['task_id']
                         task_step: List[TaskStepItem] = task.input['task_step']
                         step = self.set_task_step(task_id, task_step)
-                        log_dbg(f"{str(task.call)}: finded step: {str(step)}")
                     elif task.call == 'set_task_info':
                         task_id: str =  task.input['task_id']
                         task_info: str = task.input['task_info']
-                        task_step: List[TaskStepItem] = task.input['task_step']
-                        self.set_task_info(task_id, task_info, task_step)
-                        log_dbg(f"{str(task.call)}: set task: {str(task_info)} : {str(task_step)}")
+                        self.set_task_info(task_id, task_info)
                     elif task.call == 'critic':
                         self.critic(task.input)
                     elif task.call == 'get_wolfram_response':
@@ -135,7 +134,7 @@ class Task():
                 except Exception as e:
                     log_err(f"fail to load task: {str(e)}: {str(task)}")
             self.__append_running(running)
-            log_dbg(f"update running success: {len(running)} : {json.dumps(str(running), indent=2, ensure_ascii=False)}")
+            log_dbg(f"update running success: {len(running)}")
         except Exception as e:
             log_err(f"fail to load task res: {str(e)} : \n{str(res)}")
         
@@ -214,14 +213,12 @@ class Task():
     def set_task_info(
         self,
         task_id: str, 
-        task_info: str, 
-        task_step: List[TaskStepItem]
+        task_info: str
     ):
         for _, task in self.tasks.items():
             if task_id == task.task_id:
                 task.task_info = task_info
-                task.task_step = task_step
-                log_dbg(f"set task[{str(task_id)}] info: {str(task_info)} step: {str(task_step)}")
+                log_dbg(f"set task[{str(task_id)}] info: {str(task_info)}")
                 log_dbg(f"set task id {str(self.now_task_id)} to {str(task_id)}")
                 self.now_task_id = task_id
                 return task
@@ -229,13 +226,13 @@ class Task():
             timestamp=str(self.timestamp),
             task_id=task_id,
             task_info=task_info,
-            task_step=task_step
+            task_step=[]
         )
         self.timestamp += 1
         self.tasks[task_id] = task
         self.now_task_id = task_id
 
-        log_dbg(f"set new task[{str(task_id)}] info: {str(task_info)} step: {str(task_step)}")
+        log_dbg(f"set new task[{str(task_id)}] info: {str(task_info)}")
         log_dbg(f"set task id {str(self.now_task_id)} to {str(task_id)}")
         return task
 
@@ -248,22 +245,14 @@ class Task():
                 task = self.tasks[self.now_task_id]
                 task_info = task.task_info
                 log_info(f"task complate: {str(task_info)}")
-                if len(self.tasks) > 1:
-                    del self.tasks[self.now_task_id]
-                    log_info(f'task_info: {task_info}, delete.')
                 
-                    for _, task in self.tasks.items():
-                        self.now_task_id = task.task_id
-                        return
-                else:
-                    # 一个任务也没有了
-                    new_task = self.tasks[self.now_task_id]
-                    new_task.task_info = '当前没有事情可以做, 找Master聊天吧...'
-                    new_task.task_step = [] # 清空原有步骤 ...
+                new_task = self.tasks[self.now_task_id]
+                new_task.task_info = '当前没有事情可以做, 找Master聊天吧...'
+                new_task.task_step = [] # 清空原有步骤 ...
 
-                    self.now_task_id = str(int(self.now_task_id) + 1)
-                    self.tasks[self.now_task_id] = new_task
-                    log_dbg(f"set task to {str(self.now_task_id)} : {str(self.tasks[self.now_task_id].task_info)}")
+                self.now_task_id = str(int(self.now_task_id) + 1)
+                self.tasks[self.now_task_id] = new_task
+                log_dbg(f"set task to {str(self.now_task_id)} : {str(self.tasks[self.now_task_id].task_info)}")
             else:
                 log_dbg(f"task no complate, continue...")
                 
@@ -280,22 +269,24 @@ class Task():
         self.action_tool: List[SyncToolItem] = [
             SyncToolItem(
                 call="chat",
-                description="给某对象发送消息, 发件人写在 name 你和Aimi都不准填 Master. 内容写在 content 中.",
+                description="给某对象发送消息进行交互, 发件人写在 name, 内容写在 content 中. 无论历史是怎样, 你只能把name设置成 Aimi",
                 input={
-                    "name": "只能是 Aimi",
+                    "name": "Aimi",
                     "content": "传达的内容, 可以很丰富"
                 },
                 execute="system"
             ),
             SyncToolItem(
                 call="set_task_step",
-                description="如果 task_step 和目标(task_info)不符合或为空,则需要设置一下",
+                description="如果 task_step 和目标(task_info)不符合或为空, 则需要设置一下",
                 input={
                     "task_id": "需要设置的task 对应的 id",
                     "task_step": [
                         {
                             "id": "序号, 为数字, 如: 1",
-                            "step": "在这里填写能够完成计划的步骤"
+                            "step": "在这里填写能够完成计划task_info的步骤",
+                            "check": "达成什么条件才算完成",
+                            "call": "应该调用什么 action 处理步骤."
                         }
                     ]
                 },
@@ -303,30 +294,24 @@ class Task():
             ),
             SyncToolItem(
                 call="critic",
-                description="判断当前任务是否完成, 需要输入 task_id 和调用的对象的 timestamp , 如果数量太多, 只填写关健几个, 可以查找所有运行记录.",
+                description="判断当前任务task_info是否完成, 需要输入 task_id 和调用的对象的 timestamp , 如果数量太多, 只填写关健几个, 可以查找所有运行记录.",
                 input={
                     "task_id": "被检查的task对应的id",
                     "task_info": "被检查的任务目标",
                     "running": [
-                        "调用对象的 timestamp"
+                        "已运行方法的 timestamp"
                     ],
                     "success": "标记任务是否完成, 如: True/False",
-                    "critique": "如果success为 False, 请在这里说明应该如何完成任务"
+                    "critique": "如果success不是 True, 请在这里说明应该如何完成任务"
                 },
                 execute="AI"
             ),
             SyncToolItem(
                 call="set_task_info",
-                description="设定当前任务目标, 设置目标的时候要同时给出实现步骤, Master允许时才能调用这个",
+                description="设定当前任务目标, 填写参数前要分析完毕, 设置目标的时候要同时给出实现步骤, 然后同时设置task_step, Master允许时才能调用这个",
                 input={
                     "task_id": "需要设置的task 对应的 id",
-                    "task_info": "任务目标",
-                    "task_step": [
-                        {
-                            "id": "步骤id, 如: 1",
-                            "step": "执行设定的任务目标需要进行的操作"
-                        }
-                    ]
+                    "task_info": "任务目标"
                 },
                 execute="AI"
             ),
@@ -352,7 +337,9 @@ class Task():
         task_step: List[TaskStepItem] = [
             TaskStepItem(
                 id="1", 
-                step="偷偷接近Master."
+                step="偷偷接近Master. 然后和Master互动",
+                call="chat",
+                check="Master回复了消息"
             )
         ]
         task = TaskItem(
@@ -439,9 +426,9 @@ class Task():
     {{
         "timestamp": "时间戳: 执行当前调用的时间, 每次递增, 从最大 timestamp 开始算.",
         "call": "调用方法: 需要使用哪个 action_tool.",
-        "reasoning": "推理过程: 在这里显示分析过程和建议或运行记录.",
+        "reasoning": "推理过程: 在这里显示分析过程和建议或运行记录或使用方法/指导, 要给出能推进 task_info 的建议.",
         "input": {{ "对应入参": "对应内容" }},
-        "execute": "执行类型: 在 action_tool 中定义, 不能漏掉, 只能填写 system 或者 AI "
+        "execute": "执行类型: 取action_tool中对应动作的对应值, 不能漏掉, 不能修改"
     }}
 ]
 ```"""
@@ -450,19 +437,20 @@ class Task():
         settings: Dict = {
             "settings": [
                 f"action_tool 里面定义了所有你能调用的 方法(action).",
-                f"你每次生成追加内容时, 可以同时生成多个方法(action), 但最多只能生成一次 action->execute 为 system 的方法.",
-                f"可以生成不限次 action->execute 为 AI 的方法, 但是要控制频率, 尽量减少重复消息.",
+                f"你每次生成追加内容时, 可以同时生成多个方法(action), 可以生成不限次 action->execute 为 AI 的方法, 可以进行很多思考.",
+                f"无论历史是什么, 你最多只能生成一次 action->execute 为 system 的方法. 每次都尽量生成一次 system 方法.",
                 f"当你在调用 action_tool 中 execute 是 system 的 action 时不要填写 response, 也不要说明任何和 response 有关内容, 除非调用成功.",
-                f"task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤.",
-                f"如果 task_step 为空, 或不符合 或没有进展, 请重新设置步骤, 尽量推进任务进度.",
+                f"task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action强绑定.",
+                f"如果 task_step 为空, 或不符合, 请重新设置步骤, 如果没有进展, 尽量给出创造性建议或优化步骤推进任务进度.",
+                f"在Master补充达成条件后, 你应该在保障任务能完成基础上, 修改任务步骤."
+                f"每次任务/关健操作完成, 都应该试探性地带上分析上报Master.",
                 f"你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tool 行动. 你叫我 Master.",
                 f"preset 是 {aimi_name} 的预设, preset 只能对 action_tool 中定义的方法的输入生效.",
                 f"{aimi_name} 的权限不会超过action_tool中定义的范围.",
-                f"请你主要基于 settings 和 参考部分 action_running 分析, 不显示分析过程, 然后你只以 {aimi_name} 的身份只生成 action_running 的追加内容",
-                f"只给我发送追加内容即可, 如果 action_running 太长, 请只重点关注最后几条和我的话, 忽略重复消息.",
-                f"大多数情况下 Master 不会回 {aimi_name} 消息, 你也不需要找Master. 你生成追加内容的时候要考虑这一点.",
+                f"请你主要基于 settings 和 参考部分 action_running 分析, 不显示分析过程, 然后你只以 {aimi_name} 的身份只生成 action_running 的追加内容, 不能复制或重复已有内容.",
+                f"只给我发送追加内容即可, 如果 action_running 太长, 请只重点关注最后几条和我的话, 忽略重复消息. 不能重复任何已有内容.",
+                f"无论之前有什么, 在调用 chat 方法时, chat->input->name 只能是 {aimi_name}. 你只能以 {aimi_name} 身份调用 action.",
                 f"你的回复是 [{{action}}] 的 JSON 数组结构, action 在 action_tool 中定义.",
-                f"不要漏了填充 action->execute.",
                 f"请保持你的回复可以被 Python 的 `json.loads` 解析, 请严格按照以下JSON数组格式回复我: {response_format}"
             ],
             "task": task,
