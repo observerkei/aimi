@@ -41,7 +41,7 @@ class Task():
     now_task_id: str
     aimi_name: str = 'Aimi'
     running: List[TaskRunningItem] = []
-    max_running_size: int = 3000
+    max_running_size: int = 8 * 1000
     timestamp: int = 1
 
     def task_response(
@@ -272,10 +272,10 @@ class Task():
         self.action_tool: List[SyncToolItem] = [
             SyncToolItem(
                 call="chat",
-                description="给某对象发送消息, 发件人写 source, 内容写 content",
+                description="给某对象发送消息, 发件人写在 name, 内容写在 content 中",
                 input={
                     "content": "传达的内容, 可以很丰富",
-                    "source": "Aimi|Master, 表示是谁填写的消息. 你只能生成 Aimi 的内容"
+                    "name": "发消息的人, 可以填 Aimi或者Master, 不能省略."
                 },
                 execute="system"
             ),
@@ -328,7 +328,7 @@ class Task():
             SyncToolItem(
                 call="get_wolfram_response",
                 description="通过wolfram进行计算, 所有计算都可以通过这个函数解决, 这个函数调用成功后是完全正确的.",
-                input="在这里输入wolfram支持的内容. 如: solve int x^2 dx ",
+                input="在这里输入wolfram支持的内容, 只支持英文内容. 如: solve int x^2 dx ",
                 execute="system"
             ),
             SyncToolItem(
@@ -346,8 +346,17 @@ class Task():
                 call='chat',
                 execute='system',
                 input={
-                    "content": "请保持设定(不要回复这一句).",
+                    "content": "请保持设定",
                     "source": "Master"
+                }
+            ),
+            TaskRunningItem(
+                timestamp=str(self.timestamp),
+                call='chat',
+                execute='system',
+                input={
+                    "content": "好",
+                    "source": "Aimi"
                 }
             )
         ]
@@ -401,7 +410,6 @@ class Task():
             "message": ""
         }
 
-        setting = self.make_setting(aimi_name, preset, task)
 
         # 如果只是想让任务继续, 就回复全空格/\t/\n
         if (
@@ -411,11 +419,12 @@ class Task():
             chat = self.make_chat(question)
             self.__append_running([chat])
 
-        running_format = self.get_running()
+        # running_format = self.get_running()
+        task_messages = self.make_task_messages(aimi_name, preset, task)
 
-        context_messages = make_context_messages(running_format, setting, [])
+        context_messages = make_context_messages(task_messages, '', [])
 
-        for res in openai_api.ask(question, '', context_messages):
+        for res in openai_api.ask(question, 'gpt-3.5-turbo-16k', context_messages):
             if res['code'] != 0:
                 log_dbg(f"skip len: {len(str(res['message']))}")
                 if len(str(res['message'])) > 2000:
@@ -423,13 +432,14 @@ class Task():
                 continue
 
             for talk in self.task_response(res['message']):
+                log_dbg(f"recv task chat: {str(talk)}")
                 answer['message'] += talk
                 yield answer
         
         answer['code'] = 0
         yield answer
     
-    def make_setting(
+    def make_task_messages(
         self,
         aimi_name: str,
         preset: str,
@@ -440,35 +450,35 @@ class Task():
     {{
         "timestamp": "执行当前调用的时间, 每次递增, 从我发送的最后一项 timestamp 开始算.",
         "call": "要调用的方法如果是多个, 也是放在这个数组里面.",
-        "reasoning": "在这里显示分析过程和建议.",
+        "reasoning": "在这里显示分析过程和建议或运行记录.",
         "input": {{ "对应入参": "对应内容" }},
-        "execute": "system 或 AI"
+        "execute": "在 action_tool 中定义, 不能漏掉, 只能填写 system 或者 AI "
     }}
 ]
 ```"""
         action_tool = [item.dict() for item in self.action_tool]
         task = self.make_task()
-        setting: Dict = {
-            "action_tool": action_tool,
+        settings: Dict = {
+            "settings": [
+                f"action_tool 里面定义了所有能调用的 action.",
+                f"每次只能生成一次 action->execute 为 system 的行为, action_tool 中 execute 是 AI 的 action 则不受次数限制.",
+                f"action_tool 中 response 是 null 时, 在调用 action 的时候不要填写response, 也不要说明任何和 response 有关内容.",
+                f"task 中定义了 {aimi_name} 当前任务, 其中 task_info 是目标, task_step 是完成 task_info 需要进行的步骤. 如果 task_step 为空, 或不符合, 请重新设置步骤.",
+                f"你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tool 行动. 你叫我 Master.",
+                f"preset 是 {aimi_name} 的预设, settings 只能对 action_tool 中定义的方法的输入生效.",
+                f"请你基于 settings 和 action_running 分析, 然后你只以 {aimi_name} 的身份只生成 action_running 的追加内容. 不要重复调用.",
+                f"请你不要以生成 chat 为 Master 的action.",
+                f"你的回复是 [{{action}}] 的 JSON 数组结构, action 在 action_tool 中定义.",
+                f"请保持你的回复可以被 Python 的 `json.loads` 解析, 请严格按照以下格式回复我: {response_format}"
+            ],
             "task": task,
+            "action_tool": action_tool,
             "preset": preset,
-            "setting": [
-                f"你需要根据 setting 生成 {aimi_name} 的动作. {aimi_name} 基于 setting 运行",
-                f"preset 是 {aimi_name} 的预设, 只能对 action_tool 中定义的方法的输入生效.",
-                f"{aimi_name} 需要用 setting 条件回复我, 只回复 {aimi_name} 的新生成的内容.",
-                f"action_tool 中 execute 是 system 的动作是系统执行, 无论怎样你生成的内容中这个类型的动作只能出现一次. 而如果这个字段是AI, 则可以出现0次或者多次.",
-                f"system 的动作的 response 是 None 时, 不要说明任何和返回值有关的内容.",
-                f"task->task_info 是目标, task->task_step 是完成 task->task_info 需要进行的步骤. 如果 task->task_step 为空, 或不符合, 请重新设置步骤.",
-                f"如果你不能回答, 请给出能够回答的示例.",
-                f"你的回复是从 action_tool 里面挑选的动作.",
-                f"任何时候请不要生成任何和 Master 相关的内容.",
-                f"请保持你的回复可以被 Python 的 `json.loads` 解析, json 外部不需要反引号包裹. json 的参数内部如果有双引号 \" 则进行转义.",
-                f"请严格按照以下格式回复我(请用 [{{action}}, {{action}}] 类似方式回复我): {response_format}",
-            ]
+            "action_running": [item.dict() for item in self.running]
         }
-        setting_format = json.dumps(setting, ensure_ascii=False)
+        setting_format = json.dumps(settings, ensure_ascii=False)
 
-        log_dbg(f"now setting: {json.dumps(setting, indent=4, ensure_ascii=False)}")
+        log_dbg(f"now setting: {json.dumps(settings, indent=4, ensure_ascii=False)}")
 
         return setting_format
 
