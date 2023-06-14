@@ -21,9 +21,9 @@ class SyncToolItem(BaseModel):
 
 class TaskRunningItem(BaseModel):
     timestamp: str = ''
+    reasoning: Optional[Union[str, None]] = None
     call: str
     input: Any
-    reasoning: Optional[Union[str, None]] = None
     response: Any = None
     execute: constr(regex='system|AI')
 
@@ -101,10 +101,10 @@ class Task():
 
                     
                     if task.call == "chat":
-                        source = task.input['source']
+                        name = task.input['name']
                         content = task.input['content']
-                        response = self.chat(source, content)
-                        if 'Master' == source:
+                        response = self.chat(name, content)
+                        if 'Master' == name:
                             log_err(f"AI try predict Master res as: {str(content)}")
                             continue
                         yield response
@@ -174,11 +174,11 @@ class Task():
 
     def chat(
         self,
-        source: str, 
+        name: str, 
         content: str
     ) -> str:
-        log_dbg(f"{source}: {content}")
-        if source != self.aimi_name:
+        log_dbg(f"{name}: {content}")
+        if name != self.aimi_name:
             return ''
         return content + '\n'
     
@@ -191,7 +191,7 @@ class Task():
             call='chat',
             input={
                 'content': question,
-                'source': 'Master'
+                'name': 'Master'
             },
             execute='system'
         )
@@ -347,7 +347,7 @@ class Task():
                 execute='system',
                 input={
                     "content": "请保持设定",
-                    "source": "Master"
+                    "name": "Master"
                 }
             ),
             TaskRunningItem(
@@ -356,7 +356,7 @@ class Task():
                 execute='system',
                 input={
                     "content": "好",
-                    "source": "Aimi"
+                    "name": "Aimi"
                 }
             )
         ]
@@ -448,7 +448,7 @@ class Task():
         response_format = f"""```json
 [
     {{
-        "timestamp": "执行当前调用的时间, 每次递增, 从我发送的最后一项 timestamp 开始算.",
+        "timestamp": "执行当前调用的时间, 每次递增, 从最大 timestamp 开始算.",
         "call": "要调用的方法如果是多个, 也是放在这个数组里面.",
         "reasoning": "在这里显示分析过程和建议或运行记录.",
         "input": {{ "对应入参": "对应内容" }},
