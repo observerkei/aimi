@@ -18,10 +18,19 @@ class OpenAIAPI:
     trigger: List[str] = []
     model: str = ''
     models: List[str] = []
+    default_model: str = 'gpt-3.5-turbo'
     chat_completions_models: List[str] = [
-        'gpt-4', 'gpt-4-0314', 'gpt-4-32k', 
-        'gpt-4-32k-0314', 'gpt-3.5-turbo', 
-        'gpt-3.5-turbo-0301'
+        'gpt-3.5-turbo', 
+        'gpt-3.5-turbo-0301',
+        'gpt-3.5-turbo-0613	',
+        'gpt-3.5-turbo-16k',
+        'gpt-3.5-turbo-16k-0613',
+        'gpt-4',
+        'gpt-4-0314',
+        'gpt-4-0613',
+        'gpt-4-32k',
+        'gpt-4-32k-0314',
+        'gpt-4-32k-0613',
     ]
     init: bool = False
 
@@ -121,7 +130,7 @@ class OpenAIAPI:
         self,
         question: str
     ) -> str:
-        return 'gpt-3.5-turbo'
+        return self.default_model
 
     def api_ask(
         self,
