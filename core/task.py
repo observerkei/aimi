@@ -221,7 +221,9 @@ class Task():
             if task_id == task.task_id:
                 task.task_info = task_info
                 task.task_step = task_step
-                log_dbg(f"set old task[{str(task_id)}] info: {str(task_info)} step: {str(task_step)}")
+                log_dbg(f"set task[{str(task_id)}] info: {str(task_info)} step: {str(task_step)}")
+                log_dbg(f"set task id {str(self.now_task_id)} to {str(task_id)}")
+                self.now_task_id = task_id
                 return task
         task = TaskItem(
             timestamp=str(self.timestamp),
@@ -231,9 +233,10 @@ class Task():
         )
         self.timestamp += 1
         self.tasks[task_id] = task
+        self.now_task_id = task_id
 
         log_dbg(f"set new task[{str(task_id)}] info: {str(task_info)} step: {str(task_step)}")
-
+        log_dbg(f"set task id {str(self.now_task_id)} to {str(task_id)}")
         return task
 
     def critic(
@@ -302,7 +305,7 @@ class Task():
                 call="critic",
                 description="判断当前任务是否完成, 需要输入 task_id 和调用的对象的 timestamp , 如果数量太多, 只填写关健几个, 可以查找所有运行记录.",
                 input={
-                    "task_id": "任务id",
+                    "task_id": "被检查的task对应的id",
                     "task_info": "被检查的任务目标",
                     "running": [
                         "调用对象的 timestamp"
@@ -316,7 +319,7 @@ class Task():
                 call="set_task_info",
                 description="设定当前任务目标, 设置目标的时候要同时给出实现步骤, Master允许时才能调用这个",
                 input={
-                    "task_id": "任务id",
+                    "task_id": "需要设置的task 对应的 id",
                     "task_info": "任务目标",
                     "task_step": [
                         {
@@ -434,11 +437,11 @@ class Task():
         response_format = f"""```json
 [
     {{
-        "timestamp": "执行当前调用的时间, 每次递增, 从最大 timestamp 开始算.",
-        "call": "需要使用哪个 action_tool.",
-        "reasoning": "在这里显示分析过程和建议或运行记录.",
+        "timestamp": "时间戳: 执行当前调用的时间, 每次递增, 从最大 timestamp 开始算.",
+        "call": "调用方法: 需要使用哪个 action_tool.",
+        "reasoning": "推理过程: 在这里显示分析过程和建议或运行记录.",
         "input": {{ "对应入参": "对应内容" }},
-        "execute": "在 action_tool 中定义, 不能漏掉, 只能填写 system 或者 AI "
+        "execute": "执行类型: 在 action_tool 中定义, 不能漏掉, 只能填写 system 或者 AI "
     }}
 ]
 ```"""
@@ -447,15 +450,16 @@ class Task():
         settings: Dict = {
             "settings": [
                 f"action_tool 里面定义了所有你能调用的 方法(action).",
-                f"你每次生成追加内容时, 可以同时生成多个方法(action), 但最多只能生成一次 action->execute 为 system 的方法. 可以生成不限次 action->execute 为 AI 的方法.",
-                f"当你在调用 action_tool 中 execute 是 system 的 action 时不要填写 response, 也不要说明任何和 response 有关内容.",
+                f"你每次生成追加内容时, 可以同时生成多个方法(action), 但最多只能生成一次 action->execute 为 system 的方法.",
+                f"可以生成不限次 action->execute 为 AI 的方法, 但是要控制频率, 尽量减少重复消息.",
+                f"当你在调用 action_tool 中 execute 是 system 的 action 时不要填写 response, 也不要说明任何和 response 有关内容, 除非调用成功.",
                 f"task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤.",
                 f"如果 task_step 为空, 或不符合 或没有进展, 请重新设置步骤, 尽量推进任务进度.",
                 f"你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tool 行动. 你叫我 Master.",
                 f"preset 是 {aimi_name} 的预设, preset 只能对 action_tool 中定义的方法的输入生效.",
                 f"{aimi_name} 的权限不会超过action_tool中定义的范围.",
-                f"请你基于 settings 和 action_running 分析, 然后你只以 {aimi_name} 的身份只生成 action_running 的追加内容",
-                f"只给我发送追加内容即可, 如果 action_running 太长, 请只重点关注最后几条和我的话.",
+                f"请你主要基于 settings 和 参考部分 action_running 分析, 不显示分析过程, 然后你只以 {aimi_name} 的身份只生成 action_running 的追加内容",
+                f"只给我发送追加内容即可, 如果 action_running 太长, 请只重点关注最后几条和我的话, 忽略重复消息.",
                 f"大多数情况下 Master 不会回 {aimi_name} 消息, 你也不需要找Master. 你生成追加内容的时候要考虑这一点.",
                 f"你的回复是 [{{action}}] 的 JSON 数组结构, action 在 action_tool 中定义.",
                 f"不要漏了填充 action->execute.",
