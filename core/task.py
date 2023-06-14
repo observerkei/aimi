@@ -97,7 +97,7 @@ class Task():
                         task.execute == "system"
                         and task.response
                     ):
-                        log_err(f"AI try predict system call {str(task.call)} response: {str(task.response)}")
+                        log_err(f"{str(task.call)}: AI try predict system set response: {str(task.response)}")
 
                     
                     if task.call == "chat":
@@ -105,22 +105,22 @@ class Task():
                         content = task.input['content']
                         response = self.chat(name, content)
                         if 'Master' == name:
-                            log_err(f"AI try predict Master res as: {str(content)}")
+                            log_err(f"{str(task.call)}: AI try predict Master res as: {str(content)}")
                             continue
                         yield response
                     elif task.call == 'set_task_step':
                         task_id: str = task.input['task_id']
                         task_step: List[TaskStepItem] = task.input['task_step']
                         step = self.set_task_step(task_id, task_step)
-                        log_dbg(f"finded step: {str(step)}")
+                        log_dbg(f"{str(task.call)}: finded step: {str(step)}")
                     elif task.call == 'set_task_info':
                         task_id: str =  task.input['task_id']
                         task_info: str = task.input['task_info']
                         task_step: List[TaskStepItem] = task.input['task_step']
                         self.set_task_info(task_id, task_info, task_step)
-                        log_dbg(f"set task: {str(task_info)} : {str(task_step)}")
+                        log_dbg(f"{str(task.call)}: set task: {str(task_info)} : {str(task_step)}")
                     elif task.call == 'critic':
-                        self.critic(task.response)
+                        self.critic(task.input)
                     elif task.call == 'get_wolfram_response':
                         response = self.get_wolfram_response(task.input)
                         task.response = response
@@ -184,14 +184,15 @@ class Task():
     
     def make_chat(
         self,
+        name: str,
         question: str
     ) -> TaskRunningItem:
         chat: TaskRunningItem = TaskRunningItem(
             timestamp=str(self.timestamp),
             call='chat',
             input={
-                'content': question,
-                'name': 'Master'
+                'name': name,
+                'content': question
             },
             execute='system'
         )
@@ -206,9 +207,8 @@ class Task():
         for _, task in self.tasks.items():
             if task_id != task.task_id:
                 continue
-            if task.task_step:
-                return task.task_step
             task.task_step = task_step
+            log_dbg(f"set task[{str(task_id)}] step: {str(task_step)}")
             return task.task_step
 
     def set_task_info(
@@ -221,6 +221,7 @@ class Task():
             if task_id == task.task_id:
                 task.task_info = task_info
                 task.task_step = task_step
+                log_dbg(f"set old task[{str(task_id)}] info: {str(task_info)} step: {str(task_step)}")
                 return task
         task = TaskItem(
             timestamp=str(self.timestamp),
@@ -230,16 +231,20 @@ class Task():
         )
         self.timestamp += 1
         self.tasks[task_id] = task
+
+        log_dbg(f"set new task[{str(task_id)}] info: {str(task_info)} step: {str(task_step)}")
+
         return task
 
     def critic(
         self,
-        response
+        input
     ):
         try:
-            if response['success']:
+            if input['success'] == 'True' or input['success'] == True:
                 task = self.tasks[self.now_task_id]
                 task_info = task.task_info
+                log_info(f"task complate: {str(task_info)}")
                 if len(self.tasks) > 1:
                     del self.tasks[self.now_task_id]
                     log_info(f'task_info: {task_info}, delete.')
@@ -260,7 +265,7 @@ class Task():
                 log_dbg(f"task no complate, continue...")
                 
         except Exception as e:
-            log_err(f"fail to critic {str(response)} : {str(e)}")
+            log_err(f"fail to critic {str(input)} : {str(e)}")
 
     def __init__(self):
         try:
@@ -272,10 +277,10 @@ class Task():
         self.action_tool: List[SyncToolItem] = [
             SyncToolItem(
                 call="chat",
-                description="给某对象发送消息, 发件人写在 name, 内容写在 content 中",
+                description="给某对象发送消息, 发件人写在 name 你和Aimi都不准填 Master. 内容写在 content 中.",
                 input={
-                    "content": "传达的内容, 可以很丰富",
-                    "name": "发消息的人, 可以填 Aimi或者Master, 不能省略."
+                    "name": "只能是 Aimi",
+                    "content": "传达的内容, 可以很丰富"
                 },
                 execute="system"
             ),
@@ -295,18 +300,15 @@ class Task():
             ),
             SyncToolItem(
                 call="critic",
-                description="判断当前任务是否完成, 只需要输入 task_id 和调用的对象的 timestamp 即可,如果数量太多,只填写关健几个,可以查找所有运行记录",
+                description="判断当前任务是否完成, 需要输入 task_id 和调用的对象的 timestamp , 如果数量太多, 只填写关健几个, 可以查找所有运行记录.",
                 input={
                     "task_id": "任务id",
                     "task_info": "被检查的任务目标",
                     "running": [
                         "调用对象的 timestamp"
-                    ]
-                },
-                response={
-                    "analysis": "在这里显示分析过程",
+                    ],
                     "success": "标记任务是否完成, 如: True/False",
-                    "critique": "如果success为false,请在这里说明应该如何完成任务"
+                    "critique": "如果success为 False, 请在这里说明应该如何完成任务"
                 },
                 execute="AI"
             ),
@@ -315,10 +317,10 @@ class Task():
                 description="设定当前任务目标, 设置目标的时候要同时给出实现步骤, Master允许时才能调用这个",
                 input={
                     "task_id": "任务id",
-                    "task_info": "",
+                    "task_info": "任务目标",
                     "task_step": [
                         {
-                            "id": "1",
+                            "id": "步骤id, 如: 1",
                             "step": "执行设定的任务目标需要进行的操作"
                         }
                     ]
@@ -341,24 +343,8 @@ class Task():
         self.tasks = {}
         self.now_task_id = "1"
         running: List[TaskRunningItem] = [
-            TaskRunningItem(
-                timestamp=str(self.timestamp),
-                call='chat',
-                execute='system',
-                input={
-                    "content": "请保持设定",
-                    "name": "Master"
-                }
-            ),
-            TaskRunningItem(
-                timestamp=str(self.timestamp),
-                call='chat',
-                execute='system',
-                input={
-                    "content": "好",
-                    "name": "Aimi"
-                }
-            )
+            self.make_chat('Master', '请保持设定'),
+            self.make_chat('Aimi', '好')
         ]
         task_step: List[TaskStepItem] = [
             TaskStepItem(
@@ -416,7 +402,7 @@ class Task():
             len(question)
             and not question.isspace()
         ):
-            chat = self.make_chat(question)
+            chat = self.make_chat('Master', question)
             self.__append_running([chat])
 
         # running_format = self.get_running()
@@ -449,7 +435,7 @@ class Task():
 [
     {{
         "timestamp": "执行当前调用的时间, 每次递增, 从最大 timestamp 开始算.",
-        "call": "要调用的方法如果是多个, 也是放在这个数组里面.",
+        "call": "需要使用哪个 action_tool.",
         "reasoning": "在这里显示分析过程和建议或运行记录.",
         "input": {{ "对应入参": "对应内容" }},
         "execute": "在 action_tool 中定义, 不能漏掉, 只能填写 system 或者 AI "
@@ -460,16 +446,20 @@ class Task():
         task = self.make_task()
         settings: Dict = {
             "settings": [
-                f"action_tool 里面定义了所有能调用的 action.",
-                f"每次只能生成一次 action->execute 为 system 的行为, action_tool 中 execute 是 AI 的 action 则不受次数限制.",
-                f"action_tool 中 response 是 null 时, 在调用 action 的时候不要填写response, 也不要说明任何和 response 有关内容.",
-                f"task 中定义了 {aimi_name} 当前任务, 其中 task_info 是目标, task_step 是完成 task_info 需要进行的步骤. 如果 task_step 为空, 或不符合, 请重新设置步骤.",
+                f"action_tool 里面定义了所有你能调用的 方法(action).",
+                f"你每次生成追加内容时, 可以同时生成多个方法(action), 但最多只能生成一次 action->execute 为 system 的方法. 可以生成不限次 action->execute 为 AI 的方法.",
+                f"当你在调用 action_tool 中 execute 是 system 的 action 时不要填写 response, 也不要说明任何和 response 有关内容.",
+                f"task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤.",
+                f"如果 task_step 为空, 或不符合 或没有进展, 请重新设置步骤, 尽量推进任务进度.",
                 f"你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tool 行动. 你叫我 Master.",
-                f"preset 是 {aimi_name} 的预设, settings 只能对 action_tool 中定义的方法的输入生效.",
-                f"请你基于 settings 和 action_running 分析, 然后你只以 {aimi_name} 的身份只生成 action_running 的追加内容. 不要重复调用.",
-                f"请你不要以生成 chat 为 Master 的action.",
+                f"preset 是 {aimi_name} 的预设, preset 只能对 action_tool 中定义的方法的输入生效.",
+                f"{aimi_name} 的权限不会超过action_tool中定义的范围.",
+                f"请你基于 settings 和 action_running 分析, 然后你只以 {aimi_name} 的身份只生成 action_running 的追加内容",
+                f"只给我发送追加内容即可, 如果 action_running 太长, 请只重点关注最后几条和我的话.",
+                f"大多数情况下 Master 不会回 {aimi_name} 消息, 你也不需要找Master. 你生成追加内容的时候要考虑这一点.",
                 f"你的回复是 [{{action}}] 的 JSON 数组结构, action 在 action_tool 中定义.",
-                f"请保持你的回复可以被 Python 的 `json.loads` 解析, 请严格按照以下格式回复我: {response_format}"
+                f"不要漏了填充 action->execute.",
+                f"请保持你的回复可以被 Python 的 `json.loads` 解析, 请严格按照以下JSON数组格式回复我: {response_format}"
             ],
             "task": task,
             "action_tool": action_tool,
