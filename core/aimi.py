@@ -290,6 +290,12 @@ answer this following question: {{
 
         log_dbg('aimi exit')
 
+        
+    def __question_model(self, api_type, question: str) -> str:
+        if api_type == task.type:
+            return task.get_model(question)
+        return ''
+
     def __question_api_type(self, question: str) -> str:
         if bing_api.is_call(question):
             return bing_api.type
@@ -444,12 +450,14 @@ answer this following question: {{
     ) -> Generator[dict, None, None]:
         if ((owned_by == self.aimi_name) and (model == 'auto')):
             return self.ask(question, nickname)
-        elif owned_by == self.aimi_name and model == 'task':
+        elif owned_by == self.aimi_name and (
+            model == 'task' or model == 'task-16k'):
             preset = context_messages[0]['content']
             task_link_think = task.make_link_think(
                 question, self.aimi_name, preset)
+            model = task.get_model(model)
 
-            return task.ask(task_link_think)
+            return task.ask(task_link_think, model)
         else:
             preset = context_messages[0]['content']
             talk_history = context_messages[1:]
@@ -472,7 +480,8 @@ answer this following question: {{
         nickname: str = None
     ) -> Generator[dict, None, None]:
 
-        api_type = self.__question_api_type(question)         
+        api_type = self.__question_api_type(question)   
+        model = self.__question_model(api_type, question)      
         nickname = nickname if nickname and len(nickname) else self.master_name
 
         preset = ''
@@ -486,7 +495,7 @@ answer this following question: {{
         answer = self.__post_question(
             link_think=link_think, 
             api_type=api_type, 
-            model=None,
+            model=model,
             context_messages=context_messages)
 
         for message in answer:
@@ -515,7 +524,7 @@ answer this following question: {{
         if api_type == openai_api.type:
             yield from self.__post_openai(link_think, model, context_messages, memory.openai_conversation_id)
         elif api_type == task.type:
-            yield from task.ask(link_think)
+            yield from task.ask(link_think, model)
         elif api_type == bing_api.type:
             yield from self.__post_bing(link_think, model)
         elif api_type == bard_api.type:
@@ -588,7 +597,7 @@ answer this following question: {{
     ) -> Dict[str, List[str]]:
         bot_models = {}
 
-        bot_models[self.aimi_name] = ['auto', 'task']
+        bot_models[self.aimi_name] = ['auto', 'task', 'task-16k']
 
         models = openai_api.get_models()
         if len(models):
