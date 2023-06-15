@@ -46,9 +46,9 @@ class TaskItem(BaseModel):
 
 class Task:
     type: str = "task"
-    tasks: Dict[str, TaskItem]
-    action_tool: List[ActionToolItem]
-    now_task_id: str
+    tasks: Dict[str, TaskItem] = {}
+    action_tool: List[ActionToolItem] = []
+    now_task_id: str = "1"
     aimi_name: str = "Aimi"
     running: List[TaskRunningItem] = []
     max_running_size: int = 8 * 1000
@@ -260,7 +260,8 @@ class Task:
         task_config = {}
         try:
             task_config = config.load_task()
-            if not task_config:
+            if not task_config or not len(task_config):
+                log_dbg(f"no task config.")
                 return False
         except Exception as e:
             log_err(f"fail to load task config: {str(e)}")
@@ -271,17 +272,20 @@ class Task:
             for id, task in task_config["tasks"].items():
                 task_id = task["task_id"]
                 task_info = task["task_info"]
+                now_task_step_id = task['now_task_step_id']
                 task_step = [TaskStepItem(**step) for step in task["task_step"]]
 
                 tasks[id] = TaskItem(
-                    task_id=task_id, task_info=task_info, task_step=task_step
+                    task_id=task_id,
+                    task_info=task_info,
+                    now_task_step_id=now_task_step_id,
+                    task_step=task_step
                 )
             self.tasks = tasks
         except Exception as e:
             log_err(f"fail to load task config: {str(e)}")
             return False
         try:
-            pass
             self.running = [TaskRunningItem(**run) for run in task_config["running"]]
         except Exception as e:
             log_err(f"fail to load task config: {str(e)}")
@@ -430,12 +434,16 @@ class Task:
             ),
         ]
 
-        if not self.now_task_id or (type(str) is not type(self.now_task_id)):
+        if (
+            not self.now_task_id 
+            or (not int(self.now_task_id))
+            or (type(str) is not type(self.now_task_id))
+        ):
             self.now_task_id = "1"
 
         if (
             not self.tasks
-            and not self.tasks
+            or not len(self.tasks)
             or (type(List[TaskStepItem]) is not type(self.tasks))
         ):
             task_step: List[TaskStepItem] = [
@@ -458,7 +466,7 @@ class Task:
 
         if (
             not self.running
-            and not len(self.running)
+            or not len(self.running)
             or (type(List[TaskRunningItem]) is not type(self.running))
         ):
             running: List[TaskRunningItem] = [
