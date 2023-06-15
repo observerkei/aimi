@@ -8,11 +8,13 @@ from tool.wolfram_api import wolfram_api
 from tool.bard_api import bard_api
 from tool.util import log_dbg, log_err, log_info, make_context_messages
 
+
 class TaskStepItem(BaseModel):
     id: str
     step: str
     check: str
     call: str
+
 
 class SyncToolItem(BaseModel):
     call: str
@@ -20,6 +22,7 @@ class SyncToolItem(BaseModel):
     input: Any
     response: Any
     execute: constr(regex='system|AI')
+
 
 class TaskRunningItem(BaseModel):
     timestamp: str = ''
@@ -29,8 +32,8 @@ class TaskRunningItem(BaseModel):
     response: Any = None
     execute: constr(regex='system|AI')
 
+
 class TaskItem(BaseModel):
-    timestamp: str
     task_id: str
     task_info: str
     task_step: List[TaskStepItem] = []
@@ -45,6 +48,7 @@ class Task():
     running: List[TaskRunningItem] = []
     max_running_size: int = 8 * 1000
     timestamp: int = 1
+
 
     def task_response(
         self, 
@@ -78,17 +82,8 @@ class Task():
             # decoder = json.JSONDecoder(strict=False)
             # data = decoder.decode(answer)
             data = json5.loads(answer)
+            tasks = [TaskRunningItem(**item) for item in data]
 
-            tasks = []
-            try:
-                tasks = [TaskRunningItem(**item) for item in data]
-            except Exception as e:
-                log_err(f"res not arr...: {e}\n{str(res)}")
-                if data[0] == '{':
-                    log_dbg(f"try load one obj")
-                    task = TaskItem.parse_obj(data)
-                    tasks = [task]
-            
             running: List[TaskRunningItem] = []
             task_cnt = 1
             for task in tasks:
@@ -132,6 +127,8 @@ class Task():
                         log_err(f'no suuport call: {str(self.call)}')
                         continue
                     if (len(str(running)) + len(str(task))) < self.max_running_size:
+                        task.timestamp = str(self.timestamp)
+                        self.timestamp += 1
                         running.append(task)
                 except Exception as e:
                     log_err(f"fail to load task: {str(e)}: {str(task)}")
@@ -157,7 +154,8 @@ class Task():
             answer = res['message']
 
         return answer
-    
+
+
     def get_wolfram_response(
         self,
         input: str
@@ -182,14 +180,17 @@ class Task():
         if name != self.aimi_name:
             return ''
         return content + '\n'
-    
+
+
     def make_chat(
         self,
         name: str,
-        question: str
+        question: str,
+        reasoning: str = ""
     ) -> TaskRunningItem:
         chat: TaskRunningItem = TaskRunningItem(
             timestamp=str(self.timestamp),
+            reasoning=reasoning,
             call='chat',
             input={
                 'name': name,
@@ -199,6 +200,7 @@ class Task():
         )
         self.timestamp += 1
         return chat
+
 
     def set_task_step(
         self,
@@ -211,6 +213,7 @@ class Task():
             task.task_step = task_step
             log_dbg(f"set task[{str(task_id)}] step: {str(task_step)}")
             return task.task_step
+
 
     def set_task_info(
         self,
@@ -225,18 +228,17 @@ class Task():
                 self.now_task_id = task_id
                 return task
         task = TaskItem(
-            timestamp=str(self.timestamp),
             task_id=task_id,
             task_info=task_info,
             task_step=[]
         )
-        self.timestamp += 1
         self.tasks[task_id] = task
         self.now_task_id = task_id
 
         log_dbg(f"set new task[{str(task_id)}] info: {str(task_info)}")
         log_dbg(f"set task id {str(self.now_task_id)} to {str(task_id)}")
         return task
+
 
     def critic(
         self,
@@ -261,12 +263,14 @@ class Task():
         except Exception as e:
             log_err(f"fail to critic {str(input)} : {str(e)}")
 
+
     def __init__(self):
         try:
             self.__load_task()
         except Exception as e:
             log_err(f"fait to init: {str(e)}")
     
+
     def __load_task(self):
         self.action_tool: List[SyncToolItem] = [
             SyncToolItem(
@@ -330,11 +334,9 @@ class Task():
                 execute="system"
             )
         ]
-        self.tasks = {}
-        self.now_task_id = "1"
         running: List[TaskRunningItem] = [
             self.make_chat('Master', '请保持设定'),
-            self.make_chat('Aimi', '好')
+            self.make_chat('Aimi', '好', "作为Aimi，我听从Master的指示")
         ]
         task_step: List[TaskStepItem] = [
             TaskStepItem(
@@ -344,38 +346,39 @@ class Task():
                 check="Master回复了消息"
             )
         ]
+        self.now_task_id = "1"
         task = TaskItem(
-            timestamp=str(self.timestamp),
             task_id=self.now_task_id,
             task_info="想和Master亲密接触",
             task_step=task_step
         )
-        self.timestamp += 1
+        self.tasks = {}
         self.tasks[self.now_task_id] = task
         self.running = running
 
+
     def __get_now_task(self):
         return self.tasks[self.now_task_id]
+
 
     def __append_running(self, running: List[TaskRunningItem]):
         if not (self.now_task_id in self.tasks):
             log_dbg(f"no now_task ... {str(self.now_task_id)}")
             return
-        
+
         for run in reversed(self.running):
             if (len(str(running)) + len(str(run))) > self.max_running_size:
                 break
             running.insert(0, run)
         self.running = running
-        for run in self.running:
-            run.timestamp = str(self.timestamp)
-            self.timestamp += 1
     
+
     def get_running(self) -> str:
         run_dict = [item.dict() for item in self.running]
         js = json.dumps(run_dict, ensure_ascii=False)
         log_dbg(f"running: {json.dumps(run_dict, indent=4, ensure_ascii=False)}")
         return str(js)
+
 
     def is_call(
         self, 
@@ -391,13 +394,18 @@ class Task():
                 return True
 
         return False
-    
-    def get_model(self, select) -> str:
+
+
+    def get_model(
+            self,
+            select: str
+        ) -> str:
         if '16k' in select.lower():
             return 'gpt-3.5-turbo-16k'
         if '4k' in select.lower():
             return 'gpt-3.5-turbo'
         return 'gpt-3.5-turbo-16k'
+
 
     def ask(
         self,
@@ -422,10 +430,11 @@ class Task():
                 log_dbg(f"recv task chat: {str(talk)}")
                 answer['message'] += talk
                 yield answer
-        
+
         answer['code'] = 0
         yield answer
-    
+
+
     def make_link_think(
         self,
         question: str,
@@ -452,6 +461,7 @@ class Task():
     }}
 ]
 ```"""
+
         action_tool = [item.dict() for item in self.action_tool]
         task = self.__make_task()
         settings: Dict = {
@@ -471,7 +481,7 @@ class Task():
                 f"只给我发送追加内容即可, 如果 action_running 太长, 请只重点关注最后几条和我的话, 忽略重复消息. 不能重复任何已有内容.",
                 f"无论之前有什么, 在调用 chat 方法时, chat->input->name 只能是 {aimi_name}. 你只能以 {aimi_name} 身份调用 action.",
                 f"你的回复是 [{{action}}] 的 JSON 数组结构, action 在 action_tool 中定义.",
-                f"请保持你的回复可以被 Python 的 `json.loads` 解析, 请在 action_tool 结构基础上 严格按照以下JSON数组格式回复我: {response_format}"
+                f"请保持你的回复可以被 Python 的 `json.loads` 解析, 请严格按照以下JSON数组格式回复我: {response_format}"
             ],
             "task": task,
             "action_tool": action_tool,
@@ -490,13 +500,15 @@ class Task():
     ) -> Dict:
         if not (self.now_task_id in self.tasks):
             log_err(f"no task {str(self.now_task_id)}.")
-            return
-        
+            return {}
+
         # log_dbg(f"make task: {self.tasks[self.now_task_id].json(indent=2,ensure_ascii=False)}")
-        
+
         return self.tasks[self.now_task_id].dict()
+
 
     def set_running(self, api_response):
         self.running = json.loads(api_response)
+
 
 task = Task()
