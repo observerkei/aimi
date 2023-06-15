@@ -7,6 +7,7 @@ from tool.util import log_dbg, log_err
 
 # 将 Markdown 源码转换成 HTML
 
+
 class Md:
     md_test = """
 喵~嘿嘿~Master，Aimi来为你解答喵~
@@ -68,57 +69,72 @@ class Md:
 希望这个回答可以帮助到你，Master~🤗  
 """
 
-    out_prefix: str = './run/md/'
+    out_prefix: str = "./run/md/"
 
     def __init__(self):
-        self.out_prefix = os.path.abspath(self.out_prefix) + '/'
+        self.out_prefix = os.path.abspath(self.out_prefix) + "/"
 
     def has_md(self, text) -> bool:
         pattern = r"```[\s\S]*?```"
         return re.search(pattern, text, re.IGNORECASE) is not None
 
     def has_latex(self, text) -> bool:
-        #r'\$\$.*?\$\$|\$.*?\$'
-        #r'\$.*?\$|\$\$.*?\$\$|\\\(.*?\\\)|\\\[.*?\\\]'
-        pattern = r'\$.*?\$|\$\$.*?\$\$|\\\((.|\s)*?\\\)|\\\[([\s\S]*?)\\\]|LaTeX|latex|\{\\frac\{.*?\}\{.*?\s*\}\}' 
+        # r'\$\$.*?\$\$|\$.*?\$'
+        # r'\$.*?\$|\$\$.*?\$\$|\\\(.*?\\\)|\\\[.*?\\\]'
+        pattern = r"\$.*?\$|\$\$.*?\$\$|\\\((.|\s)*?\\\)|\\\[([\s\S]*?)\\\]|LaTeX|latex|\{\\frac\{.*?\}\{.*?\s*\}\}"
         return re.search(pattern, text, re.IGNORECASE) is not None
-    
+
     def has_html(self, text) -> bool:
-        pattern = r'<.*?>'
+        pattern = r"<.*?>"
         return re.search(pattern, text) is not None
 
     def __html_to_img(self, img_id: str) -> str:
+        # wkhtmltoimage --encoding UTF-8 ./output.html output.png
+        result = subprocess.run(
+            [
+                "wkhtmltoimage",
+                "--encoding",
+                "UTF-8",
+                "--user-style-sheet",
+                self.out_prefix + "style.css",
+                "--zoom",
+                "2",
+                "--width",
+                "350",
+                img_id + ".html",
+                img_id + ".png",
+            ],
+            stdout=subprocess.PIPE,
+        )
+        log_dbg(result.stdout.decode("utf-8"))
 
-            # wkhtmltoimage --encoding UTF-8 ./output.html output.png
-            result = subprocess.run(['wkhtmltoimage', '--encoding', 'UTF-8', '--user-style-sheet', self.out_prefix + 'style.css', 
-                                     '--zoom', '2', '--width', '350', 
-                                     img_id + '.html', img_id + '.png'], stdout=subprocess.PIPE)
-            log_dbg(result.stdout.decode('utf-8'))
-
-            return img_id + '.png'
+        return img_id + ".png"
 
     def md_to_img(self, img_id: str, md_source: str) -> str:
         try:
             img_id = self.out_prefix + img_id
-            if 'latex' in md_source.lower():
-                if '```\n$' in md_source:
-                    md_source = md_source.replace('```', '')
+            if "latex" in md_source.lower():
+                if "```\n$" in md_source:
+                    md_source = md_source.replace("```", "")
                 else:
-                    md_source = md_source.replace('```', '$$ ')
-                log_dbg(f'md: {md_source}')
-            
+                    md_source = md_source.replace("```", "$$ ")
+                log_dbg(f"md: {md_source}")
+
             # 打开文件，并以写入模式写入字符串
-            with open(img_id + '.md', 'w') as f:
+            with open(img_id + ".md", "w") as f:
                 f.write(md_source)
 
             # pandoc --webtex -o output.html input.md
-            result = subprocess.run(['pandoc', '--webtex', '-o', img_id + '.html', img_id + '.md'], stdout=subprocess.PIPE)
-            log_dbg(result.stdout.decode('utf-8'))
+            result = subprocess.run(
+                ["pandoc", "--webtex", "-o", img_id + ".html", img_id + ".md"],
+                stdout=subprocess.PIPE,
+            )
+            log_dbg(result.stdout.decode("utf-8"))
 
             return self.__html_to_img(img_id)
 
         except Exception as e:
-            log_err('create md to img failed: ' + str(img_id) + ' err: '+ str(e))
+            log_err("create md to img failed: " + str(img_id) + " err: " + str(e))
             return None
 
     def html_to_img(self, img_id: str, html_source: str) -> str:
@@ -127,16 +143,16 @@ class Md:
 
             # 转化为html的换行
             html_filter = html_source
-            #html_filter = html_filter.replace('\n', ' <br> ')
+            # html_filter = html_filter.replace('\n', ' <br> ')
 
             # 打开文件，并以写入模式写入字符串
-            with open(img_id + '.html', 'w') as f:
+            with open(img_id + ".html", "w") as f:
                 f.write(html_filter)
 
             return self.__html_to_img(img_id)
 
         except Exception as e:
-            log_err('create html to img failed: ' + str(img_id) + ' err: '+ str(e))
+            log_err("create html to img failed: " + str(img_id) + " err: " + str(e))
             return None
 
     def need_set_img(self, message: str) -> bool:
@@ -146,18 +162,18 @@ class Md:
             return True
 
         return False
-           
+
     def message_to_img(self, message: str) -> str:
         msg_id = random.randint(1, 1000000)
         msg_id = str(msg_id)
-        
-        log_dbg('new id:' + msg_id)
+
+        log_dbg("new id:" + msg_id)
         if self.has_latex(message):
             return self.md_to_img(msg_id, message)
         if self.has_html(message):
             return self.html_to_img(msg_id, message)
 
-        return ''
+        return ""
+
 
 md = Md()
-

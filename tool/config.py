@@ -4,21 +4,22 @@ import os
 
 from tool.util import read_yaml, log_dbg, log_err
 
+
 class Meme:
     # 错误表情包路径
-    meme_error_path: str = './run/meme/error/'
+    meme_error_path: str = "./run/meme/error/"
     # 默认表情包路径
-    meme_common_path: str = './run/meme/common/'
+    meme_common_path: str = "./run/meme/common/"
     meme: Dict[str, List]
 
     def __init__(self):
         try:
             self.meme = {}
-            self.meme['error'] = self.get_file_paths(self.meme_error_path)
-            self.meme['common'] = self.get_file_paths(self.meme_common_path)
-            
+            self.meme["error"] = self.get_file_paths(self.meme_error_path)
+            self.meme["common"] = self.get_file_paths(self.meme_common_path)
+
         except Exception as e:
-            log_err('fail to load meme:' + str(e))
+            log_err("fail to load meme:" + str(e))
 
     def get_file_paths(self, folder_path):
         """
@@ -37,91 +38,92 @@ class Meme:
     @property
     def error(self):
         try:
-            return random.choice(self.meme['error'])
+            return random.choice(self.meme["error"])
         except:
-            return ''
-    
+            return ""
+
     @property
     def common(self):
         try:
-            return random.choice(self.meme['common'])
+            return random.choice(self.meme["common"])
         except:
-            return ''
-    
+            return ""
+
+
 class Config:
-    go_cqhttp_config: str = './run/config.yml'
-    setting_config: str = './run/setting.yml'
-    memory_config: str = './run/memory.yml'
-    memory_model_file: str = './run/memory.pt'
-    task_config: str = './run/task.yml'
+    go_cqhttp_config: str = "./run/config.yml"
+    setting_config: str = "./run/setting.yml"
+    memory_config: str = "./run/memory.yml"
+    memory_model_file: str = "./run/memory.pt"
+    task_config: str = "./run/task.yml"
     setting: dict = {}
     meme: Meme
     max_requestion: int = 1024
 
     def __init__(self) -> None:
         self.meme = Meme()
-        
+
     def load_memory(self) -> dict:
         try:
             obj = read_yaml(self.memory_config)
             mem = {}
-            mem['openai_conversation_id'] = obj.get('openai_conversation_id', '')
-            mem['idx'] = obj.get('idx', 0)
-            mem['pool'] = obj.get('pool', [])
+            mem["openai_conversation_id"] = obj.get("openai_conversation_id", "")
+            mem["idx"] = obj.get("idx", 0)
+            mem["pool"] = obj.get("pool", [])
 
-            log_dbg('cfg load memory done.')
+            log_dbg("cfg load memory done.")
 
-            #log_dbg('mem: ' + str(mem))
+            # log_dbg('mem: ' + str(mem))
 
             try:
                 label = 0
-                for iter in mem['pool']:
+                for iter in mem["pool"]:
                     if not iter:
                         continue
-                    iter['idx'] = label
+                    iter["idx"] = label
 
                     label += 1
             except Exception as e:
-                log_err('fail to set label: ' + str(e))
-                mem['pool'] = []
-            #log_dbg('mem: ' + str(mem))
-           
+                log_err("fail to set label: " + str(e))
+                mem["pool"] = []
+            # log_dbg('mem: ' + str(mem))
+
             return mem
         except Exception as e:
-            log_err('fail to load memory: ' + str(e))
+            log_err("fail to load memory: " + str(e))
             return {}
-    
+
     def load_task(self) -> dict:
         try:
             obj = read_yaml(self.task_config)
             task = {}
 
-            task['tasks'] = obj.get('tasks', {})
-            task['now_task_id'] = obj.get('now_task_id', '1')
-            task['timestamp'] = obj.get('timestamp', 1)
-            task['running'] = obj.get('running', [])
+            task["tasks"] = obj.get("tasks", {})
+            task["now_task_id"] = obj.get("now_task_id", "1")
+            task["timestamp"] = obj.get("timestamp", 1)
+            task["running"] = obj.get("running", [])
 
-            log_dbg('cfg load task done.')
+            log_dbg("cfg load task done.")
 
             return task
         except Exception as e:
-            log_err('fail to load task: ' + str(e))
+            log_err("fail to load task: " + str(e))
             return {}
-
 
     def load_setting(self, type) -> dict:
         try:
             obj = read_yaml(self.setting_config)
         except Exception as e:
-            log_err(f'fail to load setting: {e}')
+            log_err(f"fail to load setting: {e}")
             return {}
-        
+
         try:
             self.setting[type] = obj.get(type, {})
         except Exception as e:
-            log_err(f'fail to load setting[{type}]: {e}')
+            log_err(f"fail to load setting[{type}]: {e}")
             self.setting[type] = {}
 
         return self.setting[type]
-    
+
+
 config = Config()
