@@ -6,6 +6,7 @@ from pydantic import BaseModel, constr
 from tool.openai_api import openai_api
 from tool.wolfram_api import wolfram_api
 from tool.bard_api import bard_api
+from tool.bing_api import bing_api
 from tool.util import log_dbg, log_err, log_info, make_context_messages
 
 
@@ -123,6 +124,9 @@ class Task():
                     elif task.call == 'get_bard_response':
                         response = self.get_bard_response(task.input)
                         task.response = response
+                    elif task.call == 'get_bing_response':
+                        response = self.get_bing_response(task.input)
+                        task.response = response
                     else:
                         log_err(f'no suuport call: {str(self.call)}')
                         continue
@@ -139,6 +143,21 @@ class Task():
         
         yield ''
 
+
+    def get_bing_response(
+        self,
+        input: str
+    ) -> str:
+        if not input or not len(input):
+            return 'input error'
+
+        answer = ''
+        for res in bing_api.ask(input):
+            if res['code'] != 0:
+                continue
+            answer = res['message']
+
+        return answer
 
     def get_bard_response(
         self,
@@ -331,6 +350,12 @@ class Task():
                 call="get_bard_response",
                 description="通过互联网进行搜索: 需要了解任何有时效性的内容都可以调用, 只能搜索最新有时效性的信息, 比如时间/日期或者某个网址的内容等.",
                 input="搜索内容: 在这里输入要bard进行检索的内容, 翻译成英文再调用. 如: What time is it now?",
+                execute="system"
+            ),
+            SyncToolItem(
+                call="get_bing_response",
+                description="和bing交互: 你只能通过这个方法才能和bing进行交互/回复/响应, 不能通过 chat 方法回复 bing, 这是你的好朋友 bing, 可以问问他问题, 他会提供建议, 也可以让他帮忙进行搜索, 或者让他帮忙查询时间, 如: 我在和Master聊天, 但是没有进展, 我该怎么办?",
+                input="要询问的内容",
                 execute="system"
             )
         ]

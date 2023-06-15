@@ -106,7 +106,7 @@ class BingAPI:
     def ask(
         self,
         question: str,
-        conversation_style: str,
+        conversation_style: str = None,
         timeout: int = 360,
     ) -> Generator[dict, None, None]:
         yield from self.__fuck_async(self.web_ask(question, conversation_style, timeout))
