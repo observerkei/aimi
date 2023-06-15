@@ -61,8 +61,6 @@ class BardAPI:
                 log_dbg('try ask: ' + str(question))
 
                 data = self.chatbot.ask(question)
-                log_dbg(f'res: {data}')
-                
                 content = data['content']
                 message = content
                 try:
@@ -86,12 +84,14 @@ class BardAPI:
                 """
 
                 answer['message'] = message
+                log_dbg(f"recv bard: {str(answer['message'])}")
+                
                 answer['code'] = 0
                 yield answer
              
             except Exception as e:
                 log_err('fail to ask: ' + str(e))
-                log_info('server fail, sleep 15')
+                log_info('server fail, maybe need check cookie, sleep 15')
                 time.sleep(15)
                 self.__bot_create()
                 log_info('reload bot')
@@ -115,6 +115,7 @@ class BardAPI:
             new_bot = Chatbot(cookie_key)
             self.chatbot = new_bot
             self.init = True
+            log_info(f"create {self.type} done")
         except Exception as e:
             log_err(f'fail to create bard: {e}')
             return -1
