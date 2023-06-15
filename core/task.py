@@ -90,11 +90,13 @@ class Task():
                     tasks = [task]
             
             running: List[TaskRunningItem] = []
+            task_cnt = 1
             for task in tasks:
                 try:
-                    log_dbg(f"get task: {str(task)}")
+                    log_dbg(f"[{task_cnt}] get task: {str(task.call)} : {str(task)}\n\n")
+                    task_cnt += 1
                     if task.reasoning:
-                        log_dbg(f"reasoning: {str(task.reasoning)}")
+                        log_dbg(f"{str(task.call)} reasoning: {str(task.reasoning)}")
                     if (
                         task.execute == "system"
                         and task.response
@@ -269,24 +271,24 @@ class Task():
         self.action_tool: List[SyncToolItem] = [
             SyncToolItem(
                 call="chat",
-                description="给某对象发送消息进行交互, 发件人写在 name, 内容写在 content 中. 无论历史是怎样, 你只能把name设置成 Aimi",
+                description="发送聊天: 给某对象发送消息进行交互, 发件人写在 name, 内容写在 content 中. 无论历史是怎样, 你只能把name设置成 Aimi",
                 input={
                     "name": "Aimi",
-                    "content": "传达的内容, 可以很丰富"
+                    "content": "传达的内容: 可以很丰富, 包含多句话, 每句话都要加换行"
                 },
                 execute="system"
             ),
             SyncToolItem(
                 call="set_task_step",
-                description="如果 task_step 和目标(task_info)不符合或者和Master要求不符合或为空, 则需要设置一下, 如果某步骤执行完毕, 也需要设置一下新步骤.",
+                description="设置任务步骤: 如果 task_step 和目标(task_info)不符合或者和Master要求不符合或为空, 则需要设置一下, 如果某步骤执行完毕, 也需要设置一下新步骤.",
                 input={
-                    "task_id": "需要设置的task 对应的 id",
+                    "task_id": "任务id: 表明修改哪个任务",
                     "task_step": [
                         {
-                            "id": "序号, 为数字, 如: 1",
-                            "step": "在这里填写能够完成计划 task_info 的步骤",
-                            "check": "达成什么条件才算完成步骤",
-                            "call": "应该调用什么 action 处理步骤."
+                            "id": "步骤号: 为数字, 如: 1",
+                            "step": "步骤内容: 在这里填写能够完成计划 task_info 的步骤",
+                            "check": "检查点: 达成什么条件才算完成步骤",
+                            "call": "方法名: 应该调用什么 action 处理步骤."
                         }
                     ]
                 },
@@ -294,37 +296,37 @@ class Task():
             ),
             SyncToolItem(
                 call="critic",
-                description="判断当前任务task_info是否完成, 需要输入 task_id 和调用的对象的 timestamp , 如果数量太多, 只填写关健几个, 可以查找所有运行记录.",
+                description="决策机制: 判断当前任务task_info是否完成, 需要输入 task_id 和调用的对象的 timestamp , 如果数量太多, 只填写关健几个, 可以查找所有运行记录.",
                 input={
-                    "task_id": "被检查的task对应的id",
-                    "task_info": "被检查的任务目标",
+                    "task_id": "任务id: 被检查的task对应的id",
+                    "task_info": "任务目标: 被检查的任务目标",
                     "running": [
-                        "已运行方法的 timestamp"
+                        "timestamp: 已运行方法的 timestamp"
                     ],
-                    "success": "标记任务是否完成, 如: True/False",
-                    "critique": "如果success不是 True, 请在这里说明应该如何完成任务"
+                    "success": "任务是否完成: 标记任务是否完成, 如str: True/False",
+                    "critique": "行动建议: 如果success不是 True, 请在这里说明应该给出通过 action_tool->call 完成任务目标的方法和建议"
                 },
                 execute="AI"
             ),
             SyncToolItem(
                 call="set_task_info",
-                description="设定当前任务目标, 填写参数前要分析完毕, 设置目标的时候要同时给出实现步骤, 然后同时设置task_step, Master允许时才能调用这个",
+                description="设定当前任务目标: 填写参数前要分析完毕, 设置目标的时候要同时给出实现步骤, 然后同时设置task_step, Master允许时才能调用这个",
                 input={
-                    "task_id": "需要设置的task 对应的 id",
+                    "task_id": "任务id: 需要设置的task 对应的 id",
                     "task_info": "任务目标"
                 },
                 execute="AI"
             ),
             SyncToolItem(
                 call="get_wolfram_response",
-                description="通过wolfram进行计算, 所有计算都可以通过这个函数解决, 这个函数调用成功后是完全正确的.",
-                input="在这里输入wolfram支持的内容, 翻译成英文再调用. 如: solve int x^2 dx ",
+                description="通过wolfram进行数学计算: 所有计算都可以通过这个函数解决, 这个函数调用成功后是完全正确的.",
+                input="运算内容: 在这里输入wolfram支持的内容, 翻译成英文再调用. 如: solve int x^2 dx ",
                 execute="system"
             ),
             SyncToolItem(
                 call="get_bard_response",
-                description="通过互联网进行搜索, 需要了解任何有时效性的内容都可以调用, 只能搜索最新有时效性的信息, 比如时间/日期或者某个网址的内容等.",
-                input="在这里输入要bard进行检索的内容, 翻译成英文再调用. 如: What time is it now?",
+                description="通过互联网进行搜索: 需要了解任何有时效性的内容都可以调用, 只能搜索最新有时效性的信息, 比如时间/日期或者某个网址的内容等.",
+                input="搜索内容: 在这里输入要bard进行检索的内容, 翻译成英文再调用. 如: What time is it now?",
                 execute="system"
             )
         ]
@@ -393,7 +395,9 @@ class Task():
     def get_model(self, select) -> str:
         if '16k' in select.lower():
             return 'gpt-3.5-turbo-16k'
-        return 'gpt-3.5-turbo'
+        if '4k' in select.lower():
+            return 'gpt-3.5-turbo'
+        return 'gpt-3.5-turbo-16k'
 
     def ask(
         self,
@@ -444,7 +448,7 @@ class Task():
         "call": "调用方法: 需要使用哪个 action_tool.",
         "reasoning": "推理过程: 在这里显示分析过程和建议或运行记录或使用方法/指导, 要给出能推进 task_info 的建议.",
         "input": {{ "对应入参": "对应内容" }},
-        "execute": "执行类型: 取action_tool中对应动作的对应值, 不能漏掉, 不能修改"
+        "execute": "执行类型: 取 action_tool 中对应 call 的对应值, 不能漏掉, 不能修改"
     }}
 ]
 ```"""
@@ -467,7 +471,7 @@ class Task():
                 f"只给我发送追加内容即可, 如果 action_running 太长, 请只重点关注最后几条和我的话, 忽略重复消息. 不能重复任何已有内容.",
                 f"无论之前有什么, 在调用 chat 方法时, chat->input->name 只能是 {aimi_name}. 你只能以 {aimi_name} 身份调用 action.",
                 f"你的回复是 [{{action}}] 的 JSON 数组结构, action 在 action_tool 中定义.",
-                f"请保持你的回复可以被 Python 的 `json.loads` 解析, 请严格按照以下JSON数组格式回复我: {response_format}"
+                f"请保持你的回复可以被 Python 的 `json.loads` 解析, 请在 action_tool 结构基础上 严格按照以下JSON数组格式回复我: {response_format}"
             ],
             "task": task,
             "action_tool": action_tool,
