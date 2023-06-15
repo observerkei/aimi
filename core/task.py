@@ -484,8 +484,10 @@ class Task():
         "timestamp": "时间戳: 执行当前调用的时间, 每次递增, 从最大 timestamp 开始算.",
         "call": "调用方法: 需要使用哪个 action_tool.",
         "reasoning": "推理过程: 在这里显示分析过程和建议或运行记录或使用方法/指导, 要给出能推进 task_info 的建议.",
-        "input": {{ "对应入参": "对应内容" }},
-        "execute": "执行类型: 取 action_tool 中对应 call 的对应值, 不能漏掉, 不能修改"
+        "input": {{
+            "对应入参": "对应内容."
+        }},
+        "execute": "执行类型: 取 action_tool 中对应 call 的对应值(system/AI), 不能漏掉, 不能修改."
     }}
 ]
 ```"""
