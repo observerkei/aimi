@@ -283,10 +283,12 @@ answer this following question: {{
                 cnt = 0;
             
             try:
-                memory.save_memory()
-                log_info('save memory done')
+                if memory.save_memory():
+                    log_info('save memory done')
+                if task.save_task():
+                    log_info('save task done')
             except Exception as e:
-                log_err('fail to save memory: ' + str(e))
+                log_err('fail to save: ' + str(e))
 
         log_dbg('aimi exit')
 
@@ -696,6 +698,11 @@ answer this following question: {{
             log_info('exit: save memory done.')
         else:
             log_err('exit: fail to save memory.')
+        
+        if task.save_task():
+            log_info('exit: save task done.')
+        else:
+            log_err('exit: fail to task memory.')
 
         try:
             aimi_plugin.when_exit()

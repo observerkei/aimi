@@ -1,5 +1,6 @@
 import json5
 import json
+import os
 from typing import Dict, Any, List, Generator, Optional, Union
 from pydantic import BaseModel, constr
 
@@ -7,7 +8,8 @@ from tool.openai_api import openai_api
 from tool.wolfram_api import wolfram_api
 from tool.bard_api import bard_api
 from tool.bing_api import bing_api
-from tool.util import log_dbg, log_err, log_info, make_context_messages
+from tool.config import config
+from tool.util import log_dbg, log_err, log_info, make_context_messages, write_yaml
 
 
 class TaskStepItem(BaseModel):
@@ -17,7 +19,7 @@ class TaskStepItem(BaseModel):
     call: str
 
 
-class SyncToolItem(BaseModel):
+class ActionToolItem(BaseModel):
     call: str
     description: str
     input: Any
@@ -43,7 +45,7 @@ class TaskItem(BaseModel):
 class Task():
     type: str = 'task'
     tasks: Dict[str, TaskItem]
-    action_tool: List[SyncToolItem]
+    action_tool: List[ActionToolItem]
     now_task_id: str
     aimi_name: str = 'Aimi'
     running: List[TaskRunningItem] = []
@@ -287,14 +289,93 @@ class Task():
 
     def __init__(self):
         try:
+            self.__init_task()
             self.__load_task()
         except Exception as e:
             log_err(f"fait to init: {str(e)}")
-    
+
 
     def __load_task(self):
-        self.action_tool: List[SyncToolItem] = [
-            SyncToolItem(
+        task_config = {}
+        try:
+            task_config = config.load_task()
+            if not task_config:
+                return False
+        except Exception as e:
+            log_err(f"fail to load task config: {str(e)}")
+            return False
+
+        try:
+            tasks = {}
+            for id, task in task_config['tasks'].items():
+                task_id = task['task_id']
+                task_info = task['task_info']
+                task_step = [TaskStepItem(**step) for step in task['task_step']]
+
+                tasks[id] = TaskItem(
+                    task_id=task_id, task_info=task_info, task_step=task_step
+                )
+            self.tasks = tasks
+        except Exception as e:
+            log_err(f"fail to load task config: {str(e)}")
+            return False
+        try:
+            pass
+            self.running = [TaskRunningItem(**run) for run in task_config['running']]
+        except Exception as e:
+            log_err(f"fail to load task config: {str(e)}")
+            return False
+        try:
+            self.timestamp = int(task_config['timestamp'])
+            check = int(self.running[-1].timestamp)
+            if self.timestamp <= check:
+                log_dbg(f"fix timestamp {str(self.timestamp)} to {str(check + 1)}")
+                self.timestamp = check + 1
+
+        except Exception as e:
+            log_err(f"fail to load task config: {str(e)}")
+            return False
+        try:
+            self.now_task_id = task_config['now_task_id']
+        except Exception as e:
+            log_err(f"fail to load task config: {str(e)}")
+            return False
+        return True
+
+
+    def save_task(self):
+        save_path = config.task_config
+
+        try:
+            save_dir = os.path.dirname(save_path)
+            if save_dir != '.' and not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+
+            tasks = {task_id: task.dict() for task_id, task in self.tasks.items()}
+            running = [run.dict() for run in self.running]
+
+            save_obj = {
+                'now_task_id': self.now_task_id,
+                'tasks': tasks,
+                'timestamp': self.timestamp,
+                'running': running
+            }
+
+            write_yaml(save_path, save_obj)
+
+            log_info(f'save {self.type} done: ' + str(save_path))
+            ret = True
+
+        except Exception as e:
+            log_err(f'fail to save {self.type}: {str(e)}, file:{save_path}')
+            ret = False
+
+        return ret
+
+
+    def __init_task(self):
+        self.action_tool: List[ActionToolItem] = [
+            ActionToolItem(
                 call="chat",
                 description="和 某人 交互: 给某对象发送消息进行交互, name 是说话的人的名字, to 是对谁说话, 内容写在 content 中. 无论历史是怎样, 你只能把name设置成 Aimi",
                 input={
@@ -304,7 +385,16 @@ class Task():
                 },
                 execute="system"
             ),
-            SyncToolItem(
+            ActionToolItem(
+                call="set_task_info",
+                description="设定当前任务目标: 填写参数前要分析完毕, 设置目标的时候要同时给出实现步骤, 然后同时设置 task_step, Master允许时才能调用这个, 否则不能调用这个. 如果要修改任务, 需要Master同意, 如果任务无法完成, 要给出原因然后向Master或者其他人求助.",
+                input={
+                    "task_id": "任务id: 需要设置的task 对应的 id",
+                    "task_info": "任务目标"
+                },
+                execute="AI"
+            ),
+            ActionToolItem(
                 call="set_task_step",
                 description="设置任务步骤: 如果 task_step 和目标(task_info)不符合或者和Master要求不符合或为空, 则需要设置一下, 如果某步骤执行完毕, 也需要设置一下新步骤.",
                 input={
@@ -320,7 +410,7 @@ class Task():
                 },
                 execute="AI"
             ),
-            SyncToolItem(
+            ActionToolItem(
                 call="critic",
                 description="决策机制: 判断当前任务task_info是否完成, 需要输入 task_id 和调用的对象的 timestamp , 如果数量太多, 只填写关健几个, 可以查找所有运行记录.",
                 input={
@@ -334,28 +424,19 @@ class Task():
                 },
                 execute="AI"
             ),
-            SyncToolItem(
-                call="set_task_info",
-                description="设定当前任务目标: 填写参数前要分析完毕, 设置目标的时候要同时给出实现步骤, 然后同时设置task_step, Master允许时才能调用这个",
-                input={
-                    "task_id": "任务id: 需要设置的task 对应的 id",
-                    "task_info": "任务目标"
-                },
-                execute="AI"
-            ),
-            SyncToolItem(
+            ActionToolItem(
                 call="get_wolfram_response",
                 description="通过wolfram进行数学计算: 所有计算都可以通过这个函数解决, 这个函数调用成功后是完全正确的.",
                 input="运算内容: 在这里输入wolfram支持的内容, 翻译成英文再调用. 如: solve int x^2 dx ",
                 execute="system"
             ),
-            SyncToolItem(
+            ActionToolItem(
                 call="get_bard_response",
                 description="通过互联网进行搜索: 需要了解任何有时效性的内容都可以调用, 只能搜索最新有时效性的信息, 比如时间/日期或者某个网址的内容等.",
                 input="搜索内容: 在这里输入要bard进行检索的内容, 翻译成英文再调用. 如: What time is it now?",
                 execute="system"
             ),
-            SyncToolItem(
+            ActionToolItem(
                 call="chat_bing",
                 description="和 bing 交互/回复/响应: 这是你的好朋友 bing, 你不能通过 chat 方法和 bing 进行交互, 你可以问问 bing 问题, bing 会提供建议, 也可以让 bing 帮忙进行搜索, 或者让他帮忙查询时间, 如: 我在和Master聊天, 但是没有进展, 我该怎么办?",
                 input="对 bing 说的内容",
@@ -455,9 +536,10 @@ class Task():
                 continue
 
             for talk in self.task_response(res['message']):
-                log_dbg(f"recv task chat: {str(talk)}")
                 answer['message'] += talk
                 yield answer
+
+        self.save_task()
 
         answer['code'] = 0
         yield answer

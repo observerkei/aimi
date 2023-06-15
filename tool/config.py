@@ -53,6 +53,7 @@ class Config:
     setting_config: str = './run/setting.yml'
     memory_config: str = './run/memory.yml'
     memory_model_file: str = './run/memory.pt'
+    task_config: str = './run/task.yml'
     setting: dict = {}
     meme: Meme
     max_requestion: int = 1024
@@ -89,6 +90,24 @@ class Config:
         except Exception as e:
             log_err('fail to load memory: ' + str(e))
             return {}
+    
+    def load_task(self) -> dict:
+        try:
+            obj = read_yaml(self.task_config)
+            task = {}
+
+            task['tasks'] = obj.get('tasks', {})
+            task['now_task_id'] = obj.get('now_task_id', '1')
+            task['timestamp'] = obj.get('timestamp', 1)
+            task['running'] = obj.get('running', [])
+
+            log_dbg('cfg load task done.')
+
+            return task
+        except Exception as e:
+            log_err('fail to load task: ' + str(e))
+            return {}
+
 
     def load_setting(self, type) -> dict:
         try:
