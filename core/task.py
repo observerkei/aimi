@@ -83,6 +83,16 @@ class Task:
             # decoder = json.JSONDecoder(strict=False)
             # data = decoder.decode(answer)
             data = json5.loads(answer)
+
+            # fix no execute.
+            for action in data:
+                if 'execute' in action:
+                    continue
+                for tool in self.action_tool:
+                    if action['call'] != tool.call:
+                        continue
+                    action['execute'] = tool.execute
+    
             tasks = [TaskRunningItem(**item) for item in data]
 
             running: List[TaskRunningItem] = []
@@ -100,7 +110,7 @@ class Task:
                             f"{str(task.call)}: AI try predict system set response: {str(task.response)}"
                         )
 
-                    if task.call == "chat":
+                    if task.call == "chat_master":
                         name = task.request["name"]
                         to = task.request["to"]
                         content = task.request["content"]
@@ -196,7 +206,7 @@ class Task:
         chat: TaskRunningItem = TaskRunningItem(
             timestamp=str(self.timestamp),
             reasoning=reasoning,
-            call="chat",
+            call="chat_master",
             request={"name": name, "to": to, "content": question},
             execute="system",
         )
@@ -232,7 +242,7 @@ class Task:
             if request["success"] == "True" or request["success"] == True:
                 task = self.tasks[self.now_task_id]
                 task_info = task.task_info
-                log_info(f"task complate: {str(task_info)}")
+                log_info(f"success: True, task complate: {str(task_info)}")
 
                 new_task = self.tasks[self.now_task_id]
                 new_task.task_info = "当前没有事情可以做, 找Master聊天吧..."
@@ -244,7 +254,7 @@ class Task:
                     f"set task to {str(self.now_task_id)} : {str(self.tasks[self.now_task_id].task_info)}"
                 )
             else:
-                log_dbg(f"task no complate, continue...")
+                log_info(f"success: False, task no complate, continue...")
 
         except Exception as e:
             log_err(f"fail to critic {str(request)} : {str(e)}")
@@ -339,7 +349,7 @@ class Task:
     def __init_task(self):
         self.action_tool: List[ActionToolItem] = [
             ActionToolItem(
-                call="chat",
+                call="chat_master",
                 description="和 Master 交互: 给某Master发送消息进行交互. "
                 "name 是说话的人的名字, to 是对谁说话, content 是说的内容."
                 "无论历史是怎样, 你只能把name设置成 Aimi."
@@ -436,15 +446,13 @@ class Task:
 
         if (
             not self.now_task_id 
-            or (not int(self.now_task_id))
-            or (type(str) is not type(self.now_task_id))
+            or not int(self.now_task_id)
         ):
             self.now_task_id = "1"
 
         if (
             not self.tasks
             or not len(self.tasks)
-            or (type(List[TaskStepItem]) is not type(self.tasks))
         ):
             task_step: List[TaskStepItem] = [
                 TaskStepItem(
@@ -463,17 +471,18 @@ class Task:
             )
             self.tasks = {}
             self.tasks[self.now_task_id] = task
+            log_dbg(f"no have tasks")
 
         if (
             not self.running
             or not len(self.running)
-            or (type(List[TaskRunningItem]) is not type(self.running))
         ):
             running: List[TaskRunningItem] = [
                 self.make_chat("Master", "Aimi", "请保持设定"),
                 self.make_chat("Aimi", "Master", "好", "作为Aimi, 我听从Master的指示"),
             ]
             self.running = running
+            log_dbg(f"no have running")
 
     def __get_now_task(self):
         return self.tasks[self.now_task_id]
