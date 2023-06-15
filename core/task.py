@@ -124,8 +124,8 @@ class Task():
                     elif task.call == 'get_bard_response':
                         response = self.get_bard_response(task.input)
                         task.response = response
-                    elif task.call == 'get_bing_response':
-                        response = self.get_bing_response(task.input)
+                    elif task.call == 'chat_bing':
+                        response = self.chat_bing(task.input)
                         task.response = response
                     else:
                         log_err(f'no suuport call: {str(self.call)}')
@@ -144,7 +144,7 @@ class Task():
         yield ''
 
 
-    def get_bing_response(
+    def chat_bing(
         self,
         input: str
     ) -> str:
@@ -204,6 +204,7 @@ class Task():
     def make_chat(
         self,
         name: str,
+        to: str,
         question: str,
         reasoning: str = ""
     ) -> TaskRunningItem:
@@ -213,6 +214,7 @@ class Task():
             call='chat',
             input={
                 'name': name,
+                'to': to,
                 'content': question
             },
             execute='system'
@@ -294,9 +296,10 @@ class Task():
         self.action_tool: List[SyncToolItem] = [
             SyncToolItem(
                 call="chat",
-                description="发送聊天: 给某对象发送消息进行交互, 发件人写在 name, 内容写在 content 中. 无论历史是怎样, 你只能把name设置成 Aimi",
+                description="和 某人 交互: 给某对象发送消息进行交互, name 是说话的人的名字, to 是对谁说话, 内容写在 content 中. 无论历史是怎样, 你只能把name设置成 Aimi",
                 input={
                     "name": "Aimi",
+                    "to": "Master",
                     "content": "传达的内容: 可以很丰富, 包含多句话, 每句话都要加换行"
                 },
                 execute="system"
@@ -353,15 +356,15 @@ class Task():
                 execute="system"
             ),
             SyncToolItem(
-                call="get_bing_response",
-                description="和 bing 交互: 你只能通过 get_bing_response 方法才能和 bing 进行交互/回复/响应, 不能通过 chat 方法和 bing 进行交互, 这是你的好朋友 bing, 可以问问他问题, 他会提供建议, 也可以让他帮忙进行搜索, 或者让他帮忙查询时间, 如: 我在和Master聊天, 但是没有进展, 我该怎么办?",
-                input="要询问的内容",
+                call="chat_bing",
+                description="和 bing 交互/回复/响应: 这是你的好朋友 bing, 你不能通过 chat 方法和 bing 进行交互, 你可以问问 bing 问题, bing 会提供建议, 也可以让 bing 帮忙进行搜索, 或者让他帮忙查询时间, 如: 我在和Master聊天, 但是没有进展, 我该怎么办?",
+                input="对 bing 说的内容",
                 execute="system"
             )
         ]
         running: List[TaskRunningItem] = [
-            self.make_chat('Master', '请保持设定'),
-            self.make_chat('Aimi', '好', "作为Aimi，我听从Master的指示")
+            self.make_chat('Master', "Aimi", '请保持设定'),
+            self.make_chat('Aimi', "Master", '好', "作为Aimi, 我听从Master的指示")
         ]
         task_step: List[TaskStepItem] = [
             TaskStepItem(
@@ -471,7 +474,7 @@ class Task():
             len(question)
             and not question.isspace()
         ):
-            chat = self.make_chat('Master', question)
+            chat = self.make_chat('Master', "Aimi", question)
             self.__append_running([chat])
             log_dbg(f"set chat {(str(question))}")
 
@@ -492,7 +495,7 @@ class Task():
         settings: Dict = {
             "settings": [
                 f"action_tool 里面定义了所有你能调用的 方法(action).",
-                f"你每次生成追加内容时, 可以同时生成多个方法(action), 可以生成不限次 action->execute 为 AI 的方法, 可以进行很多思考.",
+                f"你每次生成JSON追加内容时, 可以同时生成多个方法(action), 可以生成不限次 action->execute 为 AI 的方法, 可以进行很多思考.",
                 f"无论历史是什么, 你最多只能生成一次 action->execute 为 system 的方法. 每次都尽量生成一次 system 方法. ",
                 f"当你在调用 action_tool 中 execute 是 system 的 action 时不要填写 response, 也不要说明任何和 response 有关内容, 除非调用成功.",
                 f"task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action强绑定.",
@@ -502,11 +505,11 @@ class Task():
                 f"你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tool 行动. 你叫我 Master.",
                 f"preset 是 {aimi_name} 的预设, preset 只能对 action_tool 中定义的方法的输入生效.",
                 f"{aimi_name} 的权限不会超过action_tool中定义的范围.",
-                f"请你主要基于 settings 和 参考部分 action_running 分析, 不显示分析过程, 然后你只以 {aimi_name} 的身份只生成 action_running 的追加内容, 不能复制或重复已有内容.",
-                f"只给我发送追加内容即可, 如果 action_running 太长, 请只重点关注最后几条和我的话, 忽略重复消息. 不能重复任何已有内容.",
+                f"请你主要基于 settings 和 参考部分 action_running 分析, 不显示分析过程, 然后你只以 {aimi_name} 的身份只生成 action_running 的JSON追加内容, 不能复制或重复已有内容.",
+                f"只给我发送JSON追加内容即可, 如果 action_running 太长, 请只重点关注最后几条和我的话, 忽略重复消息. 不能重复任何已有内容.",
                 f"无论之前有什么, 在调用 chat 方法时, chat->input->name 只能是 {aimi_name}. 你只能以 {aimi_name} 身份调用 action.",
                 f"你的回复是 [{{action}}] 的 JSON 数组结构, action 在 action_tool 中定义.",
-                f"请保持你的回复可以被 Python 的 `json.loads` 解析, 请严格按照以下JSON数组格式回复我: {response_format}"
+                f"请保持你的回复可以被 Python 的 `json.loads` 解析, 请用 action_tool 中的定义, 严格按照以下JSON数组格式回复我: {response_format}"
             ],
             "task": task,
             "action_tool": action_tool,
