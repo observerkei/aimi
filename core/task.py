@@ -354,7 +354,7 @@ class Task():
             ),
             SyncToolItem(
                 call="get_bing_response",
-                description="和bing交互: 你只能通过这个方法才能和bing进行交互/回复/响应, 不能通过 chat 方法回复 bing, 这是你的好朋友 bing, 可以问问他问题, 他会提供建议, 也可以让他帮忙进行搜索, 或者让他帮忙查询时间, 如: 我在和Master聊天, 但是没有进展, 我该怎么办?",
+                description="和 bing 交互: 你只能通过 get_bing_response 方法才能和 bing 进行交互/回复/响应, 不能通过 chat 方法和 bing 进行交互, 这是你的好朋友 bing, 可以问问他问题, 他会提供建议, 也可以让他帮忙进行搜索, 或者让他帮忙查询时间, 如: 我在和Master聊天, 但是没有进展, 我该怎么办?",
                 input="要询问的内容",
                 execute="system"
             )
