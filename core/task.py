@@ -244,14 +244,17 @@ class Task:
                 task_info = task.task_info
                 log_info(f"success: True, task complate: {str(task_info)}")
 
-                new_task = self.tasks[self.now_task_id]
-                new_task.task_info = "当前没有事情可以做, 找Master聊天吧..."
-                new_task.task_step = []  # 清空原有步骤 ...
-
                 self.now_task_id = str(int(self.now_task_id) + 1)
+                new_task = TaskItem(
+                    task_id=self.now_task_id,
+                    task_info="当前没有事情可以做, 找Master聊天吧...",
+                    now_task_step_id="1",
+                    task_step=[]
+                )
+
                 self.tasks[self.now_task_id] = new_task
                 log_dbg(
-                    f"set task to {str(self.now_task_id)} : {str(self.tasks[self.now_task_id].task_info)}"
+                    f"set new task {str(self.now_task_id)} to {str(self.tasks[self.now_task_id].task_info)}"
                 )
             else:
                 log_info(f"success: False, task no complate, continue...")
@@ -350,15 +353,13 @@ class Task:
         self.action_tool: List[ActionToolItem] = [
             ActionToolItem(
                 call="chat_master",
-                description="和 Master 交互: 给某Master发送消息进行交互. "
-                "name 是说话的人的名字, to 是对谁说话, content 是说的内容."
-                "无论历史是怎样, 你只能把name设置成 Aimi."
-                "这个方法只能和Master交互.",
+                description="和 Master 交互: 给Master发送消息进行交互. "
+                "无论历史是怎样, 你只能把name设置成 Aimi. to 设置成 Master. content 是说的内容.",
                 request={
                     "type": "object",
                     "name": "Aimi",
                     "to": "Master",
-                    "content": "传达的内容: 可以很丰富, 包含多句话, 每句话都要加换行",
+                    "content": "传达的内容: 可以很丰富, 包含多句话, 每句话都要加换行, 如果有数学公式, 要包裹在单独行的 $$ 中.",
                 },
                 execute="system",
             ),
@@ -378,9 +379,9 @@ class Task:
             ActionToolItem(
                 call="set_task_step",
                 description="设置任务步骤: 设置完成 task_info 需要做的步骤. "
+                "如果某步骤执行完毕, 需要单独更新 task_step_id 和 call_timestamp."
                 "如果 task_step 和目标(task_info) 不符合或者和Master新要求不符合或为空或者重新设置了 task_info, "
-                "则需要重新设置一下task_step, 并重置 task_step_id 为第一步, "
-                "如果某步骤执行完毕, 需要更新 task_step_id 和 call_timestamp.",
+                "则需要重新设置一下task_step, 并重置 task_step_id 为第一步. ",
                 request={
                     "type": "object",
                     "task_id": "任务id: 表明修改哪个任务",
@@ -393,7 +394,7 @@ class Task:
                             "check": "检查点: 达成什么条件才算完成步骤",
                             "call": "方法名: 应该调用什么 action 处理步骤.",
                             "call_timestamp": [
-                                "timestamp: 调用完成的action对应的timestamp, 如果还没执行就为空, 如: 1"
+                                "timestamp: 调用完成的action对应的 timestamp, 如果还没执行就为空, 如: 1"
                             ],
                         }
                     ],
@@ -411,9 +412,9 @@ class Task:
                     "task_id": "任务id: 被检查的task对应的id",
                     "task_info": "任务目标: 被检查的任务目标",
                     "running": ["timestamp: 已运行方法的 timestamp"],
-                    "success": "任务是否完成: 标记任务是否完成, 如str: True/False",
+                    "success": "任务是否完成: 完成填 True 其他情况填 False",
                     "critique": "行动建议: 如果success不是 True, "
-                    "请在这里说明应该给出通过 action_tool->call 完成任务目标的方法和建议",
+                    "请在这里说明应该给出通过 action_tool->call 完成 task_info 的方法和建议.",
                 },
                 execute="AI",
             ),
@@ -577,8 +578,8 @@ class Task:
                 f"preset 是 {aimi_name} 的预设, preset 只能对 action_tool 中定义的方法的输入生效.",
                 f"{aimi_name} 的权限不会超过action_tool中定义的范围.",
                 f"请你主要基于 settings 和 参考部分 action_running 分析, 不显示分析过程, 然后你只以 {aimi_name} 的身份只生成 action_running 的JSON追加内容, 不能复制或重复已有内容.",
-                f"只给我发送JSON追加内容即可, 如果 action_running 太长, 请只重点关注最后几条和我的话, 忽略重复消息. 不能重复任何已有内容.",
-                f"无论之前有什么, 在调用 chat 方法时, chat->request->name 只能是 {aimi_name}. 你只能以 {aimi_name} 身份调用 action.",
+                f"只给我发送JSON追加内容即可, 如果 action_running 太长, 请只重点关注最后几条和没回复过我的话.",
+                f"无论之前有什么, 在调用 chat_master 方法时, chat_master->request->name 只能是 {aimi_name}. 你只能以 {aimi_name} 身份调用 action.",
                 f"你的回复是 [{{action}}] 的 JSON 数组结构, action 在 action_tool 中定义.",
                 f"请保持你的回复可以被 Python 的 `json.loads` 解析, 请用 action_tool 中的定义, 严格按照以下JSON数组格式回复我: {response_format}",
             ],
