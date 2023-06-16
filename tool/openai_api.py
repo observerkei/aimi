@@ -140,7 +140,9 @@ class OpenAIAPI:
         # }
 
         req_cnt = 0
-        if not bot_model or not len(bot_model):
+        if not bot_model or not len(bot_model) or (
+            bot_model not in self.chat_completions_models
+        ):
             bot_model = self.__get_bot_model(question)
         log_dbg(f"use model: {bot_model}")
         log_dbg(f"msg: {str(messages)}")

@@ -86,8 +86,6 @@ class Task:
 
             # fix no execute.
             for action in data:
-                if 'execute' in action:
-                    continue
                 for tool in self.action_tool:
                     if action['call'] != tool.call:
                         continue
@@ -128,6 +126,8 @@ class Task:
                         self.set_task_info(task_id, task_info)
                     elif task.call == "critic":
                         self.critic(task.request)
+                    elif task.call == "analyse":
+                        self.analyse(task.request)
                     elif task.call == "get_wolfram_response":
                         response = self.get_wolfram_response(task.request)
                         task.response = response
@@ -258,6 +258,13 @@ class Task:
         log_dbg(f"set task id {str(self.now_task_id)} to {str(task_id)}")
         return task
 
+    def analyse(self, request):
+        try:
+            js = json.dumps(request, indent=4, ensure_ascii=False)
+            log_info(f"analyse: {js}")
+        except Exception as e:
+            log_err(f"fail to analyse {str(e)}")
+
     def critic(self, request):
         try:
             if request["success"] == "True" or request["success"] == True:
@@ -375,7 +382,8 @@ class Task:
             ActionToolItem(
                 call="chat_to_master",
                 description="和 Master 交互: 给Master发送消息进行交互. ",
-                request="Aimi对Master传达的内容: 可以很丰富, 包含多句话, 每句话都要加换行, 如果有数学公式, 要包裹在单独行的 $$ 中.",
+                request="Aimi对Master传达的内容: 可以很丰富, 包含多句话, 每句话都要加换行, "
+                "如果有数学公式, 则要用latex显示, 每个公式都要单独包裹在单独行的 $$ 中.",
                 execute="system",
             ),
             ActionToolItem(
@@ -417,8 +425,38 @@ class Task:
                 execute="AI",
             ),
             ActionToolItem(
+                call="analyse",
+                description="分析机制: 通过自身思考进行分析 某个操作是否合理, "
+                "以及如何改进, 只能分析有问题的地方."
+                "可以同时分析多个动作(action). 需要输入想解决的问题和与问题关联的timestamp.",
+                request={
+                    "type": "object",
+                    "error": "异常点: 哪里错了, 最后检查的时候不能把这个当成答案.",
+                    "problem": "想解决的问题: 通过分析想解决什么疑问.",
+                    "check_running": {
+                        "type": "object",
+                        "timestamp: 已运行方法的 timestamp": {
+                            "type": "object",
+                            "risk": [
+                                "影响点: 可能导致出现 problem 的原因"
+                            ],
+                            "verdict": "裁决: 通过逻辑思维判断 risk 是否合理.",
+                            "suggest": "如何改进: 如果 check 发现问题, "
+                            "则要在能解决 check 的基础上考虑 action_tool 中的处理操作分析并给出改进方案. "
+                            "如果问题做了切换, 则切换前后必须在逻辑/代数上等价. "
+                            "也可以问你的好朋友看看有没有办法. ",
+                            "task_step": "task_step object: 给出改进方案后, "
+                            "也要给出 action_tool 中可行的处理操作, 新操作的输入必须和原来的完全不同. "
+                            "新操作不能马上执行. 必须含有不同方案(如向他人求助). "
+                            "task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. ",
+                        }
+                    }
+                },
+                execute="AI",
+            ),
+            ActionToolItem(
                 call="critic",
-                description="决策机制: 判断当前任务task_info是否完成, 这个是你自己的思考裁决."
+                description="决策机制: 通过自身思考判断当前任务task_info是否完成."
                 "需要输入 task_id 和调用的对象的 timestamp, "
                 "如果数量太多, 只填写关健几个, 可以查找所有运行记录."
                 "如果调用了 system 方法, 则也必须调用一下这个方法.",
@@ -429,14 +467,17 @@ class Task:
                     "running": ["timestamp: 已运行方法的 timestamp"],
                     "success": "任务是否完成: 完成填 True 其他情况填 False",
                     "critique": "行动建议: 如果success不是 True, "
-                    "请在这里说明应该给出通过 action_tool->call 完成 task_info 的方法和建议.",
+                    "请在这里说明应该给出通过 action_tool->call 完成 task_info 的方法和建议,"
+                    " 如果进展不顺利, 可以另外问Master.",
                 },
                 execute="AI",
             ),
             ActionToolItem(
                 call="get_wolfram_response",
-                description="通过wolfram进行数学计算: 所有计算都可以通过这个函数解决, " "这个函数调用成功后是完全正确的.",
-                request="运算内容: 在这里输入wolfram支持的内容, " "翻译成英文再调用. 如: solve int x^2 dx ",
+                description="通过wolfram进行数学计算: 你要用数学家严谨的逻辑分析思维来使用这个方法, "
+                "所有计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的."
+                "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照wolfram语言输入.",
+                request="运算内容: 翻译成 wolfram语言 再调用. 如: Integrate[x^2, x] ",
                 execute="system",
             ),
             ActionToolItem(
@@ -591,14 +632,15 @@ class Task:
                 f"task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action强绑定.",
                 f"如果 task_step 为空, 或不符合, 请重新设置步骤, 如果没有进展, 尽量给出创造性建议或优化步骤推进任务进度.",
                 f"Master通过 chat_from_master 下达指令, 如果Master提出了要求, 你要修改当前步骤来满足要求.",
-                f"每次任务/关健操作完成或使用了system方法, 都应该试探性地带上分析上报Master.",
+                f"每次任务(task_info) 完成 或者 关健操作(task_step) 完成或使用了system方法, 都应该试探性地带上分析上报Master.",
                 f"你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tool 行动. 你叫我 Master.",
                 f"preset 是 {aimi_name} 的预设, preset 只能对 action_tool 中定义的方法的输入生效.",
                 f"{aimi_name} 的权限不会超过action_tool中定义的范围.",
-                f"请你主要基于 settings 和 参考部分 action_running 和我的话 再用 {aimi_name} 身份生成JSON追加内容, ",
+                f"请你主要基于 settings 和 参考部分 action_running 和我的话(重点关注) 再用 {aimi_name} 身份生成JSON追加内容, ",
                 f"不显示分析过程, 不能复制或重复已有内容. 可直接复制已有 timestamp 的任何内容, ",
                 f"你的回复是 [{{action}}] 的 JSON 数组结构, action 在 action_tool 中定义.",
-                f"请保持你的回复可以被 Python 的 `json.loads` 解析, 请用 action_tool 中的定义, 严格按照以下JSON数组格式回复我: {response_format}",
+                f"请基于 action_tool 中字段的JSON用法, 保持你的回复可以被 Python 的 `json.loads` 解析, "
+                f"只用JSON回复, 严格按照以下JSON数组格式回复我: {response_format}",
             ],
             "task": task,
             "action_tool": action_tool,
