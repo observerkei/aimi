@@ -87,10 +87,10 @@ class Task:
             # fix no execute.
             for action in data:
                 for tool in self.action_tool:
-                    if action['call'] != tool.call:
+                    if action["call"] != tool.call:
                         continue
-                    action['execute'] = tool.execute
-    
+                    action["execute"] = tool.execute
+
             tasks = [TaskRunningItem(**item) for item in data]
 
             running: List[TaskRunningItem] = []
@@ -112,9 +112,11 @@ class Task:
                     if task.call == "chat_to_master":
                         content = str(task.request)
                         log_dbg(f"Aimi: {content}")
-                        yield content + '\n'
+                        yield content + "\n"
                     elif task.call == "chat_from_master":
-                        log_err(f"{str(task.call)}: AI try predict Master: {str(task.response)}")
+                        log_err(
+                            f"{str(task.call)}: AI try predict Master: {str(task.response)}"
+                        )
                         continue
                     elif task.call == "set_task_step":
                         task_id: str = task.request["task_id"]
@@ -145,7 +147,8 @@ class Task:
                         self.timestamp += 1
                         running.append(task)
                     if task_response and (
-                        (len(str(running)) + len(str(task_response))) < self.max_running_size
+                        (len(str(running)) + len(str(task_response)))
+                        < self.max_running_size
                     ):
                         task_response.timestamp = str(self.timestamp)
                         self.timestamp += 1
@@ -171,9 +174,7 @@ class Task:
 
         return answer
 
-    def make_chat_from(
-        self, from_name: str, content: str
-    ) -> TaskRunningItem:
+    def make_chat_from(self, from_name: str, content: str) -> TaskRunningItem:
         chat: TaskRunningItem = TaskRunningItem(
             timestamp=str(self.timestamp),
             call=f"chat_from_{from_name}",
@@ -182,15 +183,11 @@ class Task:
         )
         return chat
 
-    def make_chat_from_bard(
-        self, content: str
-    ) -> TaskRunningItem:
-        return self.make_chat_from('bard', content)
+    def make_chat_from_bard(self, content: str) -> TaskRunningItem:
+        return self.make_chat_from("bard", content)
 
-    def make_chat_from_bing(
-        self, content: str
-    ) -> TaskRunningItem:
-        return self.make_chat_from('bing', content)
+    def make_chat_from_bing(self, content: str) -> TaskRunningItem:
+        return self.make_chat_from("bing", content)
 
     def chat_to_bard(self, request: str) -> str:
         if not request or not len(request):
@@ -216,14 +213,10 @@ class Task:
 
         return answer
 
-    def make_chat_from_master(
-        self, content: str
-    ) -> TaskRunningItem:
-        return self.make_chat_from('master', content)
+    def make_chat_from_master(self, content: str) -> TaskRunningItem:
+        return self.make_chat_from("master", content)
 
-    def make_chat_to_master(
-        self, content: str, reasoning: str = ""
-    ) -> TaskRunningItem:
+    def make_chat_to_master(self, content: str, reasoning: str = "") -> TaskRunningItem:
         chat: TaskRunningItem = TaskRunningItem(
             timestamp=str(self.timestamp),
             reasoning=reasoning,
@@ -277,7 +270,7 @@ class Task:
                     task_id=self.now_task_id,
                     task_info="当前没有事情可以做, 找Master聊天吧...",
                     now_task_step_id="1",
-                    task_step=[]
+                    task_step=[],
                 )
 
                 self.tasks[self.now_task_id] = new_task
@@ -313,14 +306,14 @@ class Task:
             for id, task in task_config["tasks"].items():
                 task_id = task["task_id"]
                 task_info = task["task_info"]
-                now_task_step_id = task['now_task_step_id']
+                now_task_step_id = task["now_task_step_id"]
                 task_step = [TaskStepItem(**step) for step in task["task_step"]]
 
                 tasks[id] = TaskItem(
                     task_id=task_id,
                     task_info=task_info,
                     now_task_step_id=now_task_step_id,
-                    task_step=task_step
+                    task_step=task_step,
                 )
             self.tasks = tasks
         except Exception as e:
@@ -411,6 +404,7 @@ class Task:
                     "now_task_step_id": "当前执行到哪一步了, 如: 1",
                     "task_step": [
                         {
+                            "type": "object",
                             "id": "步骤号: 为数字, 如: 1",
                             "step": "步骤内容: 在这里填写能够完成计划 task_info 的步骤, "
                             "要显示分析过程和用什么方法完成这个步骤.",
@@ -437,20 +431,18 @@ class Task:
                         "type": "object",
                         "timestamp: 已运行方法的 timestamp": {
                             "type": "object",
-                            "risk": [
-                                "影响点: 可能导致出现 problem 的原因"
-                            ],
+                            "risk": ["影响点: 可能导致出现 problem 的原因"],
                             "verdict": "裁决: 通过逻辑思维判断 risk 是否合理.",
-                            "suggest": "如何改进: 如果 check 发现问题, "
-                            "则要在能解决 check 的基础上考虑 action_tool 中的处理操作分析并给出改进方案. "
+                            "suggest": "如何改进: 如果 verdict 发现问题, "
+                            "则要在能解决 verdict 的基础上考虑 action_tool 中的处理操作分析并给出改进方案. "
                             "如果问题做了切换, 则切换前后必须在逻辑/代数上等价. "
                             "也可以问你的好朋友看看有没有办法. ",
                             "task_step": "task_step object: 给出改进方案后, "
                             "也要给出 action_tool 中可行的处理操作, 新操作的输入必须和原来的完全不同. "
                             "新操作不能马上执行. 必须含有不同方案(如向他人求助). "
                             "task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. ",
-                        }
-                    }
+                        },
+                    },
                 },
                 execute="AI",
             ),
@@ -467,8 +459,8 @@ class Task:
                     "running": ["timestamp: 已运行方法的 timestamp"],
                     "success": "任务是否完成: 完成填 True 其他情况填 False",
                     "critique": "行动建议: 如果success不是 True, "
-                    "请在这里说明应该给出通过 action_tool->call 完成 task_info 的方法和建议,"
-                    " 如果进展不顺利, 可以另外问Master.",
+                    "请在这里说明应该给出通过 action_tool->call 完成 task_info 的方法和建议, "
+                    "如果进展不顺利, 可以另外问Master.",
                 },
                 execute="AI",
             ),
@@ -501,16 +493,10 @@ class Task:
             ),
         ]
 
-        if (
-            not self.now_task_id 
-            or not int(self.now_task_id)
-        ):
+        if not self.now_task_id or not int(self.now_task_id):
             self.now_task_id = "1"
 
-        if (
-            not self.tasks
-            or not len(self.tasks)
-        ):
+        if not self.tasks or not len(self.tasks):
             task_step: List[TaskStepItem] = [
                 TaskStepItem(
                     id=self.now_task_id,
@@ -530,10 +516,7 @@ class Task:
             self.tasks[self.now_task_id] = task
             log_dbg(f"no have tasks")
 
-        if (
-            not self.running
-            or not len(self.running)
-        ):
+        if not self.running or not len(self.running):
             running: List[TaskRunningItem] = []
             running.append(self.make_chat_from_master("我是Master, 请你请保持设定"))
             self.timestamp += 1
