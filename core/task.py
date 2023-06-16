@@ -103,6 +103,7 @@ class Task:
                         f"[{task_cnt}] get task: {str(task.call)} : {str(task)}\n\n"
                     )
                     task_cnt += 1
+                    task_response = None
                     if task.reasoning:
                         log_dbg(f"{str(task.call)} reasoning: {str(task.reasoning)}")
                     if task.execute == "system" and task.response:
@@ -112,6 +113,7 @@ class Task:
 
                     if task.call == "chat_to_master":
                         content = str(task.request)
+                        log_dbg(f"Aimi: {content}")
                         yield content + '\n'
                     elif task.call == "chat_from_master":
                         log_err(f"{str(task.call)}: AI try predict Master: {str(task.response)}")
@@ -131,10 +133,10 @@ class Task:
                         task.response = response
                     elif task.call == "chat_to_bard":
                         response = self.chat_to_bard(task.request)
-                        task.response = response
+                        task_response = self.make_chat_from_bard(response)
                     elif task.call == "chat_to_bing":
                         response = self.chat_to_bing(task.request)
-                        task.response = response
+                        task_response = self.make_chat_from_bing(response)
                     else:
                         log_err(f"no suuport call: {str(self.call)}")
                         continue
@@ -142,6 +144,12 @@ class Task:
                         task.timestamp = str(self.timestamp)
                         self.timestamp += 1
                         running.append(task)
+                    if task_response and (
+                        (len(str(running)) + len(str(task_response))) < self.max_running_size
+                    ):
+                        task_response.timestamp = str(self.timestamp)
+                        self.timestamp += 1
+                        running.append(task_response)
                 except Exception as e:
                     log_err(f"fail to load task: {str(e)}: {str(task)}")
             self.__append_running(running)
@@ -162,6 +170,27 @@ class Task:
             answer = res["message"]
 
         return answer
+
+    def make_chat_from(
+        self, from_name: str, content: str
+    ) -> TaskRunningItem:
+        chat: TaskRunningItem = TaskRunningItem(
+            timestamp=str(self.timestamp),
+            call=f"chat_from_{from_name}",
+            request=content,
+            execute="system",
+        )
+        return chat
+
+    def make_chat_from_bard(
+        self, content: str
+    ) -> TaskRunningItem:
+        return self.make_chat_from('bard', content)
+
+    def make_chat_from_bing(
+        self, content: str
+    ) -> TaskRunningItem:
+        return self.make_chat_from('bing', content)
 
     def chat_to_bard(self, request: str) -> str:
         if not request or not len(request):
@@ -187,25 +216,10 @@ class Task:
 
         return answer
 
-    def chat(self, name: str, to: str, content: str) -> str:
-        log_dbg(f"{name}: {content}")
-        if name != self.aimi_name:
-            return ""
-        if to != "Master":
-            content = f"[{name} -> {to}] {content}"
-        return content + "\n"
-
     def make_chat_from_master(
         self, content: str
     ) -> TaskRunningItem:
-        chat: TaskRunningItem = TaskRunningItem(
-            timestamp=str(self.timestamp),
-            call=f"chat_from_master",
-            request=content,
-            execute="system",
-        )
-        self.timestamp += 1
-        return chat
+        return self.make_chat_from('master', content)
 
     def make_chat_to_master(
         self, content: str, reasoning: str = ""
@@ -479,10 +493,12 @@ class Task:
             not self.running
             or not len(self.running)
         ):
-            running: List[TaskRunningItem] = [
-                self.make_chat_from_master("我是Master, 请你请保持设定"),
-                self.make_chat_to_master("好", "作为Aimi, 我听从Master的指示"),
-            ]
+            running: List[TaskRunningItem] = []
+            running.append(self.make_chat_from_master("我是Master, 请你请保持设定"))
+            self.timestamp += 1
+            running.append(self.make_chat_to_master("好", "作为Aimi, 我听从Master的指示"))
+            self.timestamp += 1
+
             self.running = running
             log_dbg(f"no have running")
 
@@ -546,6 +562,7 @@ class Task:
         # 如果只是想让任务继续, 就回复全空格/\t/\n
         if len(question) and not question.isspace():
             chat = self.make_chat_from_master(question)
+            self.timestamp += 1
             self.__append_running([chat])
             log_dbg(f"set chat {(str(question))}")
 
