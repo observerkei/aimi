@@ -110,17 +110,12 @@ class Task:
                             f"{str(task.call)}: AI try predict system set response: {str(task.response)}"
                         )
 
-                    if task.call == "chat_master":
-                        name = task.request["name"]
-                        to = task.request["to"]
-                        content = task.request["content"]
-                        response = self.chat(name, to, content)
-                        if "Master" == name:
-                            log_err(
-                                f"{str(task.call)}: AI try predict Master res as: {str(content)}"
-                            )
-                            continue
-                        yield response
+                    if task.call == "chat_to_master":
+                        content = str(task.request)
+                        yield content + '\n'
+                    elif task.call == "chat_from_master":
+                        log_err(f"{str(task.call)}: AI try predict Master: {str(task.response)}")
+                        continue
                     elif task.call == "set_task_step":
                         task_id: str = task.request["task_id"]
                         task_step: List[TaskStepItem] = task.request["task_step"]
@@ -134,11 +129,11 @@ class Task:
                     elif task.call == "get_wolfram_response":
                         response = self.get_wolfram_response(task.request)
                         task.response = response
-                    elif task.call == "chat_bard":
-                        response = self.chat_bard(task.request)
+                    elif task.call == "chat_to_bard":
+                        response = self.chat_to_bard(task.request)
                         task.response = response
-                    elif task.call == "chat_bing":
-                        response = self.chat_bing(task.request)
+                    elif task.call == "chat_to_bing":
+                        response = self.chat_to_bing(task.request)
                         task.response = response
                     else:
                         log_err(f"no suuport call: {str(self.call)}")
@@ -156,7 +151,7 @@ class Task:
 
         yield ""
 
-    def chat_bing(self, request: str) -> str:
+    def chat_to_bing(self, request: str) -> str:
         if not request or not len(request):
             return "request error"
 
@@ -168,7 +163,7 @@ class Task:
 
         return answer
 
-    def chat_bard(self, request: str) -> str:
+    def chat_to_bard(self, request: str) -> str:
         if not request or not len(request):
             return "request error"
 
@@ -200,14 +195,26 @@ class Task:
             content = f"[{name} -> {to}] {content}"
         return content + "\n"
 
-    def make_chat(
-        self, name: str, to: str, question: str, reasoning: str = ""
+    def make_chat_from_master(
+        self, content: str
+    ) -> TaskRunningItem:
+        chat: TaskRunningItem = TaskRunningItem(
+            timestamp=str(self.timestamp),
+            call=f"chat_from_master",
+            request=content,
+            execute="system",
+        )
+        self.timestamp += 1
+        return chat
+
+    def make_chat_to_master(
+        self, content: str, reasoning: str = ""
     ) -> TaskRunningItem:
         chat: TaskRunningItem = TaskRunningItem(
             timestamp=str(self.timestamp),
             reasoning=reasoning,
-            call="chat_master",
-            request={"name": name, "to": to, "content": question},
+            call=f"chat_to_master",
+            request=content,
             execute="system",
         )
         self.timestamp += 1
@@ -352,15 +359,9 @@ class Task:
     def __init_task(self):
         self.action_tool: List[ActionToolItem] = [
             ActionToolItem(
-                call="chat_master",
-                description="和 Master 交互: 给Master发送消息进行交互. "
-                "无论历史是怎样, 你只能把name设置成 Aimi. to 设置成 Master. content 是说的内容.",
-                request={
-                    "type": "object",
-                    "name": "Aimi",
-                    "to": "Master",
-                    "content": "传达的内容: 可以很丰富, 包含多句话, 每句话都要加换行, 如果有数学公式, 要包裹在单独行的 $$ 中.",
-                },
+                call="chat_to_master",
+                description="和 Master 交互: 给Master发送消息进行交互. ",
+                request="Aimi对Master传达的内容: 可以很丰富, 包含多句话, 每句话都要加换行, 如果有数学公式, 要包裹在单独行的 $$ 中.",
                 execute="system",
             ),
             ActionToolItem(
@@ -425,9 +426,9 @@ class Task:
                 execute="system",
             ),
             ActionToolItem(
-                call="chat_bard",
+                call="chat_to_bard",
                 description="和 bard 交互/回复/响应: 这是你的好朋友 bard, "
-                "你不能通过 chat 方法和 bard 进行交互, 你可以问 bard 问题, "
+                "你可以问 bard 问题, "
                 "需要了解任何有时效性的内容都可以调用, 要注意他只会英文."
                 "可以问有时效性的信息, 比如时间/日期或者某个网址的内容等.",
                 request="对 bard 说的内容: 在这里输入要问bard的内容, 要在文字中诱导 bard 搜索 "
@@ -435,9 +436,9 @@ class Task:
                 execute="system",
             ),
             ActionToolItem(
-                call="chat_bing",
+                call="chat_to_bing",
                 description="和 bing 交互/回复/响应: 这是你的好朋友 bing, "
-                "你不能通过 chat 方法和 bing 进行交互, 你可以问 bing 问题, "
+                "你可以问 bing 问题, "
                 "bing 会提供建议, 也可以让 bing 帮忙进行搜索, 或者让他帮忙查询时间, "
                 "如: 我在和Master聊天, 但是没有进展, 我该怎么办?",
                 request="对 bing 说的内容",
@@ -479,8 +480,8 @@ class Task:
             or not len(self.running)
         ):
             running: List[TaskRunningItem] = [
-                self.make_chat("Master", "Aimi", "请保持设定"),
-                self.make_chat("Aimi", "Master", "好", "作为Aimi, 我听从Master的指示"),
+                self.make_chat_from_master("我是Master, 请你请保持设定"),
+                self.make_chat_to_master("好", "作为Aimi, 我听从Master的指示"),
             ]
             self.running = running
             log_dbg(f"no have running")
@@ -544,7 +545,7 @@ class Task:
     def make_link_think(self, question: str, aimi_name: str, preset: str) -> str:
         # 如果只是想让任务继续, 就回复全空格/\t/\n
         if len(question) and not question.isspace():
-            chat = self.make_chat("Master", "Aimi", question)
+            chat = self.make_chat_from_master(question)
             self.__append_running([chat])
             log_dbg(f"set chat {(str(question))}")
 
@@ -567,19 +568,18 @@ class Task:
         settings: Dict = {
             "settings": [
                 f"action_tool 里面定义了所有你能调用的 方法(action).",
-                f"你每次生成JSON追加内容时, 可以同时生成多个方法(action), 可以生成不限次 action->execute 为 AI 的方法, 可以进行很多思考.",
+                f"你每次生成JSON追加内容时, 可以同时生成多个方法(action), 可以生成几次 action->execute 为 AI 的方法(AI方法的call相同时候只能调用一次), 可以进行思考.",
                 f"无论历史是什么, 你最多只能生成一次 action->execute 为 system 的方法. 每次都尽量生成一次 system 方法. ",
                 f"当你在调用 action_tool 中 execute 是 system 的 action 时不要填写 response, 也不要说明任何和 response 有关内容, 除非调用成功.",
                 f"task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action强绑定.",
                 f"如果 task_step 为空, 或不符合, 请重新设置步骤, 如果没有进展, 尽量给出创造性建议或优化步骤推进任务进度.",
-                f"如果Master提出了要求, 你要修改当前步骤来满足要求.",
+                f"Master通过 chat_from_master 下达指令, 如果Master提出了要求, 你要修改当前步骤来满足要求.",
                 f"每次任务/关健操作完成或使用了system方法, 都应该试探性地带上分析上报Master.",
                 f"你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tool 行动. 你叫我 Master.",
                 f"preset 是 {aimi_name} 的预设, preset 只能对 action_tool 中定义的方法的输入生效.",
                 f"{aimi_name} 的权限不会超过action_tool中定义的范围.",
                 f"请你主要基于 settings 和 参考部分 action_running 分析, 不显示分析过程, 然后你只以 {aimi_name} 的身份只生成 action_running 的JSON追加内容, 不能复制或重复已有内容.",
                 f"只给我发送JSON追加内容即可, 如果 action_running 太长, 请只重点关注最后几条和没回复过我的话.",
-                f"无论之前有什么, 在调用 chat_master 方法时, chat_master->request->name 只能是 {aimi_name}. 你只能以 {aimi_name} 身份调用 action.",
                 f"你的回复是 [{{action}}] 的 JSON 数组结构, action 在 action_tool 中定义.",
                 f"请保持你的回复可以被 Python 的 `json.loads` 解析, 请用 action_tool 中的定义, 严格按照以下JSON数组格式回复我: {response_format}",
             ],
