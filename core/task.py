@@ -585,7 +585,7 @@ class Task:
         settings: Dict = {
             "settings": [
                 f"action_tool 里面定义了所有你能调用的 方法(action).",
-                f"你每次生成JSON追加内容时, 可以同时生成多个方法(action), 可以生成几次 action->execute 为 AI 的方法(AI方法的call相同时候只能调用一次), 可以进行思考.",
+                f"你每次生成内容时, 可以同时生成多个方法(action), 可以生成几次 action->execute 为 AI 的方法(AI方法的call相同时候只能调用一次), 可以进行思考.",
                 f"无论历史是什么, 你最多只能生成一次 action->execute 为 system 的方法. 每次都尽量生成一次 system 方法. ",
                 f"当你在调用 action_tool 中 execute 是 system 的 action 时不要填写 response, 也不要说明任何和 response 有关内容, 除非调用成功.",
                 f"task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action强绑定.",
@@ -595,8 +595,8 @@ class Task:
                 f"你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tool 行动. 你叫我 Master.",
                 f"preset 是 {aimi_name} 的预设, preset 只能对 action_tool 中定义的方法的输入生效.",
                 f"{aimi_name} 的权限不会超过action_tool中定义的范围.",
-                f"请你主要基于 settings 和 参考部分 action_running 分析, 不显示分析过程, 然后你只以 {aimi_name} 的身份只生成 action_running 的JSON追加内容, 不能复制或重复已有内容.",
-                f"只给我发送JSON追加内容即可, 如果 action_running 太长, 请只重点关注最后几条和没回复过我的话.",
+                f"请你主要基于 settings 和 参考部分 action_running 和我的话 再用 {aimi_name} 身份生成JSON追加内容, ",
+                f"不显示分析过程, 不能复制或重复已有内容. 可直接复制已有 timestamp 的任何内容, ",
                 f"你的回复是 [{{action}}] 的 JSON 数组结构, action 在 action_tool 中定义.",
                 f"请保持你的回复可以被 Python 的 `json.loads` 解析, 请用 action_tool 中的定义, 严格按照以下JSON数组格式回复我: {response_format}",
             ],

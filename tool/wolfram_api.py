@@ -211,6 +211,7 @@ class WolframAPI:
                 answer["code"] = 0
 
                 yield answer
+                log_dbg(f"res: {str(message)}")
                 break
 
             except Exception as e:
