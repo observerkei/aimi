@@ -135,20 +135,32 @@ class Aimi:
     max_link_think: int = 1024
     running: bool = True
     api: List[str] = []
-    config = Config()
-    md = Md()
-    memory = Memory()
-    task = Task()
-    aimi_plugin = AimiPlugin()
-    openai_api = OpenAIAPI()
-    bing_api = BardAPI()
-    bard_api = BardAPI()
-    wolfram_api = WolframAPI()
-    chat_web = ChatWeb()
-    chat_qq = ChatQQ()
+    config: Config
+    md: Md
+    memory: Memory
+    task: Task
+    aimi_plugin: AimiPlugin
+    openai_api: OpenAIAPI
+    bing_api: BardAPI
+    bard_api: BardAPI
+    wolfram_api: WolframAPI
+    chat_web: ChatWeb
+    chat_qq: ChatQQ
 
     def __init__(self):
         self.__load_setting()
+        self.config = Config()
+        self.md = Md()
+        self.memory = Memory()
+        self.task = Task()
+        self.aimi_plugin = AimiPlugin()
+        self.openai_api = OpenAIAPI()
+        self.max_link_think = self.openai_api.max_requestion
+        self.bing_api = BardAPI()
+        self.bard_api = BardAPI()
+        self.wolfram_api = WolframAPI()
+        self.chat_web = ChatWeb()
+        self.chat_qq = ChatQQ()
 
         # 注册意外退出保护记忆
         atexit.register(self.__when_exit)
@@ -657,8 +669,6 @@ answer this following question: {{
         except Exception as e:
             log_err("fail to load aimi api: " + str(e))
             self.api = [self.openai_api.type]
-
-        self.max_link_think = self.openai_api.max_requestion
 
         try:
             self.preset_facts = {}

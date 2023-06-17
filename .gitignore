@@ -143,6 +143,8 @@ qq_server_data/
 /run/preset.yml
 /run/setting.yml.*
 /run/wolfram*.txt
+/run/task.yml.*
+/run/sandbox.py
 
 # plugin
 /aimi_plugin

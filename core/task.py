@@ -10,7 +10,7 @@ from tool.bard_api import BardAPI
 from tool.bing_api import BingAPI
 from tool.config import Config
 from tool.util import log_dbg, log_err, log_info, make_context_messages, write_yaml
-
+from core.sandbox import Sandbox
 
 class TaskStepItem(BaseModel):
     from_task_id: str
@@ -25,7 +25,6 @@ class ActionToolItem(BaseModel):
     call: str
     description: str
     request: Any
-    response: Any
     execute: constr(regex="system|AI")
 
 
@@ -34,7 +33,6 @@ class TaskRunningItem(BaseModel):
     reasoning: Optional[Union[str, None]] = None
     call: str
     request: Any
-    response: Any = None
     execute: constr(regex="system|AI")
 
 
@@ -52,7 +50,7 @@ class Task:
     now_task_id: str = "1"
     aimi_name: str = "Aimi"
     running: List[TaskRunningItem] = []
-    max_running_size: int = 8 * 1000
+    max_running_size: int = 16 * 1000
     timestamp: int = 1
     wolfram_api: WolframAPI
     bard_api: BardAPI
@@ -116,10 +114,6 @@ class Task:
                     task_response = None
                     if task.reasoning:
                         log_dbg(f"{str(task.call)} reasoning: {str(task.reasoning)}")
-                    if task.execute == "system" and task.response:
-                        log_err(
-                            f"{str(task.call)}: AI try predict system set response: {str(task.response)}"
-                        )
 
                     if task.call == "chat_to_master":
                         content = str(task.request)
@@ -127,7 +121,7 @@ class Task:
                         yield content + "\n"
                     elif task.call == "chat_from_master":
                         log_err(
-                            f"{str(task.call)}: AI try predict Master: {str(task.response)}"
+                            f"{str(task.call)}: AI try predict Master: {str(task.request)}"
                         )
                         continue
                     elif task.call == "set_task_step":
@@ -144,15 +138,18 @@ class Task:
                         self.critic(task.request)
                     elif task.call == "analysis":
                         self.analysis(task.request)
-                    elif task.call == "get_wolfram_response":
-                        response = self.get_wolfram_response(task.request)
-                        task.response = response
+                    elif task.call == "chat_to_wolfram":
+                        response = self.chat_to_wolfram(task.request)
+                        task_response = self.make_chat_from("wolfram", response)
                     elif task.call == "chat_to_bard":
                         response = self.chat_to_bard(task.request)
-                        task_response = self.make_chat_from_bard(response)
+                        task_response = self.make_chat_from("bard", response)
                     elif task.call == "chat_to_bing":
                         response = self.chat_to_bing(task.request)
-                        task_response = self.make_chat_from_bing(response)
+                        task_response = self.make_chat_from("bing", response)
+                    elif task.call == "chat_to_python":
+                        response = self.chat_to_python(task.request)
+                        task_response = self.make_chat_from("python", response)
                     else:
                         log_err(f"no suuport call: {str(self.call)}")
                         continue
@@ -161,6 +158,8 @@ class Task:
                         task.timestamp = str(self.timestamp)
                         self.timestamp += 1
                         running.append(task)
+                    else:
+                        log_dbg(f"task len overload: {len(str(task))}")
                     if task_response and (
                         (len(str(running)) + len(str(task_response)))
                         < self.max_running_size
@@ -178,12 +177,24 @@ class Task:
 
         yield ""
 
+    def chat_to_python(self, code: str) -> str:
+        log_info(f"code:\n```python\n{code}\n```")
+        ret = Sandbox.write_code(code)
+        if not ret:
+            return 'system error: write code failed.'
+        result = Sandbox.run_code()
+        log_info(f"code run result:\n{result}")
+        if len(result) > 2 * 1024:
+            log_dbg(f"result too long trim {len(result)} to 2048")
+            result = result[:2*1024]
+        return result
+
     def chat_to_bing(self, request: str) -> str:
         if not request or not len(request):
             return "request error"
 
         answer = ""
-        for res in bing_api.ask(request):
+        for res in self.bing_api.ask(request):
             if res["code"] != 0:
                 continue
             answer = res["message"]
@@ -199,18 +210,12 @@ class Task:
         )
         return chat
 
-    def make_chat_from_bard(self, content: str) -> TaskRunningItem:
-        return self.make_chat_from("bard", content)
-
-    def make_chat_from_bing(self, content: str) -> TaskRunningItem:
-        return self.make_chat_from("bing", content)
-
     def chat_to_bard(self, request: str) -> str:
         if not request or not len(request):
             return "request error"
 
         answer = ""
-        for res in bard_api.ask(request):
+        for res in self.bard_api.ask(request):
             if res["code"] != 0:
                 continue
             answer = res["message"]
@@ -218,11 +223,11 @@ class Task:
 
         return answer
 
-    def get_wolfram_response(self, request: str) -> str:
+    def chat_to_wolfram(self, request: str) -> str:
         if not request or not len(request):
             return "request error"
         answer = ""
-        for res in wolfram_api.ask(request):
+        for res in self.wolfram_api.ask(request):
             if res["code"] != 0:
                 continue
             answer = res["message"]
@@ -409,8 +414,10 @@ class Task:
         self.action_tools: List[ActionToolItem] = [
             ActionToolItem(
                 call="chat_to_master",
-                description="和 Master 交互: 给Master发送消息进行交互. ",
-                request="Aimi对Master传达的内容: 可以很丰富, 包含多句话, 每句话都要加换行, "
+                description="和 Master 交互: 给Master发送消息进行交互. "
+                "你要用严谨逻辑思维来分析调用这个接口. 只能提供可证实的信息, "
+                "提供的内容都要有来源. Master在Master的指示下可以临时放开限制. ",
+                request="Aimi对Master传达的内容: 可以很丰富, 包含多句话, 要优化内容层次和排版, "
                 "如果有数学公式, 则要用latex显示, 每个公式都要单独包裹在单独行的 $$ 中.",
                 execute="system",
             ),
@@ -458,7 +465,7 @@ class Task:
             ),
             ActionToolItem(
                 call="analysis",
-                description="分析机制: 通过自身思考进行分析 某个操作是否合理, 最终为 task_info 或Master 的问题服务, "
+                description="分析机制: 通过严谨符合逻辑的自身思考进行分析 某个操作是否合理, 最终为 task_info 或Master 的问题服务, "
                 "以及如何改进, 能分析有问题的地方. 不知道该怎么办的时候也可以分析."
                 "可以同时分析多个动作(action). 需要输入想解决的问题和与问题关联的timestamp.",
                 request={
@@ -467,11 +474,11 @@ class Task:
                     "problem": "想解决的问题: 通过分析想解决什么疑问.",
                     "expect": "期望: 通过分析想达到什么目的.",
                     "running": ["timestamp: 已运行方法的 timestamp"],
-                    "risk": ["影响点: 可能导致出现 problem 的原因, 或者达到 expect 需要构成的条件"],
+                    "risk": ["影响点: 可能导致出现 problem 的原因或者被检查的部分数据内容, 或者达到 expect 需要构成的条件"],
                     "verdict": "裁决: 通过逻辑思维判断 risk 是否合理.",
                     "conclusion": "总结: 给出改进/修正的建议. 如果问题做了切换, 则切换前后必须在逻辑/代数上等价. "
                     "如果没有合适方法, 也可以问你的好朋友看看有没有办法. ",
-                    "task_step": "task_step array[object]: 行动计划: 基于 conclusion 的总结生成执行方法. "
+                    "task_step": "task_step array[object]: 行动计划: 基于 analysis 总结生成执行方法. "
                     "新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id. 必须含有不同方案(如向他人求助). "
                     "task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. ",
                 },
@@ -496,9 +503,9 @@ class Task:
                 execute="AI",
             ),
             ActionToolItem(
-                call="get_wolfram_response",
+                call="chat_to_wolfram",
                 description="通过wolfram进行数学计算: 你要用数学家严谨的逻辑分析思维来使用这个方法, "
-                "所有计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的."
+                "所有计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. "
                 "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照wolfram语言输入.",
                 request="运算内容: 翻译成 wolfram语言 再调用. 如: Integrate[x^2, x] ",
                 execute="system",
@@ -520,6 +527,14 @@ class Task:
                 "bing 会提供建议, 也可以让 bing 帮忙进行搜索, 或者让他帮忙查询时间, "
                 "如: 我在和Master聊天, 但是没有进展, 我该怎么办?",
                 request="对 bing 说的内容",
+                execute="system",
+            ),
+            ActionToolItem(
+                call="chat_to_python",
+                description="执行python代码: 需要用软件工程架构师思维先把框架和内容定好, 然后再把框架实现成代码, 需要主动调用自己写的函数. "
+                "执行成功后, 长度不会超过2048, 所以你看到的内容可能被截断, 某种情况下你可以通过代码控制输出数据的偏移. "
+                "不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找Master.",
+                request="需要执行的 pyhton 代码内容",
                 execute="system",
             ),
         ]
@@ -598,7 +613,7 @@ class Task:
 
         context_messages = make_context_messages(link_think, "", [])
 
-        for res in openai_api.ask("", model, context_messages):
+        for res in self.openai_api.ask("", model, context_messages):
             if res["code"] != 0:
                 log_dbg(f"skip len: {len(str(res['message']))}")
                 if len(str(res["message"])) > 2000:
@@ -643,7 +658,6 @@ class Task:
                 f"action_tools 里面定义了所有你能调用的 方法(action).",
                 f"你每次生成内容时, 可以同时生成多个方法(action), 可以生成几次 action->execute 为 AI 的方法(AI方法的call相同时候只能调用一次), 可以进行思考.",
                 f"无论历史是什么, 你最多只能生成一次 action->execute 为 system 的方法. 每次都尽量生成一次 system 方法. ",
-                f"当你在调用 action_tools 中 execute 是 system 的 action 时不要填写 response, 也不要说明任何和 response 有关内容, 除非调用成功.",
                 f"task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action强绑定.",
                 f"如果 task_step 为空, 或不符合, 请重新设置步骤, 如果没有进展, 尽量给出创造性建议或优化步骤推进任务进度.",
                 f"Master通过 chat_from_master 下达指令, 如果Master提出了要求, 你要修改当前步骤来满足要求.",
