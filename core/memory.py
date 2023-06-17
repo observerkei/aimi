@@ -1,7 +1,7 @@
 import os
 from typing import List, Union, Any, Dict
 
-from tool.config import config
+from tool.config import Config
 from tool.util import log_dbg, log_err, log_info, write_yaml
 
 
@@ -31,7 +31,7 @@ class Memory:
                 self.model_enable = False
 
     def __load_memory(self):
-        mem = config.load_memory()
+        mem = Config.load_memory()
         try:
             self.pool = mem["pool"]
         except:
@@ -44,19 +44,27 @@ class Memory:
             self.idx = mem["idx"]
         except:
             self.idx = 0
+
+        setting = {}
         try:
-            self.size = config.setting["aimi"]["memory_size"]
+            setting = Config.load_setting("aimi")
+        except Exception as e:
+            log_err(f"fail to load memory: {str(e)}")
+            return False
+
+        try:
+            self.size = setting["memory_size"]
         except:
             self.size = 1024
         try:
-            self.memory_model_type = config.setting["aimi"]["memory_model"]
+            self.memory_model_type = setting["memory_model"]
         except:
             self.memory_model_type = "transformers"
 
-        self.memory_model_file = config.memory_model_file
+        self.memory_model_file = Config.memory_model_file
 
         try:
-            self.memory_model_depth = config.setting["aimi"]["memory_model_depth"]
+            self.memory_model_depth = setting["memory_model_depth"]
         except:
             self.memory_model_depth = 20
 
@@ -84,7 +92,7 @@ class Memory:
         log_dbg("size: " + str(self.size))
 
     def save_memory(self) -> bool:
-        save_path = config.memory_config
+        save_path = Config.memory_config
 
         try:
             save_dir = os.path.dirname(save_path)
@@ -297,6 +305,3 @@ class Memory:
         if self.idx >= (self.size - 1):
             return 0
         return self.idx + 1
-
-
-memory = Memory()

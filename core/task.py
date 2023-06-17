@@ -4,11 +4,11 @@ import os
 from typing import Dict, Any, List, Generator, Optional, Union
 from pydantic import BaseModel, constr
 
-from tool.openai_api import openai_api
-from tool.wolfram_api import wolfram_api
-from tool.bard_api import bard_api
-from tool.bing_api import bing_api
-from tool.config import config
+from tool.openai_api import OpenAIAPI
+from tool.wolfram_api import WolframAPI
+from tool.bard_api import BardAPI
+from tool.bing_api import BingAPI
+from tool.config import Config
 from tool.util import log_dbg, log_err, log_info, make_context_messages, write_yaml
 
 
@@ -54,13 +54,13 @@ class Task:
     running: List[TaskRunningItem] = []
     max_running_size: int = 8 * 1000
     timestamp: int = 1
+    wolfram_api: WolframAPI
+    bard_api: BardAPI
+    bing_api: BingAPI
+    openai_api: OpenAIAPI
 
     def task_response(self, res: str) -> Generator[dict, None, None]:
-        log_dbg(f"now task: {str(self.tasks[self.now_task_id].task_info)}")
-
-        response = ""
-        try:
-            answer = res
+        def get_json_content(answer: str) -> str:
             start_index = answer.find("```json\n[")
             if start_index == -1:
                 start_index = answer.find("[")
@@ -79,6 +79,13 @@ class Task:
                         else:
                             answer = answer[start_index : end_index + 1]
                         # 去除莫名其妙的解释说明
+            return answer
+
+        log_dbg(f"now task: {str(self.tasks[self.now_task_id].task_info)}")
+
+        response = ""
+        try:
+            answer = get_json_content(res)
 
             # 忽略错误.
             # decoder = json.JSONDecoder(strict=False)
@@ -93,7 +100,7 @@ class Task:
                     if action["call"] != tool.call:
                         continue
                     action["execute"] = tool.execute
-                    log_dbg(f"fill call(tool.call) execute: {tool.execute}")
+                    log_dbg(f"fill call({tool.call}) execute: {tool.execute}")
 
             tasks = [TaskRunningItem(**item) for item in data]
 
@@ -104,6 +111,7 @@ class Task:
                     log_dbg(
                         f"[{task_cnt}] get task: {str(task.call)} : {str(task)}\n\n"
                     )
+
                     task_cnt += 1
                     task_response = None
                     if task.reasoning:
@@ -148,6 +156,7 @@ class Task:
                     else:
                         log_err(f"no suuport call: {str(self.call)}")
                         continue
+
                     if (len(str(running)) + len(str(task))) < self.max_running_size:
                         task.timestamp = str(self.timestamp)
                         self.timestamp += 1
@@ -159,6 +168,7 @@ class Task:
                         task_response.timestamp = str(self.timestamp)
                         self.timestamp += 1
                         running.append(task_response)
+
                 except Exception as e:
                     log_err(f"fail to load task: {str(e)}: {str(task)}")
             self.__append_running(running)
@@ -241,14 +251,18 @@ class Task:
                 continue
             task.now_task_step_id = now_task_step_id
             task.task_step = task_step
-            log_info(f"set task[{str(task_id)}] now_step_id: {str(now_task_step_id)} step: {str(task_step)}")
+            log_info(
+                f"set task[{str(task_id)}] now_step_id: {str(now_task_step_id)} step: {str(task_step)}"
+            )
             return task.task_step
 
     def set_task_info(self, task_id: str, task_info: str, now_task_step_id: str):
         for _, task in self.tasks.items():
             if task_id != task.task_id:
                 continue
-            log_info(f"set task[{str(task_id)}] info: {str(task_info)} now_step_id: {now_task_step_id}")
+            log_info(
+                f"set task[{str(task_id)}] info: {str(task_info)} now_step_id: {now_task_step_id}"
+            )
             self.now_task_id = task_id
             task.task_info = task_info
             task.now_task_step_id = now_task_step_id
@@ -262,7 +276,9 @@ class Task:
         self.now_task_id = task_id
         self.tasks[task_id] = task
 
-        log_info(f"set new task[{str(task_id)}] info: {str(task_info)} now_step_id: {now_task_step_id} ")
+        log_info(
+            f"set new task[{str(task_id)}] info: {str(task_info)} now_step_id: {now_task_step_id} "
+        )
         return task
 
     def analysis(self, request):
@@ -301,13 +317,18 @@ class Task:
         try:
             self.__load_task()
             self.__init_task()
+            self.openai_api = OpenAIAPI()
+            self.wolfram_api = WolframAPI()
+            self.bing_api = BingAPI()
+            self.bard_api = BardAPI()
+        
         except Exception as e:
             log_err(f"fait to init: {str(e)}")
 
     def __load_task(self):
         task_config = {}
         try:
-            task_config = config.load_task()
+            task_config = Config.load_task()
             if not task_config or not len(task_config):
                 log_dbg(f"no task config.")
                 return False
@@ -356,7 +377,7 @@ class Task:
         return True
 
     def save_task(self):
-        save_path = config.task_config
+        save_path = Config.task_config
 
         try:
             save_dir = os.path.dirname(save_path)
@@ -658,6 +679,3 @@ class Task:
 
     def set_running(self, api_response):
         self.running = json.loads(api_response)
-
-
-task = Task()

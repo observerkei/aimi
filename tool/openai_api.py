@@ -3,7 +3,7 @@ from typing import Generator, List, Dict, Any
 import openai
 
 from tool.util import log_dbg, log_err, log_info
-from tool.config import config
+from tool.config import Config
 
 
 class OpenAIAPI:
@@ -270,7 +270,7 @@ class OpenAIAPI:
 
     def __load_setting(self):
         try:
-            setting = config.load_setting(self.type)
+            setting = Config.load_setting(self.type)
         except Exception as e:
             log_err(f"fail to load {self.type}: {e}")
             setting = {}

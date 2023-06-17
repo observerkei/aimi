@@ -1,3 +1,5 @@
-from core.aimi import aimi
+from core.aimi import Aimi
 
-aimi.run()
+if __name__ == '__main__':
+    aimi = Aimi()
+    aimi.run()

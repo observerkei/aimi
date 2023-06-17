@@ -174,6 +174,3 @@ class Md:
             return self.html_to_img(msg_id, message)
 
         return ""
-
-
-md = Md()

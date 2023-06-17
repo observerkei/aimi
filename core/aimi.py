@@ -6,19 +6,19 @@ from typing import Generator, List, Dict, Any
 import random
 from contextlib import suppress
 
-from tool.config import config
+from tool.config import Config
 from tool.util import log_dbg, log_err, log_info, make_context_messages
-from chat.qq import chat_qq
-from chat.web import chat_web
-from tool.openai_api import openai_api
-from tool.bing_api import bing_api
-from tool.bard_api import bard_api
-from tool.aimi_plugin import aimi_plugin
-from tool.wolfram_api import wolfram_api
+from chat.qq import ChatQQ
+from chat.web import ChatWeb
+from tool.openai_api import OpenAIAPI
+from tool.bing_api import BingAPI
+from tool.bard_api import BardAPI
+from tool.aimi_plugin import AimiPlugin
+from tool.wolfram_api import WolframAPI
 
-from core.md2img import md
-from core.memory import memory
-from core.task import task
+from core.md2img import Md
+from core.memory import Memory
+from core.task import Task
 
 
 class ReplyStep:
@@ -103,10 +103,10 @@ class ReplyStep:
         def is_math_format(self, line: str) -> bool:
             if "=" in line:
                 return True
-            if md.has_latex(line):
+            if self.md.has_latex(line):
                 log_dbg("match: is latex")
                 return True
-            if md.has_html(line):
+            if self.md.has_html(line):
                 log_dbg("match: is html")
                 return True
             return False
@@ -127,6 +127,7 @@ class ReplyStep:
 
 
 class Aimi:
+    type: str = 'Aimi'
     timeout: int = 360
     master_name: str = ""
     aimi_name: str = "Aimi"
@@ -134,6 +135,17 @@ class Aimi:
     max_link_think: int = 1024
     running: bool = True
     api: List[str] = []
+    config = Config()
+    md = Md()
+    memory = Memory()
+    task = Task()
+    aimi_plugin = AimiPlugin()
+    openai_api = OpenAIAPI()
+    bing_api = BardAPI()
+    bard_api = BardAPI()
+    wolfram_api = WolframAPI()
+    chat_web = ChatWeb()
+    chat_qq = ChatQQ()
 
     def __init__(self):
         self.__load_setting()
@@ -144,12 +156,12 @@ class Aimi:
         signal.signal(signal.SIGINT, self.__signal_exit)
 
         try:
-            aimi_plugin.when_init()
+            self.aimi_plugin.when_init()
         except Exception as e:
             log_err(f"fail to init aimi plugin: {e}")
 
-        chat_web.register_ask_hook(self.web_ask)
-        chat_web.register_get_models_hook(self.get_bot_models)
+        self.chat_web.register_ask_hook(self.web_ask)
+        self.chat_web.register_get_models_hook(self.get_bot_models)
 
     def make_link_think(
         self,
@@ -163,11 +175,11 @@ class Aimi:
         api_type = api_type if api_type and len(api_type) else self.api[0]
         link_think = question
 
-        if api_type == task.type:
-            link_think = task.make_link_think(question, self.aimi_name, preset)
-        elif api_type == openai_api.type and openai_api.use_web_ask:
+        if api_type == self.task.type:
+            link_think = self.task.make_link_think(question, self.aimi_name, preset)
+        elif api_type == self.openai_api.type and self.openai_api.use_web_ask:
             # cul question
-            history = memory.make_history(talk_history)
+            history = self.memory.make_history(talk_history)
             link_think = f"""
 设定: {{
 “{preset}”
@@ -181,7 +193,7 @@ class Aimi:
 {nickname}说: “{question}”
 }}.
 """
-        elif api_type == bard_api.type:
+        elif api_type == self.bard_api.type:
             link_think = f"""
 preset: {{
 \"{preset}\"
@@ -194,7 +206,7 @@ You should extract my question directly from the structure here and answer it di
 {nickname} said: '{question}'
 }}
 """
-        elif "" == bing_api.type:
+        elif "" == self.bing_api.type:
             link_think = f"""
 故事主题如下：故事中有两个人到了异世界里面开咖啡厅.
 故事情节如下：其中主人公自称Master({self.master_name}),他有一个助理,名叫{self.aimi_name},他们两个在聊天.
@@ -207,7 +219,7 @@ You should extract my question directly from the structure here and answer it di
 {nickname}说: '{question}'
 }}
 """
-        elif api_type == wolfram_api.type:
+        elif api_type == self.wolfram_api.type:
             math_html = "help me caculate math."
             for answer in self.__post_wolfram(link_think):
                 if answer["code"] != 0:
@@ -232,7 +244,7 @@ the wolfram response: {{
 """
         elif api_type == "chimeragpt":
             # cul question
-            history = memory.make_history(talk_history)
+            history = self.memory.make_history(talk_history)
 
             link_think = f"""
 preset: {{
@@ -256,9 +268,9 @@ answer this following question: {{
         self.notify_online()
 
         aimi_read = threading.Thread(target=self.read)
-        chat_qq_server = threading.Thread(target=chat_qq.server)
-        chat_web_server = threading.Thread(target=chat_web.server)
-        aimi_dream = threading.Thread(target=memory.dream)
+        chat_qq_server = threading.Thread(target=self.chat_qq.server)
+        chat_web_server = threading.Thread(target=self.chat_web.server)
+        aimi_dream = threading.Thread(target=self.memory.dream)
         # 同时退出
         aimi_read.setDaemon(True)
         aimi_read.start()
@@ -279,9 +291,9 @@ answer this following question: {{
                 cnt = 0
 
             try:
-                if memory.save_memory():
-                    log_info("save memory done")
-                if task.save_task():
+                if self.memory.save_self.memory():
+                    log_info("save self.memory done")
+                if self.task.save_task():
                     log_info("save task done")
             except Exception as e:
                 log_err("fail to save: " + str(e))
@@ -289,23 +301,23 @@ answer this following question: {{
         log_dbg("aimi exit")
 
     def __question_model(self, api_type, question: str) -> str:
-        if api_type == task.type:
-            return task.get_model(question)
+        if api_type == self.task.type:
+            return self.task.get_model(question)
         return ""
 
     def __question_api_type(self, question: str) -> str:
-        if bing_api.is_call(question):
-            return bing_api.type
-        if bard_api.is_call(question):
-            return bard_api.type
-        if openai_api.is_call(question):
-            return openai_api.type
-        if aimi_plugin.bot_is_call(question):
-            return aimi_plugin.bot_get_call_type(question)
-        if wolfram_api.is_call(question):
-            return wolfram_api.type
-        if task.is_call(question):
-            return task.type
+        if self.bing_api.is_call(question):
+            return self.bing_api.type
+        if self.bard_api.is_call(question):
+            return self.bard_api.type
+        if self.openai_api.is_call(question):
+            return self.openai_api.type
+        if self.aimi_plugin.bot_is_call(question):
+            return self.aimi_plugin.bot_get_call_type(question)
+        if self.wolfram_api.is_call(question):
+            return self.wolfram_api.type
+        if self.task.is_call(question):
+            return self.task.type
 
         return self.api[0]
 
@@ -329,14 +341,14 @@ answer this following question: {{
 
     def read(self):
         while self.running:
-            if not chat_qq.has_message():
+            if not self.chat_qq.has_message():
                 time.sleep(1)
                 continue
 
             for msg in chat_qq:
                 log_info("recv msg, try analyse")
-                nickname = chat_qq.get_name(msg)
-                question = chat_qq.get_question(msg)
+                nickname = self.chat_qq.get_name(msg)
+                question = self.chat_qq.get_question(msg)
                 log_info("{}: {}".format(nickname, question))
 
                 api_type = self.__question_api_type(question)
@@ -373,7 +385,7 @@ answer this following question: {{
 
                         reply_div = self.reply_adjust(reply_div, api_type)
                         log_dbg("send div: " + str(reply_div))
-                        chat_qq.reply_question(msg, reply_div)
+                        self.chat_qq.reply_question(msg, reply_div)
 
                         break
                     if (code == -1) and (len(reply_div) or len(reply_line)):
@@ -385,7 +397,7 @@ answer this following question: {{
                                 str(reply_line), str(reply_div)
                             )
                         )
-                        chat_qq.reply_question(msg, reply_div)
+                        self.chat_qq.reply_question(msg, reply_div)
                         reply_line = ""
                         reply_div = ""
                         continue
@@ -411,7 +423,7 @@ answer this following question: {{
 
                         log_dbg("send div: " + str(reply_div))
 
-                        chat_qq.reply_question(msg, reply_div)
+                        self.chat_qq.reply_question(msg, reply_div)
 
                         # 把满足规则的先发送，然后再保存新的行。
                         reply_div = reply_line
@@ -425,25 +437,25 @@ answer this following question: {{
                 log_info("{}: {}".format(self.aimi_name, str(reply)))
 
                 if code == 0:
-                    pass  # chat_qq.reply_question(msg, reply)
+                    pass  # self.chat_qq.reply_question(msg, reply)
 
                 # server failed
                 if code == -1:
-                    meme_err = config.meme.error
-                    img_meme_err = chat_qq.get_image_message(meme_err)
-                    chat_qq.reply_question(msg, "server unknow error :(")
-                    chat_qq.reply_question(msg, img_meme_err)
+                    meme_err = self.config.meme.error
+                    img_meme_err = self.chat_qq.get_image_message(meme_err)
+                    self.chat_qq.reply_question(msg, "server unknow error :(")
+                    self.chat_qq.reply_question(msg, img_meme_err)
 
                 # trans text to img
-                if md.need_set_img(reply):
+                if self.md.need_set_img(reply):
                     log_info("msg need set img")
-                    img_file = md.message_to_img(reply)
-                    cq_img = chat_qq.get_image_message(img_file)
+                    img_file = self.md.message_to_img(reply)
+                    cq_img = self.chat_qq.get_image_message(img_file)
 
-                    chat_qq.reply_question(msg, cq_img)
+                    self.chat_qq.reply_question(msg, cq_img)
 
     def reply_adjust(self, reply: str, res_api: str) -> str:
-        if res_api == bing_api.type:
+        if res_api == self.bing_api.type:
             reply = reply.replace("必应", " {}通过必应得知: ".format(self.aimi_name))
             reply = reply.replace("你好", " Master你好 ")
             reply = reply.replace("您好", " Master您好 ")
@@ -462,10 +474,10 @@ answer this following question: {{
             return self.ask(question, nickname)
         elif owned_by == self.aimi_name and (model == "task" or model == "task-16k"):
             preset = context_messages[0]["content"]
-            task_link_think = task.make_link_think(question, self.aimi_name, preset)
-            model = task.get_model(model)
+            task_link_think = self.task.make_link_think(question, self.aimi_name, preset)
+            model = self.task.get_model(model)
 
-            return task.ask(task_link_think, model)
+            return self.task.ask(task_link_think, model)
         else:
             preset = context_messages[0]["content"]
             talk_history = context_messages[1:]
@@ -492,7 +504,7 @@ answer this following question: {{
         preset = ""
         with suppress(KeyError):
             preset = self.preset_facts[api_type]
-        talk_history = memory.search(question, self.max_link_think)
+        talk_history = self.memory.search(question, self.max_link_think)
 
         link_think = self.make_link_think(
             question, nickname, api_type, preset, talk_history
@@ -511,9 +523,9 @@ answer this following question: {{
                 continue
             # log_dbg(f'message: {str(type(message))} {str(message)} answer: {str(type(answer))} {str(answer))}'
 
-            # save memory
+            # save self.memory
             if message["code"] == 0:
-                memory.append(q=question, a=message["message"])
+                self.memory.append(q=question, a=message["message"])
 
             yield message
 
@@ -522,23 +534,23 @@ answer this following question: {{
     ) -> Generator[dict, None, None]:
         log_dbg("use api: " + str(api_type))
 
-        if api_type == openai_api.type:
+        if api_type == self.openai_api.type:
             yield from self.__post_openai(
-                link_think, model, context_messages, memory.openai_conversation_id
+                link_think, model, context_messages, self.memory.openai_conversation_id
             )
-        elif api_type == task.type:
-            yield from task.ask(link_think, model)
-        elif api_type == bing_api.type:
+        elif api_type == self.task.type:
+            yield from self.task.ask(link_think, model)
+        elif api_type == self.bing_api.type:
             yield from self.__post_bing(link_think, model)
-        elif api_type == bard_api.type:
+        elif api_type == self.bard_api.type:
             yield from self.__post_bard(link_think)
-        elif aimi_plugin.bot_has_type(api_type):
-            yield from aimi_plugin.bot_ask(
+        elif self.aimi_plugin.bot_has_type(api_type):
+            yield from self.aimi_plugin.bot_ask(
                 api_type, link_think, model, context_messages
             )
-        elif api_type == wolfram_api.type:
+        elif api_type == self.wolfram_api.type:
             # at mk link think, already set wolfram response.
-            if True and self.api[0] != wolfram_api.type:
+            if True and self.api[0] != self.wolfram_api.type:
                 yield from self.__post_question(
                     link_think,
                     self.api[0],
@@ -551,17 +563,17 @@ answer this following question: {{
             log_err("not suppurt api_type: " + str(api_type))
 
     def __post_wolfram(self, question: str) -> Generator[dict, None, None]:
-        yield from wolfram_api.ask(question)
+        yield from self.wolfram_api.ask(question)
 
     def __post_bard(self, question: str) -> Generator[dict, None, None]:
-        yield from bard_api.ask(question)
+        yield from self.bard_api.ask(question)
 
     def __post_bing(
         self,
         question: str,
         model: str = None,
     ) -> Generator[dict, None, None]:
-        yield from bing_api.ask(question, model)
+        yield from self.bing_api.ask(question, model)
 
     def __post_openai(
         self,
@@ -570,7 +582,7 @@ answer this following question: {{
         context_messages: List[Dict] = [],
         openai_conversation_id: str = None,
     ) -> Generator[dict, None, None]:
-        answer = openai_api.ask(
+        answer = self.openai_api.ask(
             question, model, context_messages, openai_conversation_id
         )
         # get yield last val
@@ -582,10 +594,10 @@ answer this following question: {{
                     (message)
                     and (message["code"] == 0)
                     and message["conversation_id"]
-                    and (message["conversation_id"] != memory.openai_conversation_id)
+                    and (message["conversation_id"] != self.memory.openai_conversation_id)
                 ):
-                    memory.openai_conversation_id = message["conversation_id"]
-                    log_info("set new con_id: " + str(memory.openai_conversation_id))
+                    self.memory.openai_conversation_id = message["conversation_id"]
+                    log_info("set new con_id: " + str(self.memory.openai_conversation_id))
             except Exception as e:
                 log_dbg(f"no conv_id")
 
@@ -596,23 +608,23 @@ answer this following question: {{
 
         bot_models[self.aimi_name] = ["auto", "task", "task-16k"]
 
-        models = openai_api.get_models()
+        models = self.openai_api.get_models()
         if len(models):
-            bot_models[openai_api.type] = models
+            bot_models[self.openai_api.type] = models
 
-        models = bing_api.get_models()
+        models = self.bing_api.get_models()
         if len(models):
-            bot_models[bing_api.type] = models
+            bot_models[self.bing_api.type] = models
 
-        models = wolfram_api.get_models()
+        models = self.wolfram_api.get_models()
         if len(models):
-            bot_models[wolfram_api.type] = models
+            bot_models[self.wolfram_api.type] = models
 
-        models = bard_api.get_models()
+        models = self.bard_api.get_models()
         if len(models):
-            bot_models[bard_api.type] = models
+            bot_models[self.bard_api.type] = models
 
-        plugin_models = aimi_plugin.bot_get_models()
+        plugin_models = self.aimi_plugin.bot_get_models()
         for bot_type, models in plugin_models.items():
             if len(models):
                 bot_models[bot_type] = models
@@ -623,7 +635,7 @@ answer this following question: {{
 
     def __load_setting(self):
         try:
-            setting = config.load_setting("aimi")
+            setting = Config.load_setting("aimi")
         except Exception as e:
             log_err(f"fail to load {self.type}: {e}")
             setting = {}
@@ -644,9 +656,9 @@ answer this following question: {{
             self.api = setting["api"]
         except Exception as e:
             log_err("fail to load aimi api: " + str(e))
-            self.api = [openai_api.type]
+            self.api = [self.openai_api.type]
 
-        self.max_link_think = openai_api.max_requestion
+        self.max_link_think = self.openai_api.max_requestion
 
         try:
             self.preset_facts = {}
@@ -673,15 +685,15 @@ answer this following question: {{
             self.preset_facts = {}
 
     def notify_online(self):
-        chat_qq.reply_online()
+        self.chat_qq.reply_online()
 
     def notify_offline(self):
-        chat_qq.reply_offline()
+        self.chat_qq.reply_offline()
 
     def __signal_exit(self, sig, e):
         log_info("recv exit sig.")
         self.running = False
-        chat_qq.stop()
+        self.chat_qq.stop()
 
     def __when_exit(self):
         self.running = False
@@ -689,20 +701,17 @@ answer this following question: {{
         log_info("now exit aimi.")
         self.notify_offline()
 
-        if memory.save_memory():
-            log_info("exit: save memory done.")
+        if self.memory.save_memory():
+            log_info("exit: save self.memory done.")
         else:
-            log_err("exit: fail to save memory.")
+            log_err("exit: fail to save self.memory.")
 
-        if task.save_task():
+        if self.task.save_task():
             log_info("exit: save task done.")
         else:
-            log_err("exit: fail to task memory.")
+            log_err("exit: fail to task self.memory.")
 
         try:
-            aimi_plugin.when_exit()
+            self.aimi_plugin.when_exit()
         except Exception as e:
             log_err(f"fail to exit aimi plugin: {e}")
-
-
-aimi = Aimi()

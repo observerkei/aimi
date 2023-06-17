@@ -3,7 +3,7 @@ import importlib.util
 from typing import Any, List, Generator, Dict
 
 from tool.util import log_info, log_err, log_dbg
-from tool.config import config
+from tool.config import Config
 
 
 # call bot_ plugin
@@ -62,7 +62,7 @@ class Bot:
         return {"code": code, "message": message}
 
     def bot_load_setting(self, type: str):
-        return config.load_setting(type)
+        return Config.load_setting(type)
 
     def bot_log_dbg(self, msg: str):
         return log_dbg(msg, is_plugin=True)
@@ -89,7 +89,7 @@ class AimiPlugin:
 
     def __load_setting(self):
         try:
-            setting = config.load_setting("aimi")
+            setting = Config.load_setting("aimi")
         except Exception as e:
             log_err(f"fail to load {self.type}: {e}")
             setting = {}
@@ -235,6 +235,3 @@ class AimiPlugin:
                 bot.when_init(self.bot_obj)
             except Exception as e:
                 log_err(f"fail to init bot: {bot_type} err: {e}")
-
-
-aimi_plugin = AimiPlugin()

@@ -4,7 +4,7 @@ import re
 from typing import List, Any, Generator
 import json
 
-from tool.config import config
+from tool.config import Config
 from tool.util import log_dbg, log_info, log_err
 
 
@@ -30,7 +30,7 @@ class WolframAPI:
     def __load_setting(self):
         setting = {}
         try:
-            setting = config.load_setting("wolfram")
+            setting = Config.load_setting("wolfram")
         except Exception as e:
             log_err(f"fail to load wolfram setting: {e}")
 
@@ -251,6 +251,3 @@ class WolframAPI:
         """
 
         # answer['message'] += cq_image
-
-
-wolfram_api = WolframAPI()

@@ -9,7 +9,7 @@ import random
 import json
 
 from tool.util import log_dbg, log_err, log_info
-from tool.config import config
+from tool.config import Config
 
 
 class BingAPI:
@@ -314,6 +314,7 @@ class BingAPI:
             )
             self.chatbot = await Chatbot().create(None, cookies_list)
             self.init = True
+            log_info(f"{self.type}: init done")
         except Exception as e:
             log_err("fail to create bing bot: " + str(e))
             self.init = False
@@ -335,7 +336,7 @@ class BingAPI:
 
     def __load_setting(self):
         try:
-            setting = config.load_setting(self.type)
+            setting = Config.load_setting(self.type)
         except Exception as e:
             log_err(f"fail to load {self.type}: {e}")
             setting = {}

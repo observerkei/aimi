@@ -73,7 +73,7 @@ class Models(BaseModel):
     data: List[ModelInfo]
 
 
-class AimiWebApi:
+class ChatWeb:
     api_host: str = "localhost"
     api_port: int = 4642
     app: Any
@@ -273,6 +273,3 @@ class AimiWebApi:
         log_info("web start")
 
         self.http_server.serve_forever()
-
-
-chat_web = AimiWebApi()

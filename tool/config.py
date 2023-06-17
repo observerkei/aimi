@@ -63,9 +63,9 @@ class Config:
     def __init__(self) -> None:
         self.meme = Meme()
 
-    def load_memory(self) -> dict:
+    def load_memory() -> dict:
         try:
-            obj = read_yaml(self.memory_config)
+            obj = read_yaml(Config.memory_config)
             mem = {}
             mem["openai_conversation_id"] = obj.get("openai_conversation_id", "")
             mem["idx"] = obj.get("idx", 0)
@@ -93,9 +93,9 @@ class Config:
             log_err("fail to load memory: " + str(e))
             return {}
 
-    def load_task(self) -> dict:
+    def load_task() -> dict:
         try:
-            obj = read_yaml(self.task_config)
+            obj = read_yaml(Config.task_config)
             task = {}
 
             task["tasks"] = obj.get("tasks", {})
@@ -110,20 +110,18 @@ class Config:
             log_err("fail to load task: " + str(e))
             return {}
 
-    def load_setting(self, type) -> dict:
+    def load_setting(type) -> dict:
         try:
-            obj = read_yaml(self.setting_config)
+            obj = read_yaml(Config.setting_config)
         except Exception as e:
             log_err(f"fail to load setting: {e}")
             return {}
 
+        setting = {}
         try:
-            self.setting[type] = obj.get(type, {})
+            setting = obj.get(type, {})
         except Exception as e:
             log_err(f"fail to load setting[{type}]: {e}")
-            self.setting[type] = {}
+            setting = {}
 
-        return self.setting[type]
-
-
-config = Config()
+        return setting

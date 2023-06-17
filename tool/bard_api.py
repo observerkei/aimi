@@ -5,7 +5,7 @@ from Bard import Chatbot
 from contextlib import suppress
 
 from tool.util import log_dbg, log_err, log_info
-from tool.config import config
+from tool.config import Config
 
 
 class BardAPI:
@@ -128,7 +128,7 @@ class BardAPI:
 
     def __load_setting(self):
         try:
-            setting = config.load_setting(self.type)
+            setting = Config.load_setting(self.type)
         except Exception as e:
             log_err(f"fail to load {self.type}: {e}")
             setting = {}
@@ -154,6 +154,3 @@ class BardAPI:
         except Exception as e:
             log_err("fail to load bard config: " + str(e))
             self.trigger = ["@bard", "#bard"]
-
-
-bard_api = BardAPI()

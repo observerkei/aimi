@@ -7,7 +7,7 @@ from flask import Flask, request
 from urllib import parse
 
 from tool.util import log_dbg, log_err, log_info, read_yaml
-from tool.config import config
+from tool.config import Config
 
 
 class GoCQHttp:
@@ -22,11 +22,11 @@ class GoCQHttp:
         self.__load_go_cqhttp_config()
 
     def __load_go_cqhttp_config(self):
-        go_cqhttp_config = "./run/config.yml"
+        go_cqhttp_config = "./run/Config.yml"
         try:
-            go_cqhttp_config = config.setting["config"]
+            go_cqhttp_config = Config.setting["config"]
         except:
-            go_cqhttp_config = "./run/config.yml"
+            go_cqhttp_config = "./run/Config.yml"
 
         obj = read_yaml(go_cqhttp_config)
         try:
@@ -192,7 +192,7 @@ class BotManage:
 
     def __load_setting(self):
         try:
-            setting = config.load_setting("manage")
+            setting = Config.load_setting("manage")
         except Exception as e:
             log_err(f"fail to get qq cfg: {e}")
             return
@@ -429,11 +429,11 @@ class ChatQQ:
         if not self.is_permission_denied(msg):
             return
 
-        meme_com = config.meme.common
+        meme_com = Config.meme.common
         img_meme_com = self.get_image_message(meme_com)
 
-        chat_qq.reply_question(msg, "非服务对象 :(")
-        chat_qq.reply_question(msg, img_meme_com)
+        self.reply_question(msg, "非服务对象 :(")
+        self.reply_question(msg, img_meme_com)
 
     def reply_online(self):
         if self.type == GoCQHttp.name:
@@ -588,7 +588,7 @@ class ChatQQ:
 
     def server(self):
         # 开启回复线程
-        threading.Thread(target=chat_qq.reply).start()
+        threading.Thread(target=self.reply).start()
 
         from gevent import pywsgi
 
@@ -603,7 +603,7 @@ class ChatQQ:
 
     def __load_setting(self):
         try:
-            setting = config.load_setting("qq")
+            setting = Config.load_setting("qq")
         except Exception as e:
             log_err(f"fail to load {self.type}: {e}")
             setting = {}
@@ -632,5 +632,3 @@ class ChatQQ:
             log_err(f"fail to load qq: {e}")
             self.type = GoCQHttp.name
 
-
-chat_qq = ChatQQ()
