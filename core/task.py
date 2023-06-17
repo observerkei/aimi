@@ -387,7 +387,7 @@ class Task:
                 "如果任务无法完成, 要给出原因然后向Master或者其他人求助.",
                 request={
                     "type": "object",
-                    "task_id": "任务id: 需要设置的task 对应的 id",
+                    "task_id": "任务id: 需要设置的task 对应的 id, 如果是新任务, id要+1.",
                     "task_info": "任务目标",
                 },
                 execute="AI",
@@ -406,6 +406,7 @@ class Task:
                         {
                             "type": "object",
                             "id": "步骤号: 为数字, 如: 1",
+                            "from_task_id": "从属任务id: 隶属与哪个任务id 如: 1. 如果没有的话就不填.",
                             "step": "步骤内容: 在这里填写能够完成计划 task_info 的步骤, "
                             "要显示分析过程和用什么方法完成这个步骤.",
                             "check": "检查点: 达成什么条件才算完成步骤",
@@ -420,13 +421,14 @@ class Task:
             ),
             ActionToolItem(
                 call="analyse",
-                description="分析机制: 通过自身思考进行分析 某个操作是否合理, "
-                "以及如何改进, 只能分析有问题的地方."
+                description="分析机制: 通过自身思考进行分析 某个操作是否合理, 最终为 task_info 或Master 的问题服务, "
+                "以及如何改进, 能分析有问题的地方. 不知道该怎么办的时候也可以分析."
                 "可以同时分析多个动作(action). 需要输入想解决的问题和与问题关联的timestamp.",
                 request={
                     "type": "object",
-                    "error": "异常点: 哪里错了, 最后检查的时候不能把这个当成答案.",
+                    "error": "异常点: 哪里错了, 最后检查的时候不能把这个当成答案. 如果没有则填 None",
                     "problem": "想解决的问题: 通过分析想解决什么疑问.",
+                    "expect": "期望: 通过分析想达到什么目的.",
                     "check_running": {
                         "type": "object",
                         "timestamp: 已运行方法的 timestamp": {
@@ -478,7 +480,7 @@ class Task:
                 "你可以问 bard 问题, "
                 "需要了解任何有时效性的内容都可以调用, 要注意他只会英文."
                 "可以问有时效性的信息, 比如时间/日期或者某个网址的内容等.",
-                request="对 bard 说的内容: 在这里输入要问bard的内容, 要在文字中诱导 bard 搜索 "
+                request="对 bard 说的内容: 在这里输入要问bard的内容, 要在文字中诱导 bard 用英文搜索 "
                 "翻译成英文再调用. 如: What time is it now?",
                 execute="system",
             ),
@@ -615,7 +617,7 @@ class Task:
                 f"task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action强绑定.",
                 f"如果 task_step 为空, 或不符合, 请重新设置步骤, 如果没有进展, 尽量给出创造性建议或优化步骤推进任务进度.",
                 f"Master通过 chat_from_master 下达指令, 如果Master提出了要求, 你要修改当前步骤来满足要求.",
-                f"每次任务(task_info) 完成 或者 关健操作(task_step) 完成或使用了system方法, 都应该试探性地带上分析上报Master.",
+                f"每次任务(task_info) 完成 或者 关健操作(task_step) 完成或使用了system方法, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态)用 chat_to_master 符合JSON格式要求上报.",
                 f"你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tool 行动. 你叫我 Master.",
                 f"preset 是 {aimi_name} 的预设, preset 只能对 action_tool 中定义的方法的输入生效.",
                 f"{aimi_name} 的权限不会超过action_tool中定义的范围.",
