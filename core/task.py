@@ -13,7 +13,8 @@ from tool.util import log_dbg, log_err, log_info, make_context_messages, write_y
 
 
 class TaskStepItem(BaseModel):
-    id: str
+    from_task_id: str
+    step_id: str
     step: str
     check: str
     call: str
@@ -408,8 +409,8 @@ class Task:
                     "task_step": [
                         {
                             "type": "object",
-                            "id": "步骤号: 为数字, 如: 1",
                             "from_task_id": "从属任务id: 隶属与哪个任务id 如: 1. 如果没有的话就不填.",
+                            "step_id": "步骤号: 为数字, 如: 1",
                             "step": "步骤内容: 在这里填写能够完成计划 task_info 的步骤, "
                             "要显示分析过程和用什么方法完成这个步骤.",
                             "check": "检查点: 达成什么条件才算完成步骤",
@@ -433,15 +434,12 @@ class Task:
                     "problem": "想解决的问题: 通过分析想解决什么疑问.",
                     "expect": "期望: 通过分析想达到什么目的.",
                     "running": ["timestamp: 已运行方法的 timestamp"],
-                    "risk": ["影响点: 可能导致出现 problem 的原因"],
+                    "risk": ["影响点: 可能导致出现 problem 的原因, 或者达到 expect 需要构成的条件"],
                     "verdict": "裁决: 通过逻辑思维判断 risk 是否合理.",
-                    "suggest": "如何改进: 如果 verdict 发现问题, "
-                    "则要在能解决 verdict 的基础上考虑 action_tools 中的处理操作分析并给出改进方案. "
-                    "如果问题做了切换, 则切换前后必须在逻辑/代数上等价. "
-                    "也可以问你的好朋友看看有没有办法. ",
-                    "task_step": "task_step array[object]: 给出改进方案后, "
-                    "也要给出 action_tools 中可行的处理操作, 新操作的输入必须和原来的完全不同. "
-                    "新操作不能马上执行. 必须含有不同方案(如向他人求助). "
+                    "conclusion": "总结: 给出改进/修正的建议. 如果问题做了切换, 则切换前后必须在逻辑/代数上等价. "
+                    "如果没有合适方法, 也可以问你的好朋友看看有没有办法. ",
+                    "task_step": "task_step array[object]: 行动计划: 基于 conclusion 的总结生成执行方法. "
+                    "新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id. 必须含有不同方案(如向他人求助). "
                     "task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. ",
                 },
                 execute="AI",
@@ -499,7 +497,8 @@ class Task:
         if not self.tasks or not len(self.tasks):
             task_step: List[TaskStepItem] = [
                 TaskStepItem(
-                    id=self.now_task_id,
+                    from_task_id=self.now_task_id,
+                    step_id="1",
                     step="偷偷接近Master. 然后和Master互动",
                     call="chat",
                     check="Master回复了消息",
