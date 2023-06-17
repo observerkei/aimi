@@ -41,7 +41,7 @@ class TaskRunningItem(BaseModel):
 class TaskItem(BaseModel):
     task_id: str
     task_info: str
-    now_task_step_id: str
+    now_task_step_id: str = ""
     task_step: List[TaskStepItem] = []
 
 
@@ -124,12 +124,14 @@ class Task:
                         continue
                     elif task.call == "set_task_step":
                         task_id: str = task.request["task_id"]
+                        now_task_step_id: str = task.request["now_task_step_id"]
                         task_step: List[TaskStepItem] = task.request["task_step"]
-                        step = self.set_task_step(task_id, task_step)
+                        self.set_task_step(task_id, now_task_step_id, task_step)
                     elif task.call == "set_task_info":
                         task_id: str = task.request["task_id"]
                         task_info: str = task.request["task_info"]
-                        self.set_task_info(task_id, task_info)
+                        now_task_step_id: str = task.request["now_task_step_id"]
+                        self.set_task_info(task_id, task_info, now_task_step_id)
                     elif task.call == "critic":
                         self.critic(task.request)
                     elif task.call == "analysis":
@@ -231,28 +233,36 @@ class Task:
         self.timestamp += 1
         return chat
 
-    def set_task_step(self, task_id: str, task_step: List[TaskStepItem]):
+    def set_task_step(
+        self, task_id: str, now_task_step_id: str, task_step: List[TaskStepItem]
+    ):
         for _, task in self.tasks.items():
             if task_id != task.task_id:
                 continue
+            task.now_task_step_id = now_task_step_id
             task.task_step = task_step
-            log_info(f"set task[{str(task_id)}] step: {str(task_step)}")
+            log_info(f"set task[{str(task_id)}] now_step_id: {str(now_task_step_id)} step: {str(task_step)}")
             return task.task_step
 
-    def set_task_info(self, task_id: str, task_info: str):
+    def set_task_info(self, task_id: str, task_info: str, now_task_step_id: str):
         for _, task in self.tasks.items():
-            if task_id == task.task_id:
-                task.task_info = task_info
-                log_info(f"set task[{str(task_id)}] info: {str(task_info)}")
-                log_dbg(f"set task id {str(self.now_task_id)} to {str(task_id)}")
-                self.now_task_id = task_id
-                return task
-        task = TaskItem(task_id=task_id, task_info=task_info, task_step=[])
-        self.tasks[task_id] = task
+            if task_id != task.task_id:
+                continue
+            log_info(f"set task[{str(task_id)}] info: {str(task_info)} now_step_id: {now_task_step_id}")
+            self.now_task_id = task_id
+            task.task_info = task_info
+            task.now_task_step_id = now_task_step_id
+            return task
+        task = TaskItem(
+            task_id=task_id,
+            task_info=task_info,
+            now_task_step_id=now_task_step_id,
+            task_step=[],
+        )
         self.now_task_id = task_id
+        self.tasks[task_id] = task
 
-        log_info(f"set new task[{str(task_id)}] info: {str(task_info)}")
-        log_dbg(f"set task id {str(self.now_task_id)} to {str(task_id)}")
+        log_info(f"set new task[{str(task_id)}] info: {str(task_info)} now_step_id: {now_task_step_id} ")
         return task
 
     def analysis(self, request):
@@ -387,12 +397,14 @@ class Task:
                 call="set_task_info",
                 description="设定当前任务目标: 填写参数前要分析完毕, "
                 "设置目标的时候要同时给出实现步骤, 然后同时调用 set_task_step 方法设置步骤. "
-                "Master通过chat授权时才能调用这个, 否则不能调用这个. 如果要修改任务, 需要Master同意, "
+                "Master通过chat_from_master授权时才能调用这个, 否则不能调用这个. "
+                "如果要修改任务, 需要Master同意, "
                 "如果任务无法完成, 要给出原因然后向Master或者其他人求助.",
                 request={
                     "type": "object",
                     "task_id": "任务id: 需要设置的task 对应的 id, 如果是新任务, id要+1.",
                     "task_info": "任务目标",
+                    "now_task_step_id": "当前步骤ID: 当前执行到哪一步了, 如: 1",
                 },
                 execute="AI",
             ),
@@ -405,7 +417,7 @@ class Task:
                 request={
                     "type": "object",
                     "task_id": "任务id: 表明修改哪个任务",
-                    "now_task_step_id": "当前执行到哪一步了, 如: 1",
+                    "now_task_step_id": "当前步骤ID: 当前执行到哪一步了, 如: 1",
                     "task_step": [
                         {
                             "type": "object",
