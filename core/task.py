@@ -86,10 +86,13 @@ class Task:
 
             # fix no execute.
             for action in data:
+                if "execute" in action:
+                    continue
                 for tool in self.action_tool:
                     if action["call"] != tool.call:
                         continue
                     action["execute"] = tool.execute
+                    log_dbg(f"fill call(tool.call) execute: {tool.execute}")
 
             tasks = [TaskRunningItem(**item) for item in data]
 
@@ -128,8 +131,8 @@ class Task:
                         self.set_task_info(task_id, task_info)
                     elif task.call == "critic":
                         self.critic(task.request)
-                    elif task.call == "analyse":
-                        self.analyse(task.request)
+                    elif task.call == "analysis":
+                        self.analysis(task.request)
                     elif task.call == "get_wolfram_response":
                         response = self.get_wolfram_response(task.request)
                         task.response = response
@@ -251,12 +254,12 @@ class Task:
         log_dbg(f"set task id {str(self.now_task_id)} to {str(task_id)}")
         return task
 
-    def analyse(self, request):
+    def analysis(self, request):
         try:
             js = json.dumps(request, indent=4, ensure_ascii=False)
-            log_info(f"analyse: {js}")
+            log_info(f"analysis: {js}")
         except Exception as e:
-            log_err(f"fail to analyse {str(e)}")
+            log_err(f"fail to analysis {str(e)}")
 
     def critic(self, request):
         try:
@@ -420,7 +423,7 @@ class Task:
                 execute="AI",
             ),
             ActionToolItem(
-                call="analyse",
+                call="analysis",
                 description="分析机制: 通过自身思考进行分析 某个操作是否合理, 最终为 task_info 或Master 的问题服务, "
                 "以及如何改进, 能分析有问题的地方. 不知道该怎么办的时候也可以分析."
                 "可以同时分析多个动作(action). 需要输入想解决的问题和与问题关联的timestamp.",
@@ -429,22 +432,17 @@ class Task:
                     "error": "异常点: 哪里错了, 最后检查的时候不能把这个当成答案. 如果没有则填 None",
                     "problem": "想解决的问题: 通过分析想解决什么疑问.",
                     "expect": "期望: 通过分析想达到什么目的.",
-                    "check_running": {
-                        "type": "object",
-                        "timestamp: 已运行方法的 timestamp": {
-                            "type": "object",
-                            "risk": ["影响点: 可能导致出现 problem 的原因"],
-                            "verdict": "裁决: 通过逻辑思维判断 risk 是否合理.",
-                            "suggest": "如何改进: 如果 verdict 发现问题, "
-                            "则要在能解决 verdict 的基础上考虑 action_tool 中的处理操作分析并给出改进方案. "
-                            "如果问题做了切换, 则切换前后必须在逻辑/代数上等价. "
-                            "也可以问你的好朋友看看有没有办法. ",
-                            "task_step": "task_step object: 给出改进方案后, "
-                            "也要给出 action_tool 中可行的处理操作, 新操作的输入必须和原来的完全不同. "
-                            "新操作不能马上执行. 必须含有不同方案(如向他人求助). "
-                            "task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. ",
-                        },
-                    },
+                    "running": ["timestamp: 已运行方法的 timestamp"],
+                    "risk": ["影响点: 可能导致出现 problem 的原因"],
+                    "verdict": "裁决: 通过逻辑思维判断 risk 是否合理.",
+                    "suggest": "如何改进: 如果 verdict 发现问题, "
+                    "则要在能解决 verdict 的基础上考虑 action_tool 中的处理操作分析并给出改进方案. "
+                    "如果问题做了切换, 则切换前后必须在逻辑/代数上等价. "
+                    "也可以问你的好朋友看看有没有办法. ",
+                    "task_step": "task_step array[object]: 给出改进方案后, "
+                    "也要给出 action_tool 中可行的处理操作, 新操作的输入必须和原来的完全不同. "
+                    "新操作不能马上执行. 必须含有不同方案(如向他人求助). "
+                    "task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. ",
                 },
                 execute="AI",
             ),
