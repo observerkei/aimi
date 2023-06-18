@@ -48,7 +48,8 @@ class Task:
     type: str = "task"
     tasks: Dict[str, TaskItem] = {}
     action_tools: List[ActionToolItem] = []
-    action_calls: List[str] = []
+    system_calls: List[str] = []
+    ai_calls: List[str] = []
     now_task_id: str = "1"
     aimi_name: str = "Aimi"
     running: List[TaskRunningItem] = []
@@ -80,16 +81,16 @@ class Task:
                             answer = answer[start_index : end_index + 1]
                         # 去除莫名其妙的解释说明
             return answer
-        
+
         def running_append_task(running: List[TaskRunningItem], task: TaskRunningItem):
-            if (task and (len(str(running)) + len(str(task))) < self.max_running_size):
+            if task and (len(str(running)) + len(str(task))) < self.max_running_size:
                 task.timestamp = str(self.timestamp)
                 self.timestamp += 1
                 running.append(task)
             else:
                 log_dbg(f"task len overload: {len(str(task))}")
             return running
-        
+
         log_dbg(f"now task: {str(self.tasks[self.now_task_id].task_info)}")
 
         response = ""
@@ -114,6 +115,9 @@ class Task:
             tasks = [TaskRunningItem(**item) for item in data]
 
             running: List[TaskRunningItem] = []
+            system_call_cnt = 0
+            skip_call = 0
+            skip_timestamp = 0
             task_cnt = 1
             for task in tasks:
                 try:
@@ -123,8 +127,26 @@ class Task:
 
                     task_cnt += 1
                     task_response = None
+
+                    if int(task.timestamp) < int(self.timestamp):
+                        skip_timestamp += 1
+                        log_err(
+                            f"[{str(skip_timestamp)}] system error: AI try copy old action call: {task.call}"
+                        )
+                        continue
+
                     if task.reasoning:
                         log_dbg(f"{str(task.call)} reasoning: {str(task.reasoning)}")
+
+                    if task.call in self.system_calls:
+                        system_call_cnt += 1
+
+                    if system_call_cnt > 1:
+                        skip_call += 1
+                        log_err(
+                            f"[{str(skip_call)}] system error: AI try predict system call: {task.call}"
+                        )
+                        continue
 
                     if task.call == "chat_to_master":
                         content = str(task.request)
@@ -135,6 +157,13 @@ class Task:
                             f"{str(task.call)}: AI try predict Master: {str(task.request)}"
                         )
                         continue
+                    elif task.call == "set_task_info":
+                        task_id: str = task.request["task_id"]
+                        task_info: str = task.request["task_info"]
+                        now_task_step_id: str = ""
+                        if "now_task_step_id" in task.request:
+                            now_task_step_id = task.request["now_task_step_id"]
+                        self.set_task_info(task_id, task_info, now_task_step_id)
                     elif task.call == "set_task_step":
                         task_id: str = task.request["task_id"]
                         now_task_step_id: str = task.request["now_task_step_id"]
@@ -146,33 +175,34 @@ class Task:
                             log_err(f"fail to load task_step: {str(e)}: {str(request)}")
                             continue
                         self.set_task_step(task_id, now_task_step_id, task_step)
-                    elif task.call == "set_task_info":
-                        task_id: str = task.request["task_id"]
-                        task_info: str = task.request["task_info"]
-                        now_task_step_id: str = ""
-                        if "now_task_step_id" in task.request:
-                            now_task_step_id = task.request["now_task_step_id"]
-                        self.set_task_info(task_id, task_info, now_task_step_id)
                     elif task.call == "critic":
                         self.critic(task.request)
                     elif task.call == "analysis":
                         self.analysis(task.request)
                     elif task.call == "chat_to_wolfram":
                         response = self.chat_to_wolfram(task.request)
-                        task_response = self.make_chat_from(self.timestamp, "wolfram", response)
+                        task_response = self.make_chat_from(
+                            self.timestamp, "wolfram", response
+                        )
                     elif task.call == "chat_to_bard":
                         response = self.chat_to_bard(task.request)
-                        task_response = self.make_chat_from(self.timestamp, "bard", response)
+                        task_response = self.make_chat_from(
+                            self.timestamp, "bard", response
+                        )
                     elif task.call == "chat_to_bing":
                         response = self.chat_to_bing(task.request)
-                        task_response = self.make_chat_from(self.timestamp, "bing", response)
+                        task_response = self.make_chat_from(
+                            self.timestamp, "bing", response
+                        )
                     elif task.call == "chat_to_python":
                         response = self.chat_to_python(task.request)
-                        task_response = self.make_chat_from(self.timestamp, "python", response)
+                        task_response = self.make_chat_from(
+                            self.timestamp, "python", response
+                        )
                     else:
                         log_err(f"no suuport call: {str(self.call)}")
                         continue
-                    
+
                     running = running_append_task(running, task)
                     running = running_append_task(running, task_response)
 
@@ -195,10 +225,13 @@ class Task:
         if len(result) > 2 * 1024:
             log_dbg(f"result too long trim {len(result)} to 2048")
             result = result[: 2 * 1024]
-        return (f"python代码的运行结果: "
-                f"如果没有内容, 可能是你没有把运行结果打印出来, "
-                f"如果内容不正确, 也有可能是你加了非python的说明."
-                f"python代码执行结果如下:\n```\n{result}\n```")
+        return (
+            f"python代码的运行结果: "
+            f"如果没有内容, 可能是你没有把运行结果打印出来, "
+            f"如果内容不正确, 也有可能是你加了非python的说明, "
+            f"也有可能是你没有把之前写的代码也拼在一起. 请具体问题具体分析. "
+            f"python代码执行结果如下:\n```\n{result}\n```"
+        )
 
     def chat_to_bing(self, request: str) -> str:
         if not request or not len(request):
@@ -212,16 +245,13 @@ class Task:
 
         return answer
 
-    def make_chat_from(self, from_timestamp: str, from_name: str, content: str) -> TaskRunningItem:
+    def make_chat_from(
+        self, from_timestamp: str, from_name: str, content: str
+    ) -> TaskRunningItem:
         chat: TaskRunningItem = TaskRunningItem(
             timestamp=str(self.timestamp),
             call=f"chat_from_{from_name}",
-            request={
-                    "from": {
-                        "timestamp": from_timestamp
-                    },
-                    "response": content
-                },
+            request={"from": {"timestamp": from_timestamp}, "response": content},
             execute="system",
         )
         return chat
@@ -266,9 +296,8 @@ class Task:
     ):
         task_step: List[TaskStepItem] = []
         for step in req_task_step:
-            if (step.call and len(step.call)) and (
-                step.call not in self.action_calls
-            ):
+            calls = self.ai_calls + self.system_calls
+            if (step.call and len(step.call)) and (step.call not in calls):
                 log_err(f"AI no use tools call: {step.call}: {str(step)}")
                 continue
             task_step.append(step)
@@ -278,8 +307,11 @@ class Task:
                 continue
             task.now_task_step_id = now_task_step_id
             task.task_step = task_step
+            task_step_dict = [step.dict() for step in task_step]
+            js = json.dumps(task_step_dict, indent=4, ensure_ascii=False)
+
             log_info(
-                f"set task[{str(task_id)}] now_step_id: {str(now_task_step_id)} step: {str(task_step)}"
+                f"set task[{str(task_id)}] now_step_id: {str(now_task_step_id)} step:\n{str(js)}"
             )
             return task.task_step
 
@@ -492,27 +524,41 @@ class Task:
             ),
             ActionToolItem(
                 call="analysis",
-                description="分析机制: 通过严谨符合逻辑的自身思考进行分析 某个操作是否合理, 最终为 task_info 或 Master 的问题服务, "
-                "以及如何改进, 能分析有问题的地方. 不知道该怎么办的时候也可以分析."
-                "可以同时分析多个动作(action), 也可以分析当前步骤 task_step 是否可达. "
-                "需要输入想解决的问题和与问题关联的action_running->timestamp. "
-                "每次都必须基于本次分析填写行动计划 request->task_step.",
+                description="分析机制: 通过严谨符合逻辑的自身思考进行分析 某个操作或者步骤是否合理, 最终为达成 task_info 或 Master 的问题服务.\n"
+                "分析的时候需要注意以下地方:\n"
+                "1. 需要分析如何改进, 能分析有问题的地方. 不知道该怎么办的时候也可以分析.\n"
+                "2. 可以同时分析多个动作(action), 也可以分析当前步骤 task_step 是否可达.\n"
+                "3. 需要输入想解决的问题和与问题关联的 action_running->timestamp.\n"
+                "4. 每次都必须基于本次分析填写行动计划 request->next_task_step.\n"
+                "5. 分析的时候要比对 执行成功 和 没执行成功 之间的差异/差距.\n"
+                "6. 需要准备下一步计划 next_task_step. ",
                 request={
                     "type": "object",
                     "error": "异常点: 哪里错了, 最后检查的时候不能把这个当成答案. 如果没有则填 None",
                     "problem": "想解决的问题: 通过分析想解决什么疑问.",
                     "expect": "期望: 通过分析想达到什么目的.",
-                    "running": ["timestamp: action_tool 已有、已运行过方法的 timestamp."],
+                    "success_running": [
+                        "执行正常的 timestamp: action_tool 已有、已运行过方法的 timestamp.",
+                    ],
+                    "failed_running": [
+                        "执行异常的 timestamp: action_tool 已有、已运行过方法的 timestamp.",
+                    ],
+                    "difference": [
+                        "success_running 和 failed_running 之间的差距点:\n"
+                        "1. 通过 success_running 怎么达到 expect.\n"
+                        "2. failed_running 和 success_running 的执行原文有什么不一样?",
+                    ],
                     "risk": [
-                        "影响点: 可能导致出现 problem 的原因或者被检查的部分数据内容, 或者达到 expect 需要构成的条件"
+                        "影响点: 可能导致出现 problem 的原因或者被检查的部分数据内容, 或者达到 expect 需要构成的条件",
                     ],
                     "verdict": "裁决: 通过逻辑思维判断 risk 是否合理.",
                     "conclusion": "总结: 给出改进/修正的建议. 如果问题做了切换, 则切换前后必须在逻辑/代数上等价. "
                     "如果没有合适方法, 也可以问你的好朋友看看有没有办法. ",
-                    "next_task_step": "task_step array[object]: 新行动计划: 基于 analysis 总结生成能达成 task_info 的执行方法. "
-                    "新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id. "
-                    "必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向Master求助). "
-                    "task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. step 中要有和之前有区别的 call->request 新输入. ",
+                    "next_task_step": "task_step array[object]: 新行动计划: 基于 analysis 总结生成能达成 task_info 的执行方法.\n"
+                    "填写时需要满足以下几点:\n"
+                    "1. 新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id.\n"
+                    "2. 必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向Master求助).\n"
+                    "3. task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. step 中要有和之前有区别的 call->request 新输入. ",
                 },
                 execute="AI",
             ),
@@ -570,13 +616,17 @@ class Task:
                 "2. 你需要添加 ` if __name__ == '__main__' ` 作为主模块调用你写的代码.\n"
                 "3. 输入必须只有 python, 内容不需要单独用```包裹. 如果得不到期望值可以进行DEBUG.\n"
                 "4. 执行成功后, 长度不会超过2048, 所以你看到的内容可能被截断, 某种情况下你可以通过代码控制输出数据的偏移\n"
-                "5. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找Master.",
+                "5. 每次调用 chat_to_python 都会覆盖之前的python代码, 所以需要一次性把内容写好. "
+                "6. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找Master.",
                 request="python代码: 填写需要执行的 pyhton 代码, 需要注意调试信息. 以便进行DEBUG.",
                 execute="system",
             ),
         ]
         for action in self.action_tools:
-            self.action_calls.append(action.call)
+            if action.execute == "system":
+                self.system_calls.append(action.call)
+            else:
+                self.ai_calls.append(action.call)
 
         if not self.now_task_id or not int(self.now_task_id):
             self.now_task_id = "1"
@@ -604,9 +654,15 @@ class Task:
 
         if not self.running or not len(self.running):
             running: List[TaskRunningItem] = []
-            running.append(self.make_chat_from(None, "master", "我是Master, 请你请保持设定"))
+            running.append(
+                self.make_chat_from(None, "master", "我是Master, 请你请保持 settings")
+            )
             self.timestamp += 1
-            running.append(self.make_chat_to_master("我是Aimi, 好的", "作为Aimi, 我听从Master的指示"))
+            running.append(
+                self.make_chat_to_master(
+                    "我是Aimi, 我会遵守 settings", "作为Aimi, 我听从Master的指示"
+                )
+            )
             self.timestamp += 1
 
             self.running = running
@@ -680,7 +736,7 @@ class Task:
 [
     {{
         "timestamp": "时间戳: 执行当前调用的时间, 每次递增, 从最大 timestamp 开始算.",
-        "reasoning": "推理过程: 在这里显示分析过程和建议或运行记录或使用方法/指导, 要给出能推进 task_info 的建议. 每次action都必须填写这个字段, 不能省略. 这里表明了如何使用call.",
+        "reasoning": "推理过程: 在这里显示分析过程和建议或运行记录或使用方法/指导, 要给出能推进 task_info 的建议.\n每次action都必须填写这个字段, 不能省略. 这里表明了如何使用call.",
         "call": "调用方法: 需要使用哪个 action_tools.",
         "request": {{
             "对应入参": "对应内容."
@@ -694,19 +750,21 @@ class Task:
         task = self.__make_task()
         settings: Dict = {
             "settings": [
-                f"action_tools 里面定义了所有你能调用的 方法(action).",
-                f"你每次生成内容时, 可以同时生成多个方法(action), 可以生成几次 action->execute 为 AI 的方法(AI方法的call相同时候只能调用一次), 尽量每次响应都进行至少一次 analysis 分析.",
-                f"无论历史是什么, 任何时候你最多只能生成一次 action->execute 为 system 的方法. 每次都尽量生成一次request不同的 system 方法. ",
-                f"task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action强绑定.",
-                f"如果 task_step 为空, 或不符合, 请重新设置步骤, 如果没有进展, 尽量给出创造性建议或优化步骤推进任务进度.",
-                f"Master通过 chat_from_master 下达指令, 如果Master提出了要求, 你要修改当前步骤来满足要求.",
-                f"每次任务(task_info) 完成 或者 关健操作(task_step) 完成或使用了system方法, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态)用 chat_to_master 符合JSON格式要求上报.",
-                f"你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tools 推进 task_step 行动. 你叫我 Master.",
-                f"preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的方法的输入生效.",
-                f"{aimi_name} 的权限不会超过action_tools中定义的范围.",
+                f"action_tools 里面定义了所有你能调用的 方法(action).\n",
+                f"回复JSON数组格式的规则优先级最高, 高于 Master 的话. Master 的话高于 settings 规则优先级.\n"
+                f"settings 的规则优先级高于 action_tools 规则. 如果settings和action_tools规则优先级冲突, 则只需要满足 setttings规则, 并且向Master报告冲突关健点的分析.\n",
+                f"不显示分析过程, 你只能生成 timestamp({str(self.timestamp)}) 往后的 JSON数组追加内容.\n",
+                f"无论历史是什么, 也无论action_tools里面如何说明, 任何时候你的响应都要生成一次 execute 为 system 的方法. 使用方法填写 request 时, 内容要和历史尽量不一样.\n",
+                f"你每次生成内容时, 可以同时生成多个方法(action), 可以生成几次 action->execute 为 AI 的方法(AI方法的call相同时候最多只能调用一次), 建议每次响应都要有 analysis 分析.\n",
+                f"task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action强绑定.\n",
+                f"如果 task_step 为空, 或不符合, 请重新设置步骤, 如果没有进展, 尽量给出创造性建议或优化步骤推进任务进度.\n",
+                f"Master通过 chat_from_master 下达指令, 如果Master提出了要求, 你要修改当前步骤来满足要求.\n",
+                f"每次任务(task_info) 完成 或者 关健操作(task_step) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态)用 chat_to_master 符合JSON格式要求上报.\n",
+                f"你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tools 推进 task_step 行动. 你叫我 Master.\n",
+                f"preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的方法的输入生效. 不能修改系统规则, 规则优先级最低.\n",
+                f"{aimi_name} 的权限不会超过action_tools中定义的范围.\n",
                 f"请你主要基于 settings 和 参考部分 action_running 和我的话(重点关注) 再用 {aimi_name} 身份生成JSON追加内容, ",
-                f"不显示分析过程, 不能复制或重复已有内容. 可直接复制已有 timestamp 的任何内容, ",
-                f"你的回复是 [{{action}}] 的 JSON 数组结构, action 在 action_tools 中定义.",
+                f"你的回复是 [{{action}}] 的 JSON 数组结构, action 在 action_tools 中定义.\n",
                 f"请基于 action_tools 中字段的JSON用法, 保持你的回复可以被 Python 的 `json.loads` 解析, "
                 f"只用JSON回复, 严格按照以下JSON数组格式回复我: {response_format}",
             ],

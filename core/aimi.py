@@ -127,7 +127,7 @@ class ReplyStep:
 
 
 class Aimi:
-    type: str = 'Aimi'
+    type: str = "Aimi"
     timeout: int = 360
     master_name: str = ""
     aimi_name: str = "Aimi"
@@ -486,7 +486,9 @@ answer this following question: {{
             return self.ask(question, nickname)
         elif owned_by == self.aimi_name and (model == "task" or model == "task-16k"):
             preset = context_messages[0]["content"]
-            task_link_think = self.task.make_link_think(question, self.aimi_name, preset)
+            task_link_think = self.task.make_link_think(
+                question, self.aimi_name, preset
+            )
             model = self.task.get_model(model)
 
             return self.task.ask(task_link_think, model)
@@ -606,10 +608,14 @@ answer this following question: {{
                     (message)
                     and (message["code"] == 0)
                     and message["conversation_id"]
-                    and (message["conversation_id"] != self.memory.openai_conversation_id)
+                    and (
+                        message["conversation_id"] != self.memory.openai_conversation_id
+                    )
                 ):
                     self.memory.openai_conversation_id = message["conversation_id"]
-                    log_info("set new con_id: " + str(self.memory.openai_conversation_id))
+                    log_info(
+                        "set new con_id: " + str(self.memory.openai_conversation_id)
+                    )
             except Exception as e:
                 log_dbg(f"no conv_id")
 
