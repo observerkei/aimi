@@ -25,13 +25,18 @@ class Sandbox():
 
     def run_code():
         import subprocess
+        result = ''
         try:
             result = subprocess.run(
                 ["python3.9", Sandbox.sandbox_file],
                 stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
+            if result.returncode != 0:
+                return result.stderr.decode("utf-8")
             return result.stdout.decode('utf-8')
         except Exception as e:
             log_err(f"fail to exec code: {str(e)}")
-        return 'system error: exec code failed.'
+            result = str(e)
+        return f'system error: exec code failed:\n{result}'
     

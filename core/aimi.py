@@ -303,7 +303,7 @@ answer this following question: {{
                 cnt = 0
 
             try:
-                if self.memory.save_self.memory():
+                if self.memory.save_memory():
                     log_info("save self.memory done")
                 if self.task.save_task():
                     log_info("save task done")

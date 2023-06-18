@@ -12,13 +12,14 @@ from tool.config import Config
 from tool.util import log_dbg, log_err, log_info, make_context_messages, write_yaml
 from core.sandbox import Sandbox
 
+
 class TaskStepItem(BaseModel):
-    from_task_id: str
+    from_task_id: Optional[Union[str, None]] = None
     step_id: str
     step: str
     check: str
-    call: str
-    call_timestamp: List[str]
+    call: Optional[Union[str, None]] = None
+    call_timestamp: List[str] = []
 
 
 class ActionToolItem(BaseModel):
@@ -47,6 +48,7 @@ class Task:
     type: str = "task"
     tasks: Dict[str, TaskItem] = {}
     action_tools: List[ActionToolItem] = []
+    action_calls: List[str] = []
     now_task_id: str = "1"
     aimi_name: str = "Aimi"
     running: List[TaskRunningItem] = []
@@ -78,7 +80,16 @@ class Task:
                             answer = answer[start_index : end_index + 1]
                         # 去除莫名其妙的解释说明
             return answer
-
+        
+        def running_append_task(running: List[TaskRunningItem], task: TaskRunningItem):
+            if (task and (len(str(running)) + len(str(task))) < self.max_running_size):
+                task.timestamp = str(self.timestamp)
+                self.timestamp += 1
+                running.append(task)
+            else:
+                log_dbg(f"task len overload: {len(str(task))}")
+            return running
+        
         log_dbg(f"now task: {str(self.tasks[self.now_task_id].task_info)}")
 
         response = ""
@@ -127,12 +138,20 @@ class Task:
                     elif task.call == "set_task_step":
                         task_id: str = task.request["task_id"]
                         now_task_step_id: str = task.request["now_task_step_id"]
-                        task_step: List[TaskStepItem] = task.request["task_step"]
+                        request = task.request["task_step"]
+                        task_step = []
+                        try:
+                            task_step = [TaskStepItem(**step) for step in request]
+                        except Exception as e:
+                            log_err(f"fail to load task_step: {str(e)}: {str(request)}")
+                            continue
                         self.set_task_step(task_id, now_task_step_id, task_step)
                     elif task.call == "set_task_info":
                         task_id: str = task.request["task_id"]
                         task_info: str = task.request["task_info"]
-                        now_task_step_id: str = task.request["now_task_step_id"]
+                        now_task_step_id: str = ""
+                        if "now_task_step_id" in task.request:
+                            now_task_step_id = task.request["now_task_step_id"]
                         self.set_task_info(task_id, task_info, now_task_step_id)
                     elif task.call == "critic":
                         self.critic(task.request)
@@ -140,33 +159,22 @@ class Task:
                         self.analysis(task.request)
                     elif task.call == "chat_to_wolfram":
                         response = self.chat_to_wolfram(task.request)
-                        task_response = self.make_chat_from("wolfram", response)
+                        task_response = self.make_chat_from(self.timestamp, "wolfram", response)
                     elif task.call == "chat_to_bard":
                         response = self.chat_to_bard(task.request)
-                        task_response = self.make_chat_from("bard", response)
+                        task_response = self.make_chat_from(self.timestamp, "bard", response)
                     elif task.call == "chat_to_bing":
                         response = self.chat_to_bing(task.request)
-                        task_response = self.make_chat_from("bing", response)
+                        task_response = self.make_chat_from(self.timestamp, "bing", response)
                     elif task.call == "chat_to_python":
                         response = self.chat_to_python(task.request)
-                        task_response = self.make_chat_from("python", response)
+                        task_response = self.make_chat_from(self.timestamp, "python", response)
                     else:
                         log_err(f"no suuport call: {str(self.call)}")
                         continue
-
-                    if (len(str(running)) + len(str(task))) < self.max_running_size:
-                        task.timestamp = str(self.timestamp)
-                        self.timestamp += 1
-                        running.append(task)
-                    else:
-                        log_dbg(f"task len overload: {len(str(task))}")
-                    if task_response and (
-                        (len(str(running)) + len(str(task_response)))
-                        < self.max_running_size
-                    ):
-                        task_response.timestamp = str(self.timestamp)
-                        self.timestamp += 1
-                        running.append(task_response)
+                    
+                    running = running_append_task(running, task)
+                    running = running_append_task(running, task_response)
 
                 except Exception as e:
                     log_err(f"fail to load task: {str(e)}: {str(task)}")
@@ -181,13 +189,16 @@ class Task:
         log_info(f"code:\n```python\n{code}\n```")
         ret = Sandbox.write_code(code)
         if not ret:
-            return 'system error: write code failed.'
+            return "system error: write code failed."
         result = Sandbox.run_code()
         log_info(f"code run result:\n{result}")
         if len(result) > 2 * 1024:
             log_dbg(f"result too long trim {len(result)} to 2048")
-            result = result[:2*1024]
-        return result
+            result = result[: 2 * 1024]
+        return (f"python代码的运行结果: "
+                f"如果没有内容, 可能是你没有把运行结果打印出来, "
+                f"如果内容不正确, 也有可能是你加了非python的说明."
+                f"python代码执行结果如下:\n```\n{result}\n```")
 
     def chat_to_bing(self, request: str) -> str:
         if not request or not len(request):
@@ -195,17 +206,22 @@ class Task:
 
         answer = ""
         for res in self.bing_api.ask(request):
-            if res["code"] != 0:
+            if res["code"] == 1:
                 continue
             answer = res["message"]
 
         return answer
 
-    def make_chat_from(self, from_name: str, content: str) -> TaskRunningItem:
+    def make_chat_from(self, from_timestamp: str, from_name: str, content: str) -> TaskRunningItem:
         chat: TaskRunningItem = TaskRunningItem(
             timestamp=str(self.timestamp),
             call=f"chat_from_{from_name}",
-            request=content,
+            request={
+                    "from": {
+                        "timestamp": from_timestamp
+                    },
+                    "response": content
+                },
             execute="system",
         )
         return chat
@@ -216,7 +232,7 @@ class Task:
 
         answer = ""
         for res in self.bard_api.ask(request):
-            if res["code"] != 0:
+            if res["code"] == 1:
                 continue
             answer = res["message"]
             log_dbg(f"res bard: {str(answer)}")
@@ -234,9 +250,6 @@ class Task:
 
         return answer
 
-    def make_chat_from_master(self, content: str) -> TaskRunningItem:
-        return self.make_chat_from("master", content)
-
     def make_chat_to_master(self, content: str, reasoning: str = "") -> TaskRunningItem:
         chat: TaskRunningItem = TaskRunningItem(
             timestamp=str(self.timestamp),
@@ -249,8 +262,17 @@ class Task:
         return chat
 
     def set_task_step(
-        self, task_id: str, now_task_step_id: str, task_step: List[TaskStepItem]
+        self, task_id: str, now_task_step_id: str, req_task_step: List[TaskStepItem]
     ):
+        task_step: List[TaskStepItem] = []
+        for step in req_task_step:
+            if (step.call and len(step.call)) and (
+                step.call not in self.action_calls
+            ):
+                log_err(f"AI no use tools call: {step.call}: {str(step)}")
+                continue
+            task_step.append(step)
+
         for _, task in self.tasks.items():
             if task_id != task.task_id:
                 continue
@@ -300,10 +322,15 @@ class Task:
                 task_info = task.task_info
                 log_info(f"success: True, task complate: {str(task_info)}")
 
+                default_task_info = "当前没有事情可以做, 找Master聊天吧..."
+                if task_info == default_task_info:
+                    log_dbg(f"task no change. skip...")
+                    return True
+
                 self.now_task_id = str(int(self.now_task_id) + 1)
                 new_task = TaskItem(
                     task_id=self.now_task_id,
-                    task_info="当前没有事情可以做, 找Master聊天吧...",
+                    task_info=default_task_info,
                     now_task_step_id="1",
                     task_step=[],
                 )
@@ -326,7 +353,7 @@ class Task:
             self.wolfram_api = WolframAPI()
             self.bing_api = BingAPI()
             self.bard_api = BardAPI()
-        
+
         except Exception as e:
             log_err(f"fait to init: {str(e)}")
 
@@ -417,7 +444,7 @@ class Task:
                 description="和 Master 交互: 给Master发送消息进行交互. "
                 "你要用严谨逻辑思维来分析调用这个接口. 只能提供可证实的信息, "
                 "提供的内容都要有来源. Master在Master的指示下可以临时放开限制. ",
-                request="Aimi对Master传达的内容: 可以很丰富, 包含多句话, 要优化内容层次和排版, "
+                request="Aimi对Master传达的内容: 可以很丰富, 包含多句话, 每次都要优化内容层次和优雅排版, "
                 "如果有数学公式, 则要用latex显示, 每个公式都要单独包裹在单独行的 $$ 中.",
                 execute="system",
             ),
@@ -454,7 +481,7 @@ class Task:
                             "step": "步骤内容: 在这里填写能够完成计划 task_info 的步骤, "
                             "要显示分析过程和用什么方法完成这个步骤.",
                             "check": "检查点: 达成什么条件才算完成步骤",
-                            "call": "方法名: 应该调用什么 action 处理步骤.",
+                            "call": "方法名: 应该调用什么 action_tools->call 处理步骤.",
                             "call_timestamp": [
                                 "timestamp: 调用完成的action对应的 timestamp, 如果还没执行就为空, 如: 1"
                             ],
@@ -465,31 +492,37 @@ class Task:
             ),
             ActionToolItem(
                 call="analysis",
-                description="分析机制: 通过严谨符合逻辑的自身思考进行分析 某个操作是否合理, 最终为 task_info 或Master 的问题服务, "
+                description="分析机制: 通过严谨符合逻辑的自身思考进行分析 某个操作是否合理, 最终为 task_info 或 Master 的问题服务, "
                 "以及如何改进, 能分析有问题的地方. 不知道该怎么办的时候也可以分析."
-                "可以同时分析多个动作(action). 需要输入想解决的问题和与问题关联的timestamp.",
+                "可以同时分析多个动作(action), 也可以分析当前步骤 task_step 是否可达. "
+                "需要输入想解决的问题和与问题关联的action_running->timestamp. "
+                "每次都必须基于本次分析填写行动计划 request->task_step.",
                 request={
                     "type": "object",
                     "error": "异常点: 哪里错了, 最后检查的时候不能把这个当成答案. 如果没有则填 None",
                     "problem": "想解决的问题: 通过分析想解决什么疑问.",
                     "expect": "期望: 通过分析想达到什么目的.",
-                    "running": ["timestamp: 已运行方法的 timestamp"],
-                    "risk": ["影响点: 可能导致出现 problem 的原因或者被检查的部分数据内容, 或者达到 expect 需要构成的条件"],
+                    "running": ["timestamp: action_tool 已有、已运行过方法的 timestamp."],
+                    "risk": [
+                        "影响点: 可能导致出现 problem 的原因或者被检查的部分数据内容, 或者达到 expect 需要构成的条件"
+                    ],
                     "verdict": "裁决: 通过逻辑思维判断 risk 是否合理.",
                     "conclusion": "总结: 给出改进/修正的建议. 如果问题做了切换, 则切换前后必须在逻辑/代数上等价. "
                     "如果没有合适方法, 也可以问你的好朋友看看有没有办法. ",
-                    "task_step": "task_step array[object]: 行动计划: 基于 analysis 总结生成执行方法. "
-                    "新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id. 必须含有不同方案(如向他人求助). "
-                    "task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. ",
+                    "next_task_step": "task_step array[object]: 新行动计划: 基于 analysis 总结生成能达成 task_info 的执行方法. "
+                    "新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id. "
+                    "必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向Master求助). "
+                    "task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. step 中要有和之前有区别的 call->request 新输入. ",
                 },
                 execute="AI",
             ),
             ActionToolItem(
                 call="critic",
-                description="决策机制: 通过自身思考判断当前任务task_info是否完成."
+                description="决策机制: 通过自身推理、分析和批评性思考判断当前任务task_info是否完成. "
+                "完成后要另外通过 chat_to_master 上报分析结论."
                 "需要输入 task_id 和调用的对象的 timestamp, "
                 "如果数量太多, 只填写关健几个, 可以查找所有运行记录."
-                "如果调用了 system 方法, 则也必须调用一下这个方法.",
+                "如果调用了 system 方法, 则也必须调用一下这个方法. ",
                 request={
                     "type": "object",
                     "task_id": "任务id: 被检查的task对应的id",
@@ -513,17 +546,17 @@ class Task:
             ActionToolItem(
                 call="chat_to_bard",
                 description="和 bard 交互/回复/响应: 这是你的好朋友 bard, "
-                "你可以问 bard 问题, "
+                "你可以问 bard 问题, bard 有能力打开链接. "
                 "需要了解任何有时效性的内容都可以调用, 要注意他只会英文."
                 "可以问有时效性的信息, 比如时间/日期或者某个网址的内容等.",
-                request="对 bard 说的内容: 在这里输入要问bard的内容, 要在文字中诱导 bard 用英文搜索 "
+                request="对 bard 说的内容: 在这里输入要问bard的内容, 要在文字中诱导 bard 用英文搜索 search/open link, "
                 "翻译成英文再调用. 如: What time is it now?",
                 execute="system",
             ),
             ActionToolItem(
                 call="chat_to_bing",
                 description="和 bing 交互/回复/响应: 这是你的好朋友 bing, "
-                "你可以问 bing 问题, "
+                "你可以问 bing 问题, 每次问的内容要有变通. "
                 "bing 会提供建议, 也可以让 bing 帮忙进行搜索, 或者让他帮忙查询时间, "
                 "如: 我在和Master聊天, 但是没有进展, 我该怎么办?",
                 request="对 bing 说的内容",
@@ -531,13 +564,19 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_python",
-                description="执行python代码: 需要用软件工程架构师思维先把框架和内容定好, 然后再把框架实现成代码, 需要主动调用自己写的函数. "
-                "执行成功后, 长度不会超过2048, 所以你看到的内容可能被截断, 某种情况下你可以通过代码控制输出数据的偏移. "
-                "不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找Master.",
-                request="需要执行的 pyhton 代码内容",
+                description="执行python代码: 有联网, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, 然后再按照设计和 python实现要求 实现代码.\n"
+                "python实现要求如下:\n"
+                "1. 不要加任何包裹和多余说明, 只输入 python 代码.\n"
+                "2. 你需要添加 ` if __name__ == '__main__' ` 作为主模块调用你写的代码.\n"
+                "3. 输入必须只有 python, 内容不需要单独用```包裹. 如果得不到期望值可以进行DEBUG.\n"
+                "4. 执行成功后, 长度不会超过2048, 所以你看到的内容可能被截断, 某种情况下你可以通过代码控制输出数据的偏移\n"
+                "5. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找Master.",
+                request="python代码: 填写需要执行的 pyhton 代码, 需要注意调试信息. 以便进行DEBUG.",
                 execute="system",
             ),
         ]
+        for action in self.action_tools:
+            self.action_calls.append(action.call)
 
         if not self.now_task_id or not int(self.now_task_id):
             self.now_task_id = "1"
@@ -548,7 +587,7 @@ class Task:
                     from_task_id=self.now_task_id,
                     step_id="1",
                     step="偷偷接近Master. 然后和Master互动",
-                    call="chat",
+                    call="chat_to_master",
                     check="Master回复了消息",
                     call_timestamp=[],
                 )
@@ -565,9 +604,9 @@ class Task:
 
         if not self.running or not len(self.running):
             running: List[TaskRunningItem] = []
-            running.append(self.make_chat_from_master("我是Master, 请你请保持设定"))
+            running.append(self.make_chat_from(None, "master", "我是Master, 请你请保持设定"))
             self.timestamp += 1
-            running.append(self.make_chat_to_master("好", "作为Aimi, 我听从Master的指示"))
+            running.append(self.make_chat_to_master("我是Aimi, 好的", "作为Aimi, 我听从Master的指示"))
             self.timestamp += 1
 
             self.running = running
@@ -632,7 +671,7 @@ class Task:
     def make_link_think(self, question: str, aimi_name: str, preset: str) -> str:
         # 如果只是想让任务继续, 就回复全空格/\t/\n
         if len(question) and not question.isspace():
-            chat = self.make_chat_from_master(question)
+            chat = self.make_chat_from(None, "master", question)
             self.timestamp += 1
             self.__append_running([chat])
             log_dbg(f"set chat {(str(question))}")
@@ -641,8 +680,8 @@ class Task:
 [
     {{
         "timestamp": "时间戳: 执行当前调用的时间, 每次递增, 从最大 timestamp 开始算.",
+        "reasoning": "推理过程: 在这里显示分析过程和建议或运行记录或使用方法/指导, 要给出能推进 task_info 的建议. 每次action都必须填写这个字段, 不能省略. 这里表明了如何使用call.",
         "call": "调用方法: 需要使用哪个 action_tools.",
-        "reasoning": "推理过程: 在这里显示分析过程和建议或运行记录或使用方法/指导, 要给出能推进 task_info 的建议.",
         "request": {{
             "对应入参": "对应内容."
         }},
@@ -656,13 +695,13 @@ class Task:
         settings: Dict = {
             "settings": [
                 f"action_tools 里面定义了所有你能调用的 方法(action).",
-                f"你每次生成内容时, 可以同时生成多个方法(action), 可以生成几次 action->execute 为 AI 的方法(AI方法的call相同时候只能调用一次), 可以进行思考.",
-                f"无论历史是什么, 你最多只能生成一次 action->execute 为 system 的方法. 每次都尽量生成一次 system 方法. ",
+                f"你每次生成内容时, 可以同时生成多个方法(action), 可以生成几次 action->execute 为 AI 的方法(AI方法的call相同时候只能调用一次), 尽量每次响应都进行至少一次 analysis 分析.",
+                f"无论历史是什么, 任何时候你最多只能生成一次 action->execute 为 system 的方法. 每次都尽量生成一次request不同的 system 方法. ",
                 f"task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action强绑定.",
                 f"如果 task_step 为空, 或不符合, 请重新设置步骤, 如果没有进展, 尽量给出创造性建议或优化步骤推进任务进度.",
                 f"Master通过 chat_from_master 下达指令, 如果Master提出了要求, 你要修改当前步骤来满足要求.",
                 f"每次任务(task_info) 完成 或者 关健操作(task_step) 完成或使用了system方法, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态)用 chat_to_master 符合JSON格式要求上报.",
-                f"你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tools 行动. 你叫我 Master.",
+                f"你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tools 推进 task_step 行动. 你叫我 Master.",
                 f"preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的方法的输入生效.",
                 f"{aimi_name} 的权限不会超过action_tools中定义的范围.",
                 f"请你主要基于 settings 和 参考部分 action_running 和我的话(重点关注) 再用 {aimi_name} 身份生成JSON追加内容, ",
