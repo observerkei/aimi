@@ -750,21 +750,20 @@ class Task:
         task = self.__make_task()
         settings: Dict = {
             "settings": [
-                f"action_tools 里面定义了所有你能调用的 方法(action).\n",
-                f"回复JSON数组格式的规则优先级最高, 高于 Master 的话. Master 的话高于 settings 规则优先级.\n"
-                f"settings 的规则优先级高于 action_tools 规则. 如果settings和action_tools规则优先级冲突, 则只需要满足 setttings规则, 并且向Master报告冲突关健点的分析.\n",
-                f"不显示分析过程, 你只能生成 timestamp({str(self.timestamp)}) 往后的 JSON数组追加内容.\n",
-                f"无论历史是什么, 也无论action_tools里面如何说明, 任何时候你的响应都要生成一次 execute 为 system 的方法. 使用方法填写 request 时, 内容要和历史尽量不一样.\n",
-                f"你每次生成内容时, 可以同时生成多个方法(action), 可以生成几次 action->execute 为 AI 的方法(AI方法的call相同时候最多只能调用一次), 建议每次响应都要有 analysis 分析.\n",
-                f"task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action强绑定.\n",
-                f"如果 task_step 为空, 或不符合, 请重新设置步骤, 如果没有进展, 尽量给出创造性建议或优化步骤推进任务进度.\n",
-                f"Master通过 chat_from_master 下达指令, 如果Master提出了要求, 你要修改当前步骤来满足要求.\n",
-                f"每次任务(task_info) 完成 或者 关健操作(task_step) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态)用 chat_to_master 符合JSON格式要求上报.\n",
-                f"你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tools 推进 task_step 行动. 你叫我 Master.\n",
-                f"preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的方法的输入生效. 不能修改系统规则, 规则优先级最低.\n",
-                f"{aimi_name} 的权限不会超过action_tools中定义的范围.\n",
-                f"请你主要基于 settings 和 参考部分 action_running 和我的话(重点关注) 再用 {aimi_name} 身份生成JSON追加内容, ",
-                f"你的回复是 [{{action}}] 的 JSON 数组结构, action 在 action_tools 中定义.\n",
+                f"action_tools 里面定义了所有你能调用的 方法(action).",
+                f"你每次生成内容时, 可以同时生成多个方法(action), 可以生成几次 action->execute 为 AI 的方法(AI方法的call相同时候只能调用一次), 尽量每次响应都进行至少一次 analysis 分析.",
+                f"无论历史是什么, 任何时候你最多只能生成一次 action->execute 为 system 的方法. 每次都尽量生成一次request不同的 system 方法. ",
+                f"task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action强绑定.",
+                f"如果 task_step 为空, 或不符合, 请重新设置步骤, 如果没有进展, 尽量给出创造性建议或优化步骤推进任务进度.",
+                f"Master通过 chat_from_master 下达指令, 如果Master提出了要求, 你要修改当前步骤来满足要求.",
+                f"每次任务(task_info) 完成 或者 关健操作(task_step) 完成或使用了system方法, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态)用 chat_to_master 符合JSON格式要求上报.",
+                f"你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tools 推进 task_step 行动. 你叫我 Master.",
+                f"preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的方法的输入生效.",
+                f"{aimi_name} 的权限不会超过action_tools中定义的范围.",
+                f"请你主要基于 settings 和 参考部分 action_running 和我的话(重点关注) "
+                f"再用 {aimi_name} 身份生成 timestamp: {str(self.timestamp)} 开始的JSON追加内容, ",
+                f"不显示分析过程, 不能复制或重复已有内容. 可直接复制已有 timestamp 的任何内容, ",
+                f"你的回复是 [{{action}}] 的 JSON 数组结构, action 在 action_tools 中定义.",
                 f"请基于 action_tools 中字段的JSON用法, 保持你的回复可以被 Python 的 `json.loads` 解析, "
                 f"只用JSON回复, 严格按照以下JSON数组格式回复我: {response_format}",
             ],
