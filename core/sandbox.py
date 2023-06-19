@@ -27,6 +27,12 @@ class Sandbox:
 
     def run_code():
         import subprocess
+        max_return_len = 2048
+        run = {
+            "returncode": "-1",
+            "stdout": "",
+            "stderr": ""
+        }
 
         result = ""
         try:
@@ -37,11 +43,23 @@ class Sandbox:
             )
             if result.returncode != 0:
                 return result.stderr.decode("utf-8")
-            retval = result.stdout.decode("utf-8")
-            if not len(retval):
-                "python 执行完成, 但是没有打印任何输出值. 请把你想要的结果打印出来."
-            return retval
+            
+            run_returncode = str(result.returncode)
+            run_stdout = str(result.stdout.decode("utf-8"))
+            run_stderr = str(result.stderr.decode("utf-8"))
+            if len(run_stdout) > max_return_len:
+                log_err(f"run stdout over limit: {str(len(run_stdout))}")
+                run_stdout = run_stdout[max_return_len:]
+            if len(run_stderr) > max_return_len:
+                log_err(f"run stderr over limit: {str(len(run_stderr))}")
+                run_stderr = run_stderr[max_return_len:]
+            run = {
+                "returncode": run_returncode,
+                "stdout": run_stdout,
+                "stderr": run_stderr
+            }
+            return run
         except Exception as e:
             log_err(f"fail to exec code: {str(e)}")
-            result = str(e)
-        return f"system error: exec code failed:\n{result}"
+            run["stderr"] = str(e)
+        return run
