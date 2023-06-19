@@ -22,11 +22,11 @@ class GoCQHttp:
         self.__load_go_cqhttp_config()
 
     def __load_go_cqhttp_config(self):
-        go_cqhttp_config = "./run/Config.yml"
+        go_cqhttp_config = "./run/config.yml"
         try:
             go_cqhttp_config = Config.setting["config"]
         except:
-            go_cqhttp_config = "./run/Config.yml"
+            go_cqhttp_config = "./run/config.yml"
 
         obj = read_yaml(go_cqhttp_config)
         try:

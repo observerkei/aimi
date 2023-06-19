@@ -29,7 +29,7 @@ class Sandbox:
         result = ""
         try:
             result = subprocess.run(
-                ["python3.9", Sandbox.sandbox_file],
+                ["python3", Sandbox.sandbox_file],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
