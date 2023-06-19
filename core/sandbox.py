@@ -1,3 +1,5 @@
+import sys
+
 from tool.util import log_err, log_dbg
 
 
@@ -29,13 +31,16 @@ class Sandbox:
         result = ""
         try:
             result = subprocess.run(
-                ["python3", Sandbox.sandbox_file],
+                [sys.executable, Sandbox.sandbox_file],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
             if result.returncode != 0:
                 return result.stderr.decode("utf-8")
-            return result.stdout.decode("utf-8")
+            retval = result.stdout.decode("utf-8")
+            if not len(retval):
+                "python 执行完成, 但是没有打印任何输出值. 请把你想要的结果打印出来."
+            return retval
         except Exception as e:
             log_err(f"fail to exec code: {str(e)}")
             result = str(e)

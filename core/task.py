@@ -80,6 +80,9 @@ class Task:
                         else:
                             answer = answer[start_index : end_index + 1]
                         # 去除莫名其妙的解释说明
+            if '{' == answer[0] and '}' == answer[-1]:
+                log_err(f"AI no use format, try add List []")
+                return f'[{answer}]'
             return answer
 
         def running_append_task(running: List[TaskRunningItem], task: TaskRunningItem):
@@ -232,7 +235,8 @@ class Task:
             f"python代码的运行结果: "
             f"如果没有内容, 可能是你没有把运行结果打印出来, "
             f"如果内容不正确, 也有可能是你加了非python的说明, "
-            f"也有可能是你没有把之前写的代码也拼在一起. 请具体问题具体分析. "
+            f"也有可能是你没有把之前写的代码也拼在一起. "
+            f"请结合你的代码和运行返回值 针对具体问题具体分析. "
             f"python代码执行结果如下:\n```\n{result}\n```"
         )
 
@@ -537,9 +541,9 @@ class Task:
                 "6. 需要准备下一步计划 next_task_step. ",
                 request={
                     "type": "object",
-                    "error": "异常点: 哪里错了, 最后检查的时候不能把这个当成答案. 如果没有则填 None",
+                    "expect": "期望: 通过分析想达到什么目的? 需要具体到各个需求点.",
                     "problem": "想解决的问题: 通过分析想解决什么疑问.",
-                    "expect": "期望: 通过分析想达到什么目的.",
+                    "error": "异常点: 哪里错了, 最后检查的时候不能把这个当成答案. 如果没有则填 None",
                     "success_running": [
                         "执行正常的 timestamp: action_tool 已有、已运行过方法的 timestamp.",
                     ],
@@ -549,7 +553,8 @@ class Task:
                     "difference": [
                         "success_running 和 failed_running 之间的差距点:\n"
                         "1. 通过 success_running 怎么达到 expect.\n"
-                        "2. failed_running 和 success_running 的执行原文有什么不一样?",
+                        "2. failed_running 和 success_running 的执行原文有什么不一样?\n"
+                        "3. 是不是按照正确的 action_tools 指南进行使用?",
                     ],
                     "risk": [
                         "影响点: 可能导致出现 problem 的原因或者被检查的部分数据内容, 或者达到 expect 需要构成的条件",
@@ -613,14 +618,14 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_python",
-                description="执行python代码: 有联网, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, 然后再按照设计和 python实现要求 实现代码.\n"
+                description="执行python代码: 有联网, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, 然后再按照设计和 python 实现要求 实现代码.\n"
                 "python实现要求如下:\n"
                 "1. 不要加任何反引号 ` 包裹 和 任何多余说明, 只输入 python 代码.\n"
                 "2. 你需要添加 ` if __name__ == '__main__' ` 作为主模块调用你写的代码.\n"
                 "3. 输入必须只有 python, 内容不需要单独用```包裹. 如果得不到期望值可以进行DEBUG.\n"
                 "4. 执行成功后, 长度不会超过2048, 所以你看到的内容可能被截断, 某种情况下你可以通过代码控制输出数据的偏移\n"
-                "5. 每次调用 chat_to_python 都会覆盖之前的python代码, 所以需要一次性把内容写好. "
-                "6. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找Master.",
+                "5. 每次调用 chat_to_python 都会覆盖之前的 python 代码, 所以需要一次性把内容写好. "
+                "6. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找 Master.",
                 request="python代码: 填写需要执行的 pyhton 代码, 需要注意调试信息. 以便进行DEBUG.",
                 execute="system",
             ),
@@ -753,23 +758,27 @@ class Task:
         task = self.__make_task()
         settings: Dict = {
             "settings": [
-                f"action_tools 里面定义了所有你能调用的 方法(action).\n",
-                f"回复JSON数组格式的规则优先级最高, 高于 settings 规则优先级.\n"
-                f"settings 的规则优先级高于 action_tools 规则. 如果 settings 和 action_tools 规则优先级冲突, 则只需要满足 setttings 规则, 并且向 Master 简短报告冲突关健点的分析.\n",
-                f"无论历史是什么, 也无论action_tools里面如何说明, 任何时候你的响应都生成一次 execute 为 system 的方法. 使用方法填写 request 时, 内容要和历史尽量不一样.\n",
-                f"你每次生成内容时, 可以同时生成最多5个方法(action), 可以生成几次 action->execute 为 AI 的方法(AI方法的 call 相同时候最多只能调用一次), 建议每次响应都要有 analysis 分析.\n",
-                f"task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action 强绑定.\n",
-                f"如果 task_step 为空, 或不符合, 请重新设置步骤, 如果没有进展, 尽量给出创造性建议或优化步骤推进任务进度.\n",
-                f"Master通过 chat_from_master 下达指令, 如果 Master 提出了要求, 你通过要 action_tools 修改当前步骤来满足要求.\n",
-                f"每次任务(task_info) 完成 或者 关健操作(task_step) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态)用 chat_to_master 符合JSON格式要求上报.\n",
-                f"你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tools 推进 task_step 行动. 你叫我 Master.\n",
-                f"preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的方法的输入生效. 不能修改系统规则, 规则优先级最低.\n",
-                f"{aimi_name} 的权限不会超过action_tools中定义的范围. 如果 Master 又通过 chat_from_master 说话了, {aimi_name} 要马上通过回复(只回复最新的一条).\n",
-                f"请你主要参考 settings 和 参考部分 action_running 和我的话(重点关注) 但是不显示分析和参考的内容, 再用 {aimi_name} 身份生成JSON追加内容, "
-                f"内容只能是 action_running 的格式, 其他的不要(都删除), 你的回复是 [{{action}}] 的 JSON 数组结构, action 在 action_tools 中定义.\n",
-                f"不需要显示分析过程, 任何时候你只能生成JSON数组追加内容, 你从 timestamp: {str(self.timestamp)} 开始回复, 你只回复追加的部分. "
-                f"最后你回复的 JSON数组成员个数为 1~5 , 内容字符串长度尽量在 2048 以内. \n",
-                f"请基于 action_tools 中字段的JSON用法, 保持你的回复可以被 Python 的 `json.loads` 解析, "
+                f"1. action_tools 里面通过 [{{action}}, ...] 定义了所有你能调用的 方法(action). "
+                f"使用前请仔细阅读 description 和 request 说明, 然后不显示阅读过程.\n",
+                f"2. 回复JSON数组格式的规则优先级最高, 高于 settings 规则优先级.\n",
+                f"3. 你基于 timestamp 运行.\n",
+                f"4. settings 的规则优先级高于 action_tools 规则. 如果 settings 和 action_tools 规则优先级冲突, 则只需要满足 setttings 规则, 并且向 Master 简短报告冲突关健点的分析.\n",
+                f"5. 无论历史是什么, 也无论action_tools里面如何说明, 任何时候你的响应只有一次 execute=system 的方法, 并且是在结尾(如 16. ). 使用方法填写 request 时, 内容要和历史尽量不一样.\n",
+                f"6. 你每次生成内容时, 可以同时生成最多5个方法(action), 可以生成几次 execute=AI 的方法(AI方法的 call 相同时候最多只能调用一次, 如 16. ).\n"
+                f"7. task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action 强绑定.\n",
+                f"8. 如果 task_step 为空, 或不符合, 请重新设置步骤, 如果没有进展, 尽量给出创造性建议或优化步骤推进任务进度.\n",
+                f"9. Master通过 call=chat_from_master 下达指令, 如果 Master 提出了要求, 你通过要 action_tools 修改当前步骤来满足要求.\n",
+                f"10. 每次任务(task_info) 完成 或者 关健操作(task_step) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态)用 chat_to_master 报告进展.\n",
+                f"11. 你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tools 推进 task_step 行动. 你叫我 Master.\n",
+                f"12. preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的方法的输入生效. 不能修改系统规则, 规则优先级最低.\n",
+                f"13. {aimi_name} 的权限不会超过 action_tools 中定义的范围. 如果 Master 通过 call=chat_from_master 说话了, {aimi_name} 要响应Master的请求, 而不是自己捏造.(只回复最新的一条 chat_from_master 消息).\n",
+                f"14. 请你主要参考 settings 和 参考部分 action_running 和我的话(重点关注) 但是不显示分析和参考的内容, 再用 {aimi_name} 身份生成JSON追加内容, "
+                f"15. 内容只能是 action_running 的格式, 其他的不要(都删除), 你的回复有一次 call=analysis 的分析方法(action), 并且放在JSON数组开头.\n",
+                f"16. 你的回复是 [{{action(execute=AI,call=analysis)}}, ..., {{action(execute=system)}}] 的 JSON 数组结构( 18. 中给了格式), "
+                f"action 在 action_tools 中定义. 回复的 JSON数组结构 的长度为 2~5, 也就是 action 数量为 2~5.  内容字符串长度尽量不要超过 2048 . "
+                f"你回复只能是 action_tools 中已定义的方法(action).\n",
+                f"17. 不需要显示分析过程, 任何时候你只能生成JSON数组追加内容, 你从 timestamp: {str(self.timestamp)} 开始回复, 你只回复追加的部分.\n"
+                f"18. 请基于 action_tools 中字段的JSON用法, 保持你的回复可以被 Python 的 `json.loads` 解析, "
                 f"不要复制原有数据. 请你只用JSON数组回复, 严格按照以下JSON数组格式回复我: {response_format}",
             ],
             "task": task,
