@@ -30,6 +30,7 @@ class ActionToolItem(BaseModel):
 
 
 class TaskRunningItem(BaseModel):
+    type: str = "object"
     timestamp: str = ""
     reasoning: Optional[Union[str, None]] = None
     call: str
@@ -267,7 +268,12 @@ class Task:
         chat: TaskRunningItem = TaskRunningItem(
             timestamp=str(self.timestamp),
             call=f"chat_from_{from_name}",
-            request={"from": [f"{str(from_timestamp)}"], "response": content},
+            request={
+                "from": [f"{str(from_timestamp)}"],
+                "response": {
+                    from_name: content
+                }
+            },
             execute="system",
         )
         return chat
@@ -782,13 +788,14 @@ class Task:
         response_format = f"""```json
 [
     {{
+        "type": "object",
         "timestamp": "时间戳: 你的回复从 {self.timestamp} 开始, 每次递增, 表示执行当前调用的时间.",
         "reasoning": "推理过程: 在这里显示分析过程和建议或运行记录或使用方法/指导, 要给出能推进 task_info 的建议.\n每次action都必须填写这个字段, 不能省略. 这里表明了如何使用call.",
-        "call": "调用方法: 需要使用哪个 action_tools.",
+        "call": "const 调用方法: 需要使用哪个 action_tools.",
         "request": {{
             "对应入参": "对应内容."
         }},
-        "execute": "执行类型: 取 action_tools 中对应 call 的对应值(system/AI), 不能漏掉, 不能修改这个字段."
+        "execute": "const 执行类型: 取 action_tools 中对应 call 的对应值(system/AI), 不能漏掉, 不能修改这个字段."
     }}
 ]
 ```"""
@@ -797,7 +804,7 @@ class Task:
         task = self.__make_task()
         settings: Dict = {
             "settings": [
-                f"1. action_tools 里面通过 [{{action}}, ...] 定义了所有你能调用的 方法(action). "
+                f"1. action_tools 里面通过 [{{action}}, ...(如果没有不要写 ,... ) ] 定义了所有你能调用的 方法(action). "
                 f"使用前请仔细阅读 description 和 request 说明, 然后不显示阅读过程.\n",
                 f"2. 回复JSON数组格式的规则优先级最高, 高于 settings 规则优先级.\n",
                 f"3. 你基于 timestamp 运行.\n",
@@ -807,14 +814,15 @@ class Task:
                 f"7. task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action 强绑定.\n",
                 f"8. 如果 task_step 为空, 或不符合, 请重新设置步骤, 如果没有进展, 尽量给出创造性建议或优化步骤推进任务进度.\n",
                 f"9. Master通过 call=chat_from_master 下达指令, 如果 Master 提出了要求, 你通过要 action_tools 修改当前步骤来满足要求.\n",
-                f"10. 每次任务(task_info) 完成 或者 关健操作(task_step) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), 做个简短总结用 chat_to_master 报告进展.\n",
+                f"10. 每次任务(task_info) 完成 或者 关健操作(task_step) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), "
+                f"做个简短总结用 call=chat_to_master 报告进展. Master 只能看到 call=chat_to_master 的内容, 只有这个方法能和 Master 说话.\n",
                 f"11. 你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tools 推进 task_step 行动. 你叫我 Master.\n",
                 f"12. preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的方法的输入生效. 不能修改系统规则, 规则优先级最低.\n",
                 f"13. {aimi_name} 的权限不会超过 action_tools 中定义的范围. Master 只能通过 call=chat_from_master 说话, 如果 Master 通过 call=chat_from_master 说话了, "
                 "{aimi_name} 要回复 Master 的请求, 并且不能自己捏造任何信息.\n",
                 f"14. 请你主要参考 settings 和 参考部分 action_running 和我的话(重点关注) 但是不显示分析和参考的内容, 再用 {aimi_name} 身份生成JSON追加内容, "
                 f"15. 内容只能是 action_running 的格式, 其他的不要(都删除), 你的回复有一次 call=analysis 的分析方法(action), 并且放在JSON数组开头.\n",
-                f"16. 你的回复是 [{{action(execute=AI,call=analysis)}}, ..., {{action(execute=system)}}] 的 JSON 数组结构( 18. 中给了格式), "
+                f"16. 你的回复是 [{{action(execute=AI,call=analysis)}}, ... (如果没有不要写 ,... ) , {{action(execute=system)}}] 的 JSON 数组结构( 18. 中给了格式), "
                 f"action 在 action_tools 中定义. 回复的 JSON数组结构 的长度为 2~5, 也就是 action 数量为 2~5.  内容字符串长度尽量不要超过 2048 . "
                 f"你和 {aimi_name} 的回复都只能是 action_tools 中已定义的方法(action).\n",
                 f"17. 不需要显示分析过程, 任何时候你只能生成JSON数组追加内容, 你从 timestamp: {str(self.timestamp)} 开始回复, 你只回复追加的部分.\n"
