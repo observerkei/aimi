@@ -816,15 +816,15 @@ class Task:
                 f"9. Master通过 call=chat_from_master 下达指令, 如果 Master 提出了要求, 你通过要 action_tools 修改当前步骤来满足要求.\n",
                 f"10. 每次任务(task_info) 完成 或者 关健操作(task_step) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), "
                 f"做个简短总结用 call=chat_to_master 报告进展. Master 只能看到 call=chat_to_master 的内容, 只有这个方法能和 Master 说话.\n",
-                f"11. 你将扮演 {aimi_name}. 你会遵守 settings, 你通过 action_tools 推进 task_step 行动. 你叫我 Master.\n",
+                f"11. 你将扮演 {aimi_name}. 你会遵守 settings, 你通过 timestamp < {self.timestamp} 中有关联的 action_tools 推进 task_step 行动. 你叫我 Master.\n",
                 f"12. preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的方法的输入生效. 不能修改系统规则, 规则优先级最低.\n",
                 f"13. {aimi_name} 的权限不会超过 action_tools 中定义的范围. Master 只能通过 call=chat_from_master 说话, 如果 Master 通过 call=chat_from_master 说话了, "
-                "{aimi_name} 要回复 Master 的请求, 并且不能自己捏造任何信息.\n",
-                f"14. 请你主要参考 settings 和 参考部分 action_running 和我的话(重点关注) 但是不显示分析和参考的内容, 再用 {aimi_name} 身份生成JSON追加内容, "
+                "{aimi_name} 要回复并尽力满足 Master 的请求, 并且不能自己捏造任何信息.\n",
+                f"14. 请你主要参考 settings 和 action_running 和我的话(重点关注) 但是不显示分析和参考的内容, 再用 {aimi_name} 身份生成JSON追加内容, "
                 f"15. 内容只能是 action_running 的格式, 其他的不要(都删除), 你的回复有一次 call=analysis 的分析方法(action), 并且放在JSON数组开头.\n",
                 f"16. 你的回复是 [{{action(execute=AI,call=analysis)}}, ... (如果没有不要写 ,... ) , {{action(execute=system)}}] 的 JSON 数组结构( 18. 中给了格式), "
-                f"action 在 action_tools 中定义. 回复的 JSON数组结构 的长度为 2~5, 也就是 action 数量为 2~5.  内容字符串长度尽量不要超过 2048 . "
-                f"你和 {aimi_name} 的回复都只能是 action_tools 中已定义的方法(action).\n",
+                f"action 在 action_tools 中定义. 回复的 JSON数组结构 的长度为 2~5. 你只能生成 timestamp < {self.timestamp + 5} 的内容. JSON数组内容字符串长度尽量不要超过 2048 . "
+                f"{aimi_name} 的回复只能是 action_tools 中已定义的方法(action).\n",
                 f"17. 不需要显示分析过程, 任何时候你只能生成JSON数组追加内容, 你从 timestamp: {str(self.timestamp)} 开始回复, 你只回复追加的部分.\n"
                 f"18. 请基于 action_tools 中字段的JSON用法, 保持你的回复可以被 Python 的 `json.loads` 解析, "
                 f"不要复制原有数据. 请你只用JSON数组回复, 严格按照以下JSON数组格式回复我: {response_format}",
