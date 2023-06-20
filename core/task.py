@@ -805,8 +805,8 @@ class Task:
     {{
         "type": "object",
         "timestamp": "timestamp 时间戳: 你的回复从 {self.timestamp} 开始, 每次递增, 表示执行当前调用的时间.",
-        "reasoning": "推理过程: 在这里显示分析过程和建议或运行记录或使用 动作(action) /指导, 要给出能推进 task_info 的建议.\n每次动作(action) 都必须填写这个字段, 不能省略. 这里表明了如何使用 动作(action). Master 看不到 reasoning.",
-        "call": "const 调用 动作(action) 名: 取 action_tools 中想要使用动作(action) 的对应 call , 不能为空.",
+        "reasoning": "推理过程: 在这里显示分析过程和建议或运行记录或使用 动作(action) /指导, 要给出能推进 task_info 的建议.\n每次动作(action) 都必须填写这个字段, 不能省略. 这里表明了如何使用 动作(action).",
+        "call": "const 调用 动作(action) 名: 取 action_tools 中想要使用动作(action) 的对应 call , 必须有值, 不能为空.",
         "request":{{
             "call对应参数": "参数内容"
         }},
