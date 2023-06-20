@@ -23,6 +23,7 @@ class TaskStepItem(BaseModel):
 
 
 class ActionToolItem(BaseModel):
+    type: str = "object"
     call: str
     description: str
     request: Any
@@ -63,6 +64,9 @@ class Task:
 
     def task_response(self, res: str) -> Generator[dict, None, None]:
         def get_json_content(answer: str) -> str:
+            if "{" == answer[0] and "}" == answer[-1]:
+                log_err(f"AI no use format, try add List []")
+                return f"[{answer}]"
             start_index = answer.find("```json\n[")
             if start_index == -1:
                 start_index = answer.find("[")
@@ -81,9 +85,6 @@ class Task:
                         else:
                             answer = answer[start_index : end_index + 1]
                         # 去除莫名其妙的解释说明
-            if "{" == answer[0] and "}" == answer[-1]:
-                log_err(f"AI no use format, try add List []")
-                return f"[{answer}]"
             return answer
 
         def running_append_task(running: List[TaskRunningItem], task: TaskRunningItem):
@@ -94,7 +95,7 @@ class Task:
             else:
                 log_dbg(f"task len overload: {len(str(task))}")
             return running
-        
+
         def fill_action_execute(data):
             # fix no execute.
             for action in data:
@@ -404,7 +405,9 @@ class Task:
                 task_info = task.task_info
                 log_info(f"success: True, task complate: {str(task_info)}")
 
-                if "task_id" in request and  int(self.now_task_id) != int(request['task_id']):
+                if "task_id" in request and int(self.now_task_id) != int(
+                    request["task_id"]
+                ):
                     log_dbg(f"not task ... ")
                     return False
 
@@ -828,7 +831,7 @@ class Task:
         "request":{{
             "call对应参数": "参数内容"
         }},
-        "execute": "const 动作(action) 级别: 取 action_tools 中对应 call 的对应值(system/AI), 不能漏掉, 不能修改这个字段."
+        "execute": "const 动作(action) 执行级别: 取 action_tools 中对应 call 的对应值(system/AI), 不能漏掉, 不能修改这个字段."
     }}
 ]
 ```"""
@@ -837,9 +840,10 @@ class Task:
         task = self.__make_task()
 
         settings: Dict = {
+            "type": "object",
             "timestamp": self.timestamp,
             "settings": [
-                f"0. 你需要阅读完 settings 后, 才回复我.\n",
+                f"0. 你需要阅读完 settings 后, 才思考如何回复我.\n",
                 f"1. 你基于 timestamp 运行. , 你从 timestamp={self.timestamp} 开始回复, 你每次只能生成 {self.timestamp-1} < timestamp < {self.timestamp+4} 之间的内容.\n",
                 f"2. action_tools 里面通过 List[action] 格式( 16. 中给出了格式) 定义了所有你能调用的 动作(action). "
                 f"使用前请仔细阅读 description 和 request, 使用 动作(action) 填写 request 时, 在保证准确性同时内容要和历史尽量不一样(不要重复自己的回答). 动作(action) 中字段的描述只对该动作有效.\n",
