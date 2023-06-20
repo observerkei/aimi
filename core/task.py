@@ -94,6 +94,21 @@ class Task:
             else:
                 log_dbg(f"task len overload: {len(str(task))}")
             return running
+        
+        def fill_action_execute(data):
+            # fix no execute.
+            for action in data:
+                for tool in self.action_tools:
+                    if "chat_from_" in action["call"] and "execute" not in action:
+                        log_err(f"AI try call: chat_from_master")
+                        action["execute"] = "system"
+                    if action["call"] != tool.call:
+                        continue
+                    if "execute" in action and action["execute"] != tool.execute:
+                        log_err(f"AI try overwrite execute: {tool.call}")
+                    action["execute"] = tool.execute
+                    log_dbg(f"fill call({tool.call}) execute: {tool.execute}")
+            return data
 
         log_dbg(f"timestamp: {str(self.timestamp)}")
         log_dbg(f"now task: {str(self.tasks[self.now_task_id].task_info)}")
@@ -107,18 +122,7 @@ class Task:
             # data = decoder.decode(answer)
             data = json5.loads(answer)
 
-            # fix no execute.
-            for action in data:
-                for tool in self.action_tools:
-                    if "chat_from_" in action["call"] and "execute" not in action:
-                        log_err(f"AI try call: chat_from_master")
-                        action["execute"] = "system"
-                    if action["call"] != tool.call:
-                        continue
-                    if "execute" in action and action["execute"] != tool.execute:
-                        log_err(f"AI try overwrite execute: {tool.call}")
-                    action["execute"] = tool.execute
-                    log_dbg(f"fill call({tool.call}) execute: {tool.execute}")
+            data = fill_action_execute(data)
 
             tasks = [TaskRunningItem(**item) for item in data]
 
@@ -852,9 +856,9 @@ class Task:
                 f"9. 你将扮演 {aimi_name}. 你会始终遵守 settings.\n",
                 f"10. preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的 动作(action) 的输入生效. preset 不能修改系统规则, preset 规则优先级最低.\n",
                 f"11. {aimi_name} 的权限不会超过 action_tools 中定义的范围. "
-                f"12. 请你主要通过 settings 和 action_running 中 timestamp < {self.timestamp} 的内容 和 Master 说所有话(重点关注), 再用 {aimi_name} 身份生成 List[action] 格式( 16. 中有定义)JSON追加内容, "
+                f"12. 请你主要通过分析 settings 和 action_running 中 timestamp < {self.timestamp} 的内容 和 Master 说所有话(重点关注), 再用 {aimi_name} 身份生成 List[action] 格式( 16. 中有定义)JSON追加内容, "
                 f"13. 你的回复有是 0 个或多个 AI 动作(action(execute=AI)) 和 必须有也最多有 1 个 system 动作(action(execute=system)) 的组合结构( 16. 中有定义). \n"
-                f"14. 你的回复是 [{{action(execute=AI, call=analysis)}}, ... (如果没有不要写 `, ...` ) , {{action(execute=system)}}] 的 List[action] JSON数组结构( 16. 中给了格式), "
+                f"14. 你的回复是 [{{action(execute=AI, call=analysis)}}, ... {{action(execute=system)}}] 的 List[action] JSON数组结构( 16. 中给了格式), "
                 f"回复结构 List[action] 中的 action 只在 action_tools 中定义, 数组中不能有 action(call=chat_to_master) 的 动作(action) . "
                 f"回复的 JSON数组结构 List[action] 的长度为 2~5. JSON数组内容字符串长度尽量不要超过 2048 . "
                 f"{aimi_name} 的回复只能是 action_tools 中已定义的动作(action).\n",
