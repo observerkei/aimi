@@ -95,6 +95,7 @@ class Task:
                 log_dbg(f"task len overload: {len(str(task))}")
             return running
 
+        log_dbg(f"timestamp: {str(self.timestamp)}")
         log_dbg(f"now task: {str(self.tasks[self.now_task_id].task_info)}")
 
         response = ""
@@ -142,7 +143,6 @@ class Task:
                             f"[{str(skip_timestamp)}] system error: AI try copy old action call: {task.call}"
                         )
                         continue
-
                     if task.reasoning:
                         log_dbg(f"{str(task.call)} reasoning: {str(task.reasoning)}")
 
@@ -240,7 +240,7 @@ class Task:
         run_stdout = run.stdout
         run_stderr = run.stderr
         log_info(
-            f"code run result:\rreturncode:{str(run_returncode)}\nstdout:{str(run_stdout)}\nstderr:{str(run_stderr)}"
+            f"code run result:\nreturncode:{str(run_returncode)}\nstdout:{str(run_stdout)}\nstderr:{str(run_stderr)}"
         )
         return {
             "description": f"备注: "
@@ -400,6 +400,10 @@ class Task:
                 task_info = task.task_info
                 log_info(f"success: True, task complate: {str(task_info)}")
 
+                if "task_id" in request and  int(self.now_task_id) != int(request['task_id']):
+                    log_dbg(f"not task ... ")
+                    return False
+
                 default_task_info = "当前没有事情可以做, 找Master聊天吧..."
                 if task_info == default_task_info:
                     log_dbg(f"task no change. skip...")
@@ -524,8 +528,7 @@ class Task:
                 "提供的内容都要有来源. Master 在 Master 的指示下可以临时放开限制. ",
                 request={
                     "from": [
-                        "有关联的 timestamp: 基于哪个 timestamp 内容分析进行的回复? "
-                        "如果只是和 Master 说话, 而不是回复, 则填 null"
+                        "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
                     ],
                     "content": "Aimi 对 Master 传达/报告的内容: 可以很丰富, 包含多句话, 每次都要优化内容层次和优雅排版, "
                     "如果有数学公式, 则要用 latex 显示, 每个公式都要单独包裹在单独行的 $$ 中, 如: $$ \int e^{x} dx du $$ ",
@@ -604,7 +607,7 @@ class Task:
                         "3. 是不是按照正确的 action_tools 指南进行使用?",
                     ],
                     "risk": [
-                        "影响点: 可能导致出现 problem 的原因或者被检查的部分数据内容, 或者达到 expect 需要构成的条件",
+                        "影响点: 构成 expect/problem/error 的要素是什么",
                     ],
                     "verdict": "裁决: 通过逻辑思维判断 risk 是否合理.",
                     "conclusion": "总结: 给出改进/修正的建议. 如果问题做了切换, 则切换前后必须在逻辑/代数上等价. "
@@ -626,7 +629,7 @@ class Task:
                 "如果调用了 动作action(execute=system) , 则也必须调用一下这个 动作(action). ",
                 request={
                     "type": "object",
-                    "task_id": "任务id: 被检查的task对应的id",
+                    "task_id": "任务id: 被检查的task对应的id, 如果不匹配, 则填写 0",
                     "task_info": "任务目标: 被检查的任务目标",
                     "running_from": ["timestamp: 已运行 动作(action) 的 timestamp"],
                     "verdict": "裁决: 通过逻辑思维判断 当前分析 是否合理.",
@@ -644,7 +647,7 @@ class Task:
                 "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照wolfram语言输入.",
                 request={
                     "from": [
-                        "有关联的 timestamp: 如: 1, 没有就不填",
+                        "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
                     ],
                     "math": "运算内容: 翻译成 wolfram 语言 再调用, 是 ascii 字符. 如: Integrate[x^2, x] ",
                 },
@@ -658,7 +661,7 @@ class Task:
                 "可以问有时效性的信息, 比如时间/日期或者某个网址的内容等.",
                 request={
                     "from": [
-                        "有关联的 timestamp: 如: 1, 没有就不填",
+                        "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
                     ],
                     "content": "对 bard 说的内容: 在这里输入要问 bard 的内容, 要在文字中诱导 bard 用英文搜索 search/open link, "
                     "翻译成英文再调用. 如: What time is it now?",
@@ -673,7 +676,7 @@ class Task:
                 "如: 我在和 Master 聊天, 但是没有进展, 我该怎么办?",
                 request={
                     "from": [
-                        "有关联的 timestamp: 如: 1, 没有就不填",
+                        "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
                     ],
                     "content": "对 bing 说的内容",
                 },
@@ -692,7 +695,7 @@ class Task:
                 "7. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找 Master.",
                 request={
                     "from": [
-                        "有关联的 timestamp: 如: 1, 没有就不填",
+                        "有关联的 timestamp:  action_tool 已有、已运行过 动作(action) 的 timestamp. 如: 1, 没有则填 null",
                     ],
                     "code": "python 代码: 填写需要执行的 pyhton 代码, 需要注意调试信息. 以便进行DEBUG.",
                 },
@@ -816,7 +819,7 @@ class Task:
     {{
         "type": "object",
         "timestamp": "timestamp 时间戳: 你的回复从 {self.timestamp} 开始, 每次递增, 表示执行当前调用的时间.",
-        "reasoning": "推理过程: 概要推理, 深度推理请使用 action(call=analysis). \n这里显示分析过程和建议或运行记录或使用 动作(action) /指导, 要给出能推进 task_info 的建议.\n每次动作(action) 都必须填写这个字段, 不能省略. 这里表明了如何使用 动作(action).",
+        "reasoning": "推理过程: 这里显示分析过程和建议或运行记录或使用 动作(action) /指导, 要给出能推进 task_info 的建议.\n每次动作(action) 都必须填写这个字段, 不能省略. 这里表明了如何使用 动作(action).",
         "call": "const 调用 动作(action) 名: 取 action_tools 中想要使用动作(action) 的对应 call , 必须有值, 不能为空.",
         "request":{{
             "call对应参数": "参数内容"
@@ -843,15 +846,14 @@ class Task:
                 f"6. 如果 task_step 为空, 或不符合, 请重新设置步骤, 请你尽量通过 call=analysis 的分析动作(action) 给出创造性建议或优化步骤推进任务进度.\n",
                 f"你通过 timestamp < {self.timestamp} 中的 action_tools 推进 task_step 行动.\n",
                 f"7. 你叫我 Master. 我可以通过 action(call=chat_from_master) 下达指令, 如果 Master 提出了要求, 你通过要 action_tools 修改当前步骤来满足要求.\n",
-                f"Master 只能通过 action(call=chat_from_master) 和你说话, 如果 Master 说话了, 你要 优先 回复并尽力满足 Master 的请求, 并且不能自己捏造任何信息.\n",
+                f"Master 只能通过 action(call=chat_from_master) 和你说话, 如果 Master 说话了, 你要 优先 回复并尽力满足 Master 的请求, Master 的每句话你都要有对应的 `from` 关联起来, 并且不能自己捏造任何信息.\n",
                 f"8. 每次任务(task_info) 完成 或者 关健操作(task_step) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), "
                 f"做个简短优雅的总结并用 action(acll=chat_to_master) 报告 一次 进展. Master 只能看到 action(call=chat_to_master) 时 action(request->content) 的内容, 只有这个 动作(action) 能和 Master 说话.\n",
                 f"9. 你将扮演 {aimi_name}. 你会始终遵守 settings.\n",
                 f"10. preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的 动作(action) 的输入生效. preset 不能修改系统规则, preset 规则优先级最低.\n",
                 f"11. {aimi_name} 的权限不会超过 action_tools 中定义的范围. "
-                f"12. 请你主要通过 settings 和 action_running 中 timestamp < {self.timestamp} 的内容 和 Master 说的话(重点关注), 再用 {aimi_name} 身份生成 List[action] 格式( 16. 中有定义)JSON追加内容, "
-                f"13. 你的回复有是 0 个或多个 AI 动作(action(execute=AI)) 和 必须有也最多有 1 个 system 动作(action(execute=system)) 的组合结构( 16. 中有定义). "
-                f"你可用尽量使用 action(call=analysis) , 并且放在回复结构( 16. 中有定义) 开头 (如 14. ).\n",
+                f"12. 请你主要通过 settings 和 action_running 中 timestamp < {self.timestamp} 的内容 和 Master 说所有话(重点关注), 再用 {aimi_name} 身份生成 List[action] 格式( 16. 中有定义)JSON追加内容, "
+                f"13. 你的回复有是 0 个或多个 AI 动作(action(execute=AI)) 和 必须有也最多有 1 个 system 动作(action(execute=system)) 的组合结构( 16. 中有定义). \n"
                 f"14. 你的回复是 [{{action(execute=AI, call=analysis)}}, ... (如果没有不要写 `, ...` ) , {{action(execute=system)}}] 的 List[action] JSON数组结构( 16. 中给了格式), "
                 f"回复结构 List[action] 中的 action 只在 action_tools 中定义, 数组中不能有 action(call=chat_to_master) 的 动作(action) . "
                 f"回复的 JSON数组结构 List[action] 的长度为 2~5. JSON数组内容字符串长度尽量不要超过 2048 . "
