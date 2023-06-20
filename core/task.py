@@ -747,9 +747,9 @@ class Task:
             self.timestamp += 1
             running.append(
                 self.make_chat_to_master(
-                    str(self.timestamp - 1),
-                    "我是Aimi, 我会遵守 settings",
-                    "作为Aimi, 我听从Master的指示",
+                    from_timestamp=str(self.timestamp - 1),
+                    content="我是Aimi, 我会遵守 settings",
+                    reasoning="作为Aimi, 我听从Master的指示",
                 )
             )
             self.timestamp += 1

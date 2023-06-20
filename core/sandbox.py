@@ -45,8 +45,6 @@ class Sandbox:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
-            if result.returncode != 0:
-                return result.stderr.decode("utf-8")
 
             run.returncode = int(result.returncode)
             run.stdout = str(result.stdout.decode("utf-8"))
