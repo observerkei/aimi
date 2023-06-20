@@ -119,8 +119,6 @@ class AimiPlugin:
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
 
-                log_dbg(f"check file:{filename} ")
-
                 # 实例化模块中的类
                 if hasattr(module, "Bot"):
                     try:

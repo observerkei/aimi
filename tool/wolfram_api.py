@@ -24,6 +24,7 @@ class WolframAPI:
         try:
             self.client = wolframalpha.Client(self.app_id)
             self.init = True
+            log_info(f"{self.type} init done")
         except Exception as e:
             log_err(f"fail to init wolfram: {e}")
 

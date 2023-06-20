@@ -75,6 +75,8 @@ def log_info(message: str, is_plugin: bool = False):
     caller_func = get_caller_function_name(is_plugin)
     caller_line = get_caller_lineno(is_plugin)
     logger.info(f"[{caller_file}:{caller_func}:{caller_line}]  {message}")
+    # import traceback
+    # traceback.print_stack()
 
 
 def get_caller_filename(is_plugin: bool = False):

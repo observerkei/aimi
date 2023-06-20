@@ -4,12 +4,9 @@ import os
 from typing import Dict, Any, List, Generator, Optional, Union
 from pydantic import BaseModel, constr
 
-from tool.openai_api import OpenAIAPI
-from tool.wolfram_api import WolframAPI
-from tool.bard_api import BardAPI
-from tool.bing_api import BingAPI
 from tool.config import Config
 from tool.util import log_dbg, log_err, log_info, make_context_messages, write_yaml
+
 from core.sandbox import Sandbox, RunCodeReturn
 
 
@@ -57,10 +54,12 @@ class Task:
     running: List[TaskRunningItem] = []
     max_running_size: int = 16 * 1000
     timestamp: int = 1
-    wolfram_api: WolframAPI
-    bard_api: BardAPI
-    bing_api: BingAPI
-    openai_api: OpenAIAPI
+    chatbot: Any
+
+    def __chatbot_init(self, chatbot):
+        from core.aimi import ChatBot
+
+        self.chatbot: ChatBot = chatbot
 
     def task_response(self, res: str) -> Generator[dict, None, None]:
         def get_json_content(answer: str) -> str:
@@ -280,7 +279,7 @@ class Task:
             return "request error"
 
         answer = ""
-        for res in self.bing_api.ask(request):
+        for res in self.chatbot.ask(self.chatbot.Bing, request):
             if res["code"] == 1:
                 continue
             answer = res["message"]
@@ -306,7 +305,7 @@ class Task:
             return "request error"
 
         answer = ""
-        for res in self.bard_api.ask(request):
+        for res in self.chatbot.ask(self.chatbot.Bard, request):
             if res["code"] == 1:
                 continue
             answer = res["message"]
@@ -318,7 +317,7 @@ class Task:
         if not request or not len(request):
             return "request error"
         answer = ""
-        for res in self.wolfram_api.ask(request):
+        for res in self.chatbot.ask(self.chatbot.Wolfram, request):
             if res["code"] != 0:
                 continue
             answer = res["message"]
@@ -434,14 +433,11 @@ class Task:
         except Exception as e:
             log_err(f"fail to critic {str(request)} : {str(e)}")
 
-    def __init__(self):
+    def __init__(self, chatbot):
         try:
             self.__load_task()
             self.__init_task()
-            self.openai_api = OpenAIAPI()
-            self.wolfram_api = WolframAPI()
-            self.bing_api = BingAPI()
-            self.bard_api = BardAPI()
+            self.__chatbot_init(chatbot)
 
         except Exception as e:
             log_err(f"fait to init: {str(e)}")
@@ -797,7 +793,9 @@ class Task:
 
         context_messages = make_context_messages(link_think, "", [])
 
-        for res in self.openai_api.ask("", model, context_messages):
+        for res in self.chatbot.bots[self.chatbot.OpenAI].ask(
+            "", model, context_messages
+        ):
             if res["code"] != 0:
                 log_dbg(f"skip len: {len(str(res['message']))}")
                 if len(str(res["message"])) > 2000:

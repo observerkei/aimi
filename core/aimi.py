@@ -21,6 +21,39 @@ from core.memory import Memory
 from core.task import Task
 
 
+class ChatBot:
+    bots: Dict[str, Any] = {}
+
+    @property
+    def OpenAI(self) -> str:
+        return OpenAIAPI.type
+
+    @property
+    def Bing(self) -> str:
+        return BingAPI.type
+
+    @property
+    def Bard(self) -> str:
+        return BardAPI.type
+
+    @property
+    def Wolfram(self) -> str:
+        return WolframAPI.type
+
+    def __init__(self):
+        self.bots = {
+            OpenAIAPI.type: OpenAIAPI(),
+            BingAPI.type: BingAPI(),
+            BardAPI.type: BardAPI(),
+            WolframAPI.type: WolframAPI(),
+        }
+
+    def ask(
+        self, type: str, question: str, context: Any = None
+    ) -> Generator[dict, None, None]:
+        yield from self.bots[type].ask(question)
+
+
 class ReplyStep:
     class TalkList:
         has_start: bool = False
@@ -146,19 +179,24 @@ class Aimi:
     wolfram_api: WolframAPI
     chat_web: ChatWeb
     chat_qq: ChatQQ
+    chatbot: ChatBot
 
     def __init__(self):
         self.__load_setting()
         self.config = Config()
         self.md = Md()
         self.memory = Memory()
-        self.task = Task()
         self.aimi_plugin = AimiPlugin()
-        self.openai_api = OpenAIAPI()
+
+        self.chatbot = ChatBot()
+        self.openai_api: OpenAIAPI = self.chatbot.bots[self.chatbot.OpenAI]
         self.max_link_think = self.openai_api.max_requestion
-        self.bing_api = BardAPI()
-        self.bard_api = BardAPI()
-        self.wolfram_api = WolframAPI()
+        self.bing_api = self.chatbot.bots[self.chatbot.Bing]
+        self.bard_api = self.chatbot.bots[self.chatbot.Bard]
+        self.wolfram_api = self.chatbot.bots[self.chatbot.Wolfram]
+
+        self.task = Task(self.chatbot)
+
         self.chat_web = ChatWeb()
         self.chat_qq = ChatQQ()
 
@@ -701,6 +739,9 @@ answer this following question: {{
             self.preset_facts = {}
 
     def notify_online(self):
+        if not self.chat_qq.is_online():
+            log_err(f"{self.chat_qq.type} offline")
+            return
         self.chat_qq.reply_online()
 
     def notify_offline(self):

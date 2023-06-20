@@ -392,6 +392,3 @@ class BingAPI:
         except Exception as e:
             log_err("fail to load bing config: " + str(e))
             self.trigger[self.ConversationStyle.precise] = []
-
-
-bing_api = BingAPI()

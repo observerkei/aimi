@@ -147,6 +147,9 @@ class GoCQHttp:
     def get_image_cq(self, file) -> str:
         return "[CQ:image,file=file://{}]".format(file)
 
+    def make_url_get_qq_info(self) -> str:
+        return f"http://{self.post_host}:{self.post_port}/get_login_info"
+
     def get_reply_private(self, user_id: int, reply: str) -> str:
         reply_quote = parse.quote(reply)
 
@@ -433,6 +436,10 @@ class ChatQQ:
 
         self.reply_question(msg, "非服务对象 :(")
         self.reply_question(msg, img_meme_com)
+
+    def is_online(self) -> bool:
+        qq_info_url = self.go_cqhttp.make_url_get_qq_info()
+        return self.reply_url(qq_info_url)
 
     def reply_online(self):
         if self.type == GoCQHttp.name:

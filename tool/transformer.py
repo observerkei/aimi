@@ -228,23 +228,20 @@ def test_predict(input_data):
     print(json.dumps(predictions, indent=2, ensure_ascii=False))
 
 
-"""
-# pip install transformers
-
-if __name__ == "__main__": 
+if __name__ == "__main__":
+    # pip install transformers
     # 输入数据
-    input_data =  [
-        {'q': '摸摸头', 'label': 0, 'a': '好的，请摸头'},
-        {'q': '我摸过你头吗?', 'a': '当然了.可以摸头', 'label': 2},
-        {'q': '我想摸摸头', 'a': 'Master请摸摸头', 'label': 1},
-        {'q': '摸摸耳朵', 'a': '请摸耳朵', 'label': 3},
-        {'q': '我摸摸耳朵', 'a': '摸摸耳朵真好', 'label': 4},
-        {'q': '我能摸摸你耳朵吗?', 'a': '随时可以摸耳朵', 'label': 5},
+    input_data = [
+        {"q": "摸摸头", "label": 0, "a": "好的，请摸头"},
+        {"q": "我摸过你头吗?", "a": "当然了.可以摸头", "label": 2},
+        {"q": "我想摸摸头", "a": "Master请摸摸头", "label": 1},
+        {"q": "摸摸耳朵", "a": "请摸耳朵", "label": 3},
+        {"q": "我摸摸耳朵", "a": "摸摸耳朵真好", "label": 4},
+        {"q": "我能摸摸你耳朵吗?", "a": "随时可以摸耳朵", "label": 5},
         None,
-        None
+        None,
     ]
 
-    #test_predict(input_data)
-    
+    # test_predict(input_data)
+
     transformers_predict(input_data)
-"""

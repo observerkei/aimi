@@ -205,7 +205,8 @@ class OpenAIAPI:
 
     def __init__(self) -> None:
         self.__load_setting()
-        self.__create_bot()
+        if self.__create_bot():
+            log_info(f"{self.type} init done.")
 
     def __create_bot(self) -> bool:
         access_token = self.access_token
@@ -316,6 +317,3 @@ class OpenAIAPI:
         except Exception as e:
             log_err(f"fail to load {self.type} config: " + str(e))
             self.api_key = ""
-
-
-openai_api = OpenAIAPI()
