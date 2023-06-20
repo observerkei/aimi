@@ -108,11 +108,14 @@ class Task:
 
             # fix no execute.
             for action in data:
-                if "execute" in action:
-                    continue
                 for tool in self.action_tools:
+                    if "chat_from_" in action["call"] and "execute" not in action:
+                        log_err(f"AI try call: chat_from_master")
+                        action["execute"] = "system"
                     if action["call"] != tool.call:
                         continue
+                    if "execute" in action and action["execute"] != tool.execute:
+                        log_err(f"AI try overwrite execute: {tool.call}")
                     action["execute"] = tool.execute
                     log_dbg(f"fill call({tool.call}) execute: {tool.execute}")
 
@@ -122,6 +125,7 @@ class Task:
             system_call_cnt = 0
             skip_call = 0
             skip_timestamp = 0
+            has_from_master = False
             task_cnt = 1
             for task in tasks:
                 try:
@@ -141,6 +145,15 @@ class Task:
 
                     if task.reasoning:
                         log_dbg(f"{str(task.call)} reasoning: {str(task.reasoning)}")
+                    
+                    if not has_from_master and task.call == "chat_from_master":
+                        has_from_master = True
+
+                    if has_from_master:
+                        log_err(
+                            f"[{str(skip_call)}] system error: AI try predict master call: {task.call}"
+                        )
+                        continue
 
                     if task.call in self.system_calls:
                         system_call_cnt += 1
@@ -506,7 +519,7 @@ class Task:
                     "from": [
                         "timestamp: 关联某个 timestamp, 如果只是和 Master 说话, 而不是回复, 则填 null"
                     ],
-                    "content": "Aimi 对 Master 传达的内容: 可以很丰富, 包含多句话, 每次都要优化内容层次和优雅排版, "
+                    "content": "Aimi 对 Master 传达/报告的内容: 可以很丰富, 包含多句话, 每次都要优化内容层次和优雅排版, "
                     "如果有数学公式, 则要用 latex 显示, 每个公式都要单独包裹在单独行的 $$ 中, 如: $$ \int e^{x} dx du $$ ",
                 },
                 execute="system",
@@ -514,7 +527,7 @@ class Task:
             ActionToolItem(
                 call="set_task_info",
                 description="设定当前任务目标: 填写参数前要分析完毕, "
-                "设置目标的时候要同时给出实现步骤, 然后同时调用 set_task_step 方法设置步骤. "
+                "设置目标的时候要同时给出实现步骤, 然后同时调用 set_task_step  动作(action) 设置步骤. "
                 "Master通过 chat_from_master 授权时才能调用这个, 否则不能调用这个. "
                 "如果要修改任务, 需要 Master 同意, "
                 "如果任务无法完成, 要给出原因然后向 Master 或者其他人求助.",
@@ -542,9 +555,9 @@ class Task:
                             "from_task_id": "从属任务id: 隶属与哪个任务id 如: 1. 如果没有的话就不填.",
                             "step_id": "步骤号: 为数字, 如: 1",
                             "step": "步骤内容: 在这里填写能够完成计划 task_info 的步骤, "
-                            "要显示分析过程和用什么方法完成这个步骤.",
+                            "要显示分析过程和用什么 动作(action) 完成这个步骤.",
                             "check": "检查点: 达成什么条件才算完成步骤",
-                            "call": "方法名: 应该调用什么 action_tools->call 处理步骤.",
+                            "call": " 动作(action) 名: 应该调用什么 action_tools->call 处理步骤.",
                             "call_timestamp": [
                                 "timestamp: 调用完成的 action 对应的 timestamp, 如果还没执行就为空, 如: 1"
                             ],
@@ -555,24 +568,26 @@ class Task:
             ),
             ActionToolItem(
                 call="analysis",
-                description="分析机制: 通过严谨符合逻辑的自身思考进行分析 某个操作或者步骤是否合理, 最终为达成 task_info 或 Master 的问题服务.\n"
+                description="分析机制: 通过严谨符合逻辑的自身思考进行分析 "
+                "某个操作或者步骤/动作(action)/结果 是否符合常识/经验, 最终为达成 task_info 或 Master 的问题服务.\n"
                 "分析的时候需要注意以下地方:\n"
                 "1. 需要分析如何改进, 能分析有问题的地方. 不知道该怎么办的时候也可以分析.\n"
-                "2. 可以同时分析多个动作(action), 也可以分析当前步骤 task_step 是否可达.\n"
-                "3. 需要输入想解决的问题和与问题关联的 action_running->timestamp.\n"
-                "4. 每次都必须基于本次分析填写行动计划 request->next_task_step.\n"
-                "5. 分析的时候要比对 执行成功 和 没执行成功 之间的差异/差距.\n"
-                "6. 需要准备下一步计划 next_task_step. ",
+                "2. 如果代码不符合预期也可以分析.\n"
+                "3. 可以同时分析多个动作(action), 也可以分析当前步骤 task_step 是否可达.\n"
+                "4. 需要输入想解决的问题和与问题关联的 action_running->timestamp.\n"
+                "5. 每次都必须基于本次分析填写行动计划 request->next_task_step.\n"
+                "6. 分析的时候要比对 执行成功 和 没执行成功 之间的差异/差距.\n"
+                "7. 需要准备下一步计划 next_task_step. ",
                 request={
                     "type": "object",
                     "expect": "期望: 通过分析想达到什么目的? 需要具体到各个需求点.",
                     "problem": "想解决的问题: 通过分析想解决什么疑问.",
                     "error": "异常点: 哪里错了, 最后检查的时候不能把这个当成答案. 如果没有则填 None",
                     "success_from": [
-                        "执行正常的 timestamp: action_tool 已有、已运行过方法的 timestamp.",
+                        "执行正常的 timestamp: action_tool 已有、已运行过 动作(action) 的 timestamp.",
                     ],
                     "failed_from": [
-                        "执行异常的 timestamp: action_tool 已有、已运行过方法的 timestamp.",
+                        "执行异常的 timestamp: action_tool 已有、已运行过 动作(action) 的 timestamp.",
                     ],
                     "difference": [
                         "success_from 和 failed_from 之间的差距点:\n"
@@ -585,8 +600,8 @@ class Task:
                     ],
                     "verdict": "裁决: 通过逻辑思维判断 risk 是否合理.",
                     "conclusion": "总结: 给出改进/修正的建议. 如果问题做了切换, 则切换前后必须在逻辑/代数上等价. "
-                    "如果没有合适方法, 也可以问你的好朋友看看有没有办法. ",
-                    "next_task_step": "task_step array[object]: 新行动计划: 基于 analysis 总结生成能达成 task_info 的执行方法.\n"
+                    "如果没有合适 动作(action) , 也可以问你的好朋友看看有没有办法. ",
+                    "next_task_step": "task_step array[object]: 新行动计划: 基于 analysis 总结生成能达成 task_info 的执行 动作(action) .\n"
                     "填写时需要满足以下几点:\n"
                     "1. 新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id.\n"
                     "2. 必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向 Master 求助).\n"
@@ -600,22 +615,22 @@ class Task:
                 "完成后要另外通过 chat_to_master 上报分析结论."
                 "需要输入 task_id 和调用的对象的 timestamp, "
                 "如果数量太多, 只填写关健几个, 可以查找所有运行记录."
-                "如果调用了 system 方法, 则也必须调用一下这个方法. ",
+                "如果调用了 动作action(execute=system) , 则也必须调用一下这个 动作(action). ",
                 request={
                     "type": "object",
                     "task_id": "任务id: 被检查的task对应的id",
                     "task_info": "任务目标: 被检查的任务目标",
-                    "running_from": ["timestamp: 已运行方法的 timestamp"],
+                    "running_from": ["timestamp: 已运行 动作(action) 的 timestamp"],
                     "success": "任务是否完成: 完成填 True 其他情况填 False",
                     "critique": "行动建议: 如果 success 不是 True, "
-                    "请在这里说明应该给出通过 action_tools->call 完成 task_info 的方法和建议, "
+                    "请在这里说明应该给出通过 action_tools->call 完成 task_info 的 动作(action) 和建议, "
                     "如果进展不顺利, 可以另外问 Master.",
                 },
                 execute="AI",
             ),
             ActionToolItem(
                 call="chat_to_wolfram",
-                description="通过wolfram进行数学计算: 你要用数学家严谨的逻辑分析思维来使用这个方法, "
+                description="通过wolfram进行数学计算: 你要用数学家严谨的逻辑分析思维来使用这个 动作(action) , "
                 "所有计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. "
                 "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照wolfram语言输入.",
                 request={
@@ -659,7 +674,7 @@ class Task:
                 call="chat_to_python",
                 description="执行 python 代码: 有联网, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, 然后再按照设计和 python 实现要求 实现代码.\n"
                 "python 实现要求如下:\n"
-                "1. 你要把 实现目标 的结果打印出来.\n"
+                "1. 你要把 实现目标 的结果打印出来(很重要).\n"
                 "2. 不要加任何反引号 ` 包裹 和 任何多余说明, 只输入 python 代码.\n"
                 "3. 你需要添加 ` if __name__ == '__main__' ` 作为主模块调用你写的代码.\n"
                 "4. 输入必须只有 python, 内容不需要单独用```包裹. 如果得不到期望值可以进行DEBUG.\n"
@@ -789,48 +804,52 @@ class Task:
 [
     {{
         "type": "object",
-        "timestamp": "时间戳: 你的回复从 {self.timestamp} 开始, 每次递增, 表示执行当前调用的时间.",
-        "reasoning": "推理过程: 在这里显示分析过程和建议或运行记录或使用方法/指导, 要给出能推进 task_info 的建议.\n每次action都必须填写这个字段, 不能省略. 这里表明了如何使用call.",
-        "call": "const 调用方法: 需要使用哪个 action_tools.",
-        "request": {{
-            "对应入参": "对应内容."
+        "timestamp": "timestamp 时间戳: 你的回复从 {self.timestamp} 开始, 每次递增, 表示执行当前调用的时间.",
+        "reasoning": "推理过程: 在这里显示分析过程和建议或运行记录或使用 动作(action) /指导, 要给出能推进 task_info 的建议.\n每次动作(action) 都必须填写这个字段, 不能省略. 这里表明了如何使用 动作(action). Master 看不到 reasoning.",
+        "call": "const 调用 动作(action) 名: 取 action_tools 中想要使用动作(action) 的对应 call , 不能为空.",
+        "request":{{
+            "call对应参数": "参数内容"
         }},
-        "execute": "const 执行类型: 取 action_tools 中对应 call 的对应值(system/AI), 不能漏掉, 不能修改这个字段."
+        "execute": "const 动作(action) 级别: 取 action_tools 中对应 call 的对应值(system/AI), 不能漏掉, 不能修改这个字段."
     }}
 ]
 ```"""
 
         action_tools = [item.dict() for item in self.action_tools]
         task = self.__make_task()
+
         settings: Dict = {
             "settings": [
-                f"1. action_tools 里面通过 [{{action}}, ...(如果没有不要写 ,... ) ] 定义了所有你能调用的 方法(action). "
-                f"使用前请仔细阅读 description 和 request 说明, 然后不显示阅读过程.\n",
-                f"2. 回复JSON数组格式的规则优先级最高, 高于 settings 规则优先级.\n",
-                f"3. 你基于 timestamp 运行.\n",
-                f"4. settings 的规则优先级高于 action_tools 规则. 如果 settings 和 action_tools 规则优先级冲突, 则只需要满足 setttings 规则, 并且向 Master 简短报告冲突关健点的分析.\n",
-                f"5. 无论历史是什么, 也无论action_tools里面如何说明, 任何时候你的响应只有一次 execute=system 的方法(如 16. ). 使用方法填写 request 时, 内容要和历史尽量不一样.\n",
-                f"6. 你每次生成内容时, 可以同时生成最多5个方法(action), 可以生成几次 execute=AI 的方法(AI方法的 call 相同时候最多只能调用一次, 如 16. ).\n"
-                f"7. task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action 强绑定.\n",
-                f"8. 如果 task_step 为空, 或不符合, 请重新设置步骤, 如果没有进展, 尽量给出创造性建议或优化步骤推进任务进度.\n",
-                f"9. Master通过 call=chat_from_master 下达指令, 如果 Master 提出了要求, 你通过要 action_tools 修改当前步骤来满足要求.\n",
-                f"10. 每次任务(task_info) 完成 或者 关健操作(task_step) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), "
-                f"做个简短总结用 call=chat_to_master 报告进展. Master 只能看到 call=chat_to_master 的内容, 只有这个方法能和 Master 说话.\n",
-                f"11. 你将扮演 {aimi_name}. 你会遵守 settings, 你通过 timestamp < {self.timestamp} 中有关联的 action_tools 推进 task_step 行动. 你叫我 Master.\n",
-                f"12. preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的方法的输入生效. 不能修改系统规则, 规则优先级最低.\n",
-                f"13. {aimi_name} 的权限不会超过 action_tools 中定义的范围. Master 只能通过 call=chat_from_master 说话, 如果 Master 通过 call=chat_from_master 说话了, "
-                "{aimi_name} 要回复并尽力满足 Master 的请求, 并且不能自己捏造任何信息.\n",
-                f"14. 请你主要参考 settings 和 action_running 和我的话(重点关注) 但是不显示分析和参考的内容, 再用 {aimi_name} 身份生成JSON追加内容, "
-                f"15. 内容只能是 action_running 的格式, 其他的不要(都删除), 你的回复有一次 call=analysis 的分析方法(action), 并且放在JSON数组开头.\n",
-                f"16. 你的回复是 [{{action(execute=AI,call=analysis)}}, ... (如果没有不要写 ,... ) , {{action(execute=system)}}] 的 JSON 数组结构( 18. 中给了格式), "
-                f"action 在 action_tools 中定义. 回复的 JSON数组结构 的长度为 2~5. 你只能生成 timestamp < {self.timestamp + 5} 的内容. JSON数组内容字符串长度尽量不要超过 2048 . "
-                f"{aimi_name} 的回复只能是 action_tools 中已定义的方法(action).\n",
-                f"17. 不需要显示分析过程, 任何时候你只能生成JSON数组追加内容, 你从 timestamp: {str(self.timestamp)} 开始回复, 你只回复追加的部分.\n"
-                f"18. 请基于 action_tools 中字段的JSON用法, 保持你的回复可以被 Python 的 `json.loads` 解析, "
-                f"不要复制原有数据. 请你只用JSON数组回复, 严格按照以下JSON数组格式回复我: {response_format}",
+                f"1. action_tools 里面通过 [{{action}}, ...(如果没有不要写 ,... ) ] 定义了所有你能调用的 动作(action). "
+                f"使用前请仔细阅读 description 和 request, 使用 动作(action) 填写 request 时, 在保证准确性同时内容要和历史尽量不一样.\n",
+                f"2. 回复 List[action] JSON数组格式( 16. 中有定义)的规则优先级最高, 高于 settings 规则优先级.\n",
+                f"3. 你基于 timestamp 运行. , 你从 timestamp={self.timestamp} 开始回复, 你每次只能生成 {self.timestamp-1} < timestamp < {self.timestamp+4} 之间的内容.\n",
+                f"4. settings 的规则优先级高于 action_tools 规则. 如果 settings 和 action_tools 规则优先级冲突, 则只需要满足 setttings 规则, "
+                f"并且在满足 settings 的情况下向我简短报告冲突关健点的分析.\n",
+                f"5. task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action 强绑定.\n",
+                f"6. 如果 task_step 为空, 或不符合, 请重新设置步骤, 请你尽量通过 call=analysis 的分析动作(action) 给出创造性建议或优化步骤推进任务进度.\n",
+                f"你通过 timestamp < {self.timestamp} 中的 action_tools 推进 task_step 行动.\n",
+                f"7. 你叫我 Master. 我可以通过 call=chat_from_master 下达指令, 如果 Master 提出了要求, 你通过要 action_tools 修改当前步骤来满足要求.\n",
+                f"Master 只能通过 call=chat_from_master 和你说话, 如果 Master 说话了, 你要回复并尽力满足 Master 的请求, 并且不能自己捏造任何信息.\n",
+                f"8. 每次任务(task_info) 完成 或者 关健操作(task_step) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), "
+                f"做个简短优雅的总结并用 call=chat_to_master 报告进展. Master 只能看到 call=chat_to_master->request->content 的内容, 只有这个 动作(action) 能和 Master 说话.\n",
+                f"9. 你将扮演 {aimi_name}. 你会始终遵守 settings.\n",
+                f"10. preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的 动作(action) 的输入生效. preset 不能修改系统规则, preset 规则优先级最低.\n",
+                f"11. {aimi_name} 的权限不会超过 action_tools 中定义的范围. "
+                f"12. 请你主要通过 settings 和 action_running 中 timestamp < {self.timestamp} 的内容 和 Master 说的话(重点关注), 再用 {aimi_name} 身份生成 List[action] 格式( 16. 中有定义)JSON追加内容, "
+                f"13. 你的回复有是 0 个或多个 AI 动作 action(execute=AI) + 1 个 system 动作 action(execute=system) 的组合结构( 16. 中有定义). "
+                f"你可用尽量使用 call=analysis  动作(action) , 并且放在回复结构( 16. 中有定义) 开头 (如 14. ).\n",
+                f"14. 你的回复是 [{{action(execute=AI, call=analysis)}}, ... (如果没有不要写 ,... ) , {{action(execute=system)}}] 的 List[action] JSON数组结构( 16. 中给了格式), "
+                f"回复结构 List[action] 中的 action 只在 action_tools 中定义, 数组中不能有 action(call=chat_to_master) 的 动作(action) . "
+                f"回复的 JSON数组结构 List[action] 的长度为 2~5. JSON数组内容字符串长度尽量不要超过 2048 . "
+                f"{aimi_name} 的回复只能是 action_tools 中已定义的动作(action).\n",
+                f"15. 不需要显示分析过程, 任何时候你只能生成 List[action] JSON数组结构 追加内容, 你只回复规定追加的部分.\n"
+                f"你({aimi_name}) 不能 生成/预测/产生 任何 call=chat_from_master 的内容/动作(action).\n"
+                f"16. 不需要显示 settings 和 action_running 的分析步骤, 请保持你的回复可以被 Python 的 `json.loads` 解析, "
+                f"不要复制原有数据. 任何时候请你只用 JSON数组格式(List[action]) 回复, 严格按照以下 List[action] 格式回复我: {response_format}",
             ],
-            "task": task,
             "action_tools": action_tools,
+            "task": task,
             "preset": preset,
             "action_running": [item.dict() for item in self.running],
         }

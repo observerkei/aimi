@@ -47,6 +47,8 @@ class Sandbox:
             run_returncode = str(result.returncode)
             run_stdout = str(result.stdout.decode("utf-8"))
             run_stderr = str(result.stderr.decode("utf-8"))
+            if not len(run_stdout):
+                run_returncode = "-1"
             if len(run_stdout) > max_return_len:
                 log_err(f"run stdout over limit: {str(len(run_stdout))}")
                 run_stdout = run_stdout[max_return_len:]
