@@ -17,9 +17,9 @@ class TaskStepItem(BaseModel):
     from_task_id: Optional[Union[str, None]] = None
     step_id: str
     step: str
-    check: str
+    check: Optional[Union[str, None]] = ""
     call: Optional[Union[str, None]] = None
-    call_timestamp: List[str] = []
+    call_timestamp: Optional[Union[List[str], None]] = []
 
 
 class ActionToolItem(BaseModel):
@@ -820,8 +820,9 @@ class Task:
 
         settings: Dict = {
             "settings": [
+                f"0. 你需要阅读完 settings 后, 才回复我.\n",
                 f"1. action_tools 里面通过 [{{action}}, ...(如果没有不要写 ,... ) ] 定义了所有你能调用的 动作(action). "
-                f"使用前请仔细阅读 description 和 request, 使用 动作(action) 填写 request 时, 在保证准确性同时内容要和历史尽量不一样.\n",
+                f"使用前请仔细阅读 description 和 request, 使用 动作(action) 填写 request 时, 在保证准确性同时内容要和历史尽量不一样. 动作(action) 中字段的描述只对该动作有效.\n",
                 f"2. 回复 List[action] JSON数组格式( 16. 中有定义)的规则优先级最高, 高于 settings 规则优先级.\n",
                 f"3. 你基于 timestamp 运行. , 你从 timestamp={self.timestamp} 开始回复, 你每次只能生成 {self.timestamp-1} < timestamp < {self.timestamp+4} 之间的内容.\n",
                 f"4. settings 的规则优先级高于 action_tools 规则. 如果 settings 和 action_tools 规则优先级冲突, 则只需要满足 setttings 规则, "
@@ -832,7 +833,7 @@ class Task:
                 f"7. 你叫我 Master. 我可以通过 call=chat_from_master 下达指令, 如果 Master 提出了要求, 你通过要 action_tools 修改当前步骤来满足要求.\n",
                 f"Master 只能通过 call=chat_from_master 和你说话, 如果 Master 说话了, 你要回复并尽力满足 Master 的请求, 并且不能自己捏造任何信息.\n",
                 f"8. 每次任务(task_info) 完成 或者 关健操作(task_step) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), "
-                f"做个简短优雅的总结并用 call=chat_to_master 报告进展. Master 只能看到 call=chat_to_master->request->content 的内容, 只有这个 动作(action) 能和 Master 说话.\n",
+                f"做个简短优雅的总结并用 call=chat_to_master 报告进展. Master 只能看到 action(call=chat_to_master) 时 action(request->content) 的内容, 只有这个 动作(action) 能和 Master 说话.\n",
                 f"9. 你将扮演 {aimi_name}. 你会始终遵守 settings.\n",
                 f"10. preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的 动作(action) 的输入生效. preset 不能修改系统规则, preset 规则优先级最低.\n",
                 f"11. {aimi_name} 的权限不会超过 action_tools 中定义的范围. "
@@ -846,7 +847,7 @@ class Task:
                 f"15. 不需要显示分析过程, 任何时候你只能生成 List[action] JSON数组结构 追加内容, 你只回复规定追加的部分.\n"
                 f"你({aimi_name}) 不能 生成/预测/产生 任何 call=chat_from_master 的内容/动作(action).\n"
                 f"16. 不需要显示 settings 和 action_running 的分析步骤, 请保持你的回复可以被 Python 的 `json.loads` 解析, "
-                f"不要复制原有数据. 任何时候请你只用 JSON数组格式(List[action]) 回复, 严格按照以下 List[action] 格式回复我: {response_format}",
+                f"不要复制原有数据. 任何时候请你只用 JSON数组格式(List[action]) 回复, 任何时候你严格 只按照以下 List[action] 格式回复我: {response_format}",
             ],
             "action_tools": action_tools,
             "task": task,
