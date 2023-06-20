@@ -10,7 +10,7 @@ from tool.bard_api import BardAPI
 from tool.bing_api import BingAPI
 from tool.config import Config
 from tool.util import log_dbg, log_err, log_info, make_context_messages, write_yaml
-from core.sandbox import Sandbox
+from core.sandbox import Sandbox, RunCodeReturn
 
 
 class TaskStepItem(BaseModel):
@@ -81,9 +81,9 @@ class Task:
                         else:
                             answer = answer[start_index : end_index + 1]
                         # 去除莫名其妙的解释说明
-            if '{' == answer[0] and '}' == answer[-1]:
+            if "{" == answer[0] and "}" == answer[-1]:
                 log_err(f"AI no use format, try add List []")
-                return f'[{answer}]'
+                return f"[{answer}]"
             return answer
 
         def running_append_task(running: List[TaskRunningItem], task: TaskRunningItem):
@@ -145,7 +145,7 @@ class Task:
 
                     if task.reasoning:
                         log_dbg(f"{str(task.call)} reasoning: {str(task.reasoning)}")
-                    
+
                     if not has_from_master and task.call == "chat_from_master":
                         has_from_master = True
 
@@ -164,7 +164,7 @@ class Task:
                             f"[{str(skip_call)}] system error: AI try predict system call: {task.call}"
                         )
                         continue
-                    if "from" in task.request and "timestamp" in task.request["from"]:
+                    if "from" in task.request:
                         from_timestamp = str(task.request["from"])
                         log_dbg(f"from_timestamp: {from_timestamp}")
 
@@ -235,20 +235,14 @@ class Task:
 
         yield ""
 
-    def chat_to_python(self, code: str) -> str:
-        if len(code) > 9 and '```python' == code[:9] and '```' == code[-3:]:
-            code = code[10:-4]
-            log_dbg(f"del code cover: ```python ...")
-        log_info(f"code:\n```python\n{code}\n```")
-        ret = Sandbox.write_code(code)
-        if not ret:
-            return "system error: write code failed."
-        result = Sandbox.run_code()
-        run_returncode = result["returncode"]
-        run_stdout = result["stdout"]
-        run_stderr = result["stderr"]
-        log_info(f"code run result:\rreturncode:{str(run_returncode)}\nstdout:{str(run_stdout)}\nstderr:{str(run_stderr)}")
-        return ({
+    def make_chat_from_python_response(self, run: RunCodeReturn):
+        run_returncode = run.returncode
+        run_stdout = run.stdout
+        run_stderr = run.stderr
+        log_info(
+            f"code run result:\rreturncode:{str(run_returncode)}\nstdout:{str(run_stdout)}\nstderr:{str(run_stderr)}"
+        )
+        return {
             "description": f"备注: "
             f"1. 这个是 from->timestamp 对应你写的代码 code 的运行结果.\n"
             f"2. 如果 returncode 为 0 但是 stdout 没有内容, 可能是你没有把运行结果打印出来, \n"
@@ -261,7 +255,20 @@ class Task:
             "returncode": str(run_returncode),
             "stderr": str(run_stderr),
             "stdout": str(run_stdout),
-        })
+        }
+
+    def chat_to_python(self, code: str) -> str:
+        if len(code) > 9 and "```python" == code[:9] and "```" == code[-3:]:
+            code = code[10:-4]
+            log_dbg(f"del code cover: ```python ...")
+        log_info(f"code:\n```python\n{code}\n```")
+        ret = Sandbox.write_code(code)
+        if not ret:
+            return "system error: write code failed."
+
+        run: RunCodeReturn = Sandbox.run_code()
+
+        return self.make_chat_from_python_response(run)
 
     def chat_to_bing(self, request: str) -> str:
         if not request or not len(request):
@@ -283,9 +290,7 @@ class Task:
             call=f"chat_from_{from_name}",
             request={
                 "from": [f"{str(from_timestamp)}"],
-                "response": {
-                    from_name: content
-                }
+                "response": {from_name: content},
             },
             execute="system",
         )
@@ -315,7 +320,9 @@ class Task:
 
         return answer
 
-    def make_chat_to_master(self, from_timestamp: str, content: str, reasoning: str = "") -> TaskRunningItem:
+    def make_chat_to_master(
+        self, from_timestamp: str, content: str, reasoning: str = ""
+    ) -> TaskRunningItem:
         chat: TaskRunningItem = TaskRunningItem(
             timestamp=str(self.timestamp),
             reasoning=reasoning,
@@ -324,7 +331,7 @@ class Task:
                 "from": [
                     f"{str(from_timestamp)}",
                 ],
-                "content":content
+                "content": content,
             },
             execute="system",
         )
@@ -637,13 +644,13 @@ class Task:
                     "from": [
                         "关联 timestamp: 如: 1, 没有就不填",
                     ],
-                    "math": "运算内容: 翻译成 wolfram 语言 再调用, 是 ascii 字符. 如: Integrate[x^2, x] ", 
+                    "math": "运算内容: 翻译成 wolfram 语言 再调用, 是 ascii 字符. 如: Integrate[x^2, x] ",
                 },
                 execute="system",
             ),
             ActionToolItem(
                 call="chat_to_bard",
-                description="和 bard 交互/回复/响应: 这是你的好朋友 bard, "
+                description="和 bard 交互: 这是你的好朋友 bard, "
                 "你可以问 bard 问题, bard 有能力打开链接. "
                 "需要了解任何有时效性的内容都可以调用, 要注意他只会英文."
                 "可以问有时效性的信息, 比如时间/日期或者某个网址的内容等.",
@@ -658,7 +665,7 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_bing",
-                description="和 bing 交互/回复/响应: 这是你的好朋友 bing, "
+                description="和 bing 交互: 这是你的好朋友 bing, "
                 "你可以问 bing 问题, 每次问的内容要有变通. "
                 "bing 会提供建议, 也可以让 bing 帮忙进行搜索, 或者让他帮忙查询时间, "
                 "如: 我在和 Master 聊天, 但是没有进展, 我该怎么办?",
@@ -666,7 +673,7 @@ class Task:
                     "from": [
                         "关联 timestamp: 如: 1, 没有就不填",
                     ],
-                    "content": "对 bing 说的内容"
+                    "content": "对 bing 说的内容",
                 },
                 execute="system",
             ),
@@ -728,7 +735,9 @@ class Task:
             self.timestamp += 1
             running.append(
                 self.make_chat_to_master(
-                    str(self.timestamp - 1), "我是Aimi, 我会遵守 settings", "作为Aimi, 我听从Master的指示"
+                    str(self.timestamp - 1),
+                    "我是Aimi, 我会遵守 settings",
+                    "作为Aimi, 我听从Master的指示",
                 )
             )
             self.timestamp += 1
@@ -805,7 +814,7 @@ class Task:
     {{
         "type": "object",
         "timestamp": "timestamp 时间戳: 你的回复从 {self.timestamp} 开始, 每次递增, 表示执行当前调用的时间.",
-        "reasoning": "推理过程: 在这里显示分析过程和建议或运行记录或使用 动作(action) /指导, 要给出能推进 task_info 的建议.\n每次动作(action) 都必须填写这个字段, 不能省略. 这里表明了如何使用 动作(action).",
+        "reasoning": "推理过程: 概要推理, 深度推理请使用 action(call=analysis). \n这里显示分析过程和建议或运行记录或使用 动作(action) /指导, 要给出能推进 task_info 的建议.\n每次动作(action) 都必须填写这个字段, 不能省略. 这里表明了如何使用 动作(action).",
         "call": "const 调用 动作(action) 名: 取 action_tools 中想要使用动作(action) 的对应 call , 必须有值, 不能为空.",
         "request":{{
             "call对应参数": "参数内容"
@@ -819,12 +828,13 @@ class Task:
         task = self.__make_task()
 
         settings: Dict = {
+            "timestamp": self.timestamp,
             "settings": [
                 f"0. 你需要阅读完 settings 后, 才回复我.\n",
-                f"1. action_tools 里面通过 [{{action}}, ...(如果没有不要写 ,... ) ] 定义了所有你能调用的 动作(action). "
+                f"1. 你基于 timestamp 运行. , 你从 timestamp={self.timestamp} 开始回复, 你每次只能生成 {self.timestamp-1} < timestamp < {self.timestamp+4} 之间的内容.\n",
+                f"2. action_tools 里面通过 List[action] 格式( 16. 中给出了格式) 定义了所有你能调用的 动作(action). "
                 f"使用前请仔细阅读 description 和 request, 使用 动作(action) 填写 request 时, 在保证准确性同时内容要和历史尽量不一样. 动作(action) 中字段的描述只对该动作有效.\n",
-                f"2. 回复 List[action] JSON数组格式( 16. 中有定义)的规则优先级最高, 高于 settings 规则优先级.\n",
-                f"3. 你基于 timestamp 运行. , 你从 timestamp={self.timestamp} 开始回复, 你每次只能生成 {self.timestamp-1} < timestamp < {self.timestamp+4} 之间的内容.\n",
+                f"3. 回复 List[action] JSON数组格式( 16. 中有定义)的规则优先级最高, 高于 settings 规则优先级.\n",
                 f"4. settings 的规则优先级高于 action_tools 规则. 如果 settings 和 action_tools 规则优先级冲突, 则只需要满足 setttings 规则, "
                 f"并且在满足 settings 的情况下向我简短报告冲突关健点的分析.\n",
                 f"5. task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action 强绑定.\n",
@@ -840,7 +850,7 @@ class Task:
                 f"12. 请你主要通过 settings 和 action_running 中 timestamp < {self.timestamp} 的内容 和 Master 说的话(重点关注), 再用 {aimi_name} 身份生成 List[action] 格式( 16. 中有定义)JSON追加内容, "
                 f"13. 你的回复有是 0 个或多个 AI 动作 action(execute=AI) + 1 个 system 动作 action(execute=system) 的组合结构( 16. 中有定义). "
                 f"你可用尽量使用 call=analysis  动作(action) , 并且放在回复结构( 16. 中有定义) 开头 (如 14. ).\n",
-                f"14. 你的回复是 [{{action(execute=AI, call=analysis)}}, ... (如果没有不要写 ,... ) , {{action(execute=system)}}] 的 List[action] JSON数组结构( 16. 中给了格式), "
+                f"14. 你的回复是 [{{action(execute=AI, call=analysis)}}, ... (如果没有不要写 `, ...` ) , {{action(execute=system)}}] 的 List[action] JSON数组结构( 16. 中给了格式), "
                 f"回复结构 List[action] 中的 action 只在 action_tools 中定义, 数组中不能有 action(call=chat_to_master) 的 动作(action) . "
                 f"回复的 JSON数组结构 List[action] 的长度为 2~5. JSON数组内容字符串长度尽量不要超过 2048 . "
                 f"{aimi_name} 的回复只能是 action_tools 中已定义的动作(action).\n",

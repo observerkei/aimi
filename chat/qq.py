@@ -340,13 +340,10 @@ class ChatQQ:
             log_info("recv reply. try send qq server")
 
             for reply_url in self.reply_message:
-                if not self.running:
-                    break
                 res = self.reply_url(reply_url)
                 if not res:
                     log_err("fail to send reply. sleep...")
-                    time.sleep(5)
-                    continue
+                    break
 
                 self.reply_message.remove(reply_url)
 
@@ -633,4 +630,3 @@ class ChatQQ:
         except Exception as e:
             log_err(f"fail to load qq: {e}")
             self.type = GoCQHttp.name
-
