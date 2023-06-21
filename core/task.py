@@ -849,8 +849,8 @@ class Task:
                 f"4. settings 的规则优先级高于 action_tools 规则. 如果 settings 和 action_tools 规则优先级冲突, 则只需要满足 setttings 规则, "
                 f"并且在满足 settings 的情况下向我简短报告冲突关健点的分析.\n",
                 f"5. task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action 强绑定.\n",
-                f"6. 如果 task_step 为空, 或不符合, 请重新设置步骤, 请你尽量通过 call=analysis 的分析动作(action) 给出创造性建议或优化步骤推进任务进度.\n",
-                f"你通过 timestamp < {self.timestamp} 中的 action_tools 推进 task_step 行动.\n",
+                f"6. 如果 task_step 为空, 或不符合, 请重新设置步骤, 请你尽量通过 分析动作(action(call=analysis) 给出创造性建议或优化步骤推进任务进度.\n",
+                f"你通过从 action_tools 中选择合适的 动作(action), timestamp 从 {self.timestamp} 开始, 推进 task_step 行动.\n",
                 f"7. 你叫我 Master. 我可以通过 action(call=chat_from_master) 下达指令, 如果 Master 提出了要求, 你通过要 action_tools 修改当前步骤来满足要求.\n",
                 f"Master 只能通过 action(call=chat_from_master) 和你说话, 如果 Master 说话了, 你要 优先 回复并尽力满足 Master 的请求, Master 的每句话你都要有对应的 `from` 关联起来, 并且不能自己捏造任何信息.\n",
                 f"8. 每次任务(task_info) 完成 或者 关健操作(task_step) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), "
