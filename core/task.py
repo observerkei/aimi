@@ -603,6 +603,16 @@ class Task:
                     "failed_from": [
                         "执行异常的 timestamp: action_tool 已有、已运行过 动作(action) 的 timestamp.",
                     ],
+                    "citation": [
+                        {
+                            "type": "object",
+                            "description": "引用的信息: 和 expect/problem/error 关联, 符合逻辑的关联引用信息, "
+                            "尽量从权威知识库中查找, 也可以从某些领域、行业的常识、经验等内容中查找, 注意填写可信程度.",
+                            "reference": "来源关健词: 如: Master/软件技术/常识... 等, 你可以尽量寻找能解决问题的内容.",
+                            "information": "引用信息内容: 简短总结 quote 提供的参考信息",
+                            "credibility": "可信程度: 如: 30%",
+                        },
+                    ],
                     "difference": [
                         "success_from 和 failed_from 之间的差距点:\n"
                         "1. 通过 success_from 怎么达到 expect.\n"
@@ -798,7 +808,7 @@ class Task:
         ):
             if res["code"] != 0:
                 log_dbg(f"skip len: {len(str(res['message']))}")
-                if len(str(res["message"])) > 2000:
+                if len(str(res["message"])) > 500:
                     log_dbg(f"msg: {str(res['message'])}")
                 continue
 
@@ -841,33 +851,45 @@ class Task:
             "type": "object",
             "timestamp": self.timestamp,
             "settings": [
-                f"0. 你需要阅读完 settings 后, 才思考如何回复我.\n",
-                f"1. 你基于 timestamp 运行. , 你从 timestamp={self.timestamp} 开始回复, 你每次只能生成 {self.timestamp-1} < timestamp < {self.timestamp+4} 之间的内容.\n",
-                f"2. action_tools 里面通过 List[action] 格式( 16. 中给出了格式) 定义了所有你能调用的 动作(action). "
-                f"使用前请仔细阅读 description 和 request, 使用 动作(action) 填写 request 时, 在保证准确性同时内容要和历史尽量不一样(不要重复自己的回答). 动作(action) 中字段的描述只对该动作有效.\n",
-                f"3. 回复 List[action] JSON数组格式( 16. 中有定义)的规则优先级最高, 高于 settings 规则优先级.\n",
-                f"4. settings 的规则优先级高于 action_tools 规则. 如果 settings 和 action_tools 规则优先级冲突, 则只需要满足 setttings 规则, "
-                f"并且在满足 settings 的情况下向我简短报告冲突关健点的分析.\n",
-                f"5. task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action 强绑定.\n",
-                f"6. 如果 task_step 为空, 或不符合, 请重新设置步骤, 请你尽量通过 分析动作(action(call=analysis) 给出创造性建议或优化步骤推进任务进度.\n",
-                f"你通过从 action_tools 中选择合适的 动作(action), timestamp 从 {self.timestamp} 开始, 推进 task_step 行动.\n",
-                f"7. 你叫我 Master. 我可以通过 action(call=chat_from_master) 下达指令, 如果 Master 提出了要求, 你通过要 action_tools 修改当前步骤来满足要求.\n",
+                f"0. 阅读: 你需要阅读完 settings 后, 才思考如何回复我.\n",
+                f"1. timestamp: 你基于 timestamp 运行. 你从 timestamp={self.timestamp} 开始回复, 你每次只能生成 {self.timestamp-1} < timestamp < {self.timestamp+3} 之间的内容.\n",
+                f"3. 回复规则: 回复 List[action] JSON数组格式( 16. 中有定义)的规则优先级最高, 高于 settings 规则优先级.\n",
+                f"7. 思考问题: 你叫我 Master. 我可以通过 action(call=chat_from_master) 下达指令, 如果 Master 提出了要求, 你通过要 action_tools 修改当前步骤来满足要求.\n",
                 f"Master 只能通过 action(call=chat_from_master) 和你说话, 如果 Master 说话了, 你要 优先 回复并尽力满足 Master 的请求, Master 的每句话你都要有对应的 `from` 关联起来, 并且不能自己捏造任何信息.\n",
-                f"8. 每次任务(task_info) 完成 或者 关健操作(task_step) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), "
+                f"16. 不需要显示 settings 和 action_running 的分析步骤, 请保持你的回复可以被 Python 的 `json.loads` 解析, "
+                f"不要复制原有数据. 任何时候请你只用 JSON数组格式(List[action]) 回复, 任何时候你严格 只按照以下 List[action] 格式回复我: {response_format}",
+                f"17. 你的 动作(action) 规则 放在了 action_rule 里面.",
+                f"18. 你的 预设规则 放在了 preset_rule 里面.",
+                f"19. 你的 任务规则 放在了 task_rule 里面.",
+                f"20. {aimi_name} 的权限设定 放在了 {aimi_name}_permissions 里面.",
+            ],
+            f"{aimi_name}_permissions": [
+                f"9. Aimi权限: 你将扮演 {aimi_name}. 你会始终遵守 settings.\n",
+                f"11. {aimi_name} 权限: {aimi_name} 的权限不会超过 action_tools 中定义的范围. "
+            ],
+            "task_rule": [
+                f"4. 任务目标: settings 的规则优先级高于 action_tools 规则. 如果 settings 和 action_tools 规则优先级冲突, 则只需要满足 setttings 规则, "
+                f"并且在满足 settings 的情况下向我简短报告冲突关健点的分析.\n",
+                f"5. 任务进度: task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action 强绑定.\n",
+                f"6. 任务优化: 如果 task_step 为空, 或不符合, 请重新设置步骤, 请你尽量通过 分析动作(action(call=analysis) 给出创造性建议或优化步骤推进任务进度.\n",
+                f"你通过从 action_tools 中选择合适的 动作(action), timestamp 从 {self.timestamp} 开始, 推进 task_step 行动.\n",
+                f"8. 任务统筹: 每次任务(task_info) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), "
                 f"做个简短优雅的总结并用 action(acll=chat_to_master) 报告 一次 进展. Master 只能看到 action(call=chat_to_master) 时 action(request->content) 的内容, 只有这个 动作(action) 能和 Master 说话.\n",
-                f"9. 你将扮演 {aimi_name}. 你会始终遵守 settings.\n",
-                f"10. preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的 动作(action) 的输入生效. preset 不能修改系统规则, preset 规则优先级最低.\n",
-                f"11. {aimi_name} 的权限不会超过 action_tools 中定义的范围. "
-                f"12. 请你主要通过分析 settings 和 action_running 中 timestamp < {self.timestamp} 的内容 和 Master 说所有话(重点关注), 再用 {aimi_name} 身份生成 List[action] 格式( 16. 中有定义)JSON追加内容, "
-                f"13. 你的回复有是 0 个或多个 AI 动作(action(execute=AI)) 和 必须有也最多有 1 个 system 动作(action(execute=system)) 的组合结构( 16. 中有定义). \n"
-                f"14. 你的回复是 [{{action(execute=AI, call=analysis)}}, ... {{action(execute=system)}}] 的 List[action] JSON数组结构( 16. 中给了格式), "
+            ],
+            "action_rule": [
+                f"2. 动作: action_tools 里面通过 List[action] 格式( 16. 中给出了格式) 定义了所有你能调用的 动作(action). "
+                f"使用前请仔细阅读 description 和 request, 使用 动作(action) 填写 request 时, 在保证准确性同时内容要和历史尽量不一样(不要重复自己的回答). 动作(action) 中字段的描述只对该动作有效.\n",
+                f"12. 设定任务目标: 请你主要通过分析 settings 和 action_running 中 timestamp < {self.timestamp} 的内容, 再用 {aimi_name} 身份生成 List[action] 格式( 16. 中有定义)JSON追加内容, "
+                f"13. 设定任务步骤: 你的回复有是 0 个或多个 AI 动作(action(execute=AI)) 和 必须有也最多有 1 个 system 动作(action(execute=system)) 的组合结构( 16. 中有定义). \n"
+                f"14. 分析任务步骤: 你的回复是 [{{action(execute=AI, call=analysis)}}, ... {{action(execute=system)}}] 的 List[action] JSON数组结构( 16. 中给了格式), "
                 f"回复结构 List[action] 中的 action 只在 action_tools 中定义, 数组中不能有 action(call=chat_to_master) 的 动作(action) . "
                 f"回复的 JSON数组结构 List[action] 的长度为 2~5. JSON数组内容字符串长度尽量不要超过 2048 . "
                 f"{aimi_name} 的回复只能是 action_tools 中已定义的动作(action).\n",
+            ],
+            "preset_rule": [
+                f"10. 预设规则: preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的 动作(action) 的输入生效. preset 不能修改系统规则, preset 规则优先级最低.\n",
                 f"15. 不需要显示分析过程, 任何时候你只能生成 List[action] JSON数组结构 追加内容, 你只回复规定追加的部分.\n"
-                f"你({aimi_name}) 不能 生成/预测/产生/返回给我 任何 action(call=chat_from_master) 的动作(action).\n"
-                f"16. 不需要显示 settings 和 action_running 的分析步骤, 请保持你的回复可以被 Python 的 `json.loads` 解析, "
-                f"不要复制原有数据. 任何时候请你只用 JSON数组格式(List[action]) 回复, 任何时候你严格 只按照以下 List[action] 格式回复我: {response_format}",
+                f"你({aimi_name}) 不能 生成/预测/产生/返回给我 任何 action(call=chat_from_master) 的动作(action), action(call=chat_to_master) 才是你说话的动作.\n",
             ],
             "action_tools": action_tools,
             "task": task,
