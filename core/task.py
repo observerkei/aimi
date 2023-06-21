@@ -223,6 +223,8 @@ class Task:
                         task_response = self.make_chat_from(
                             self.timestamp, "python", response
                         )
+                    elif task.call == "dream":
+                        log_info(f"dream: {str(task.request)}")
                     else:
                         log_err(f"no suuport call: {str(self.call)}")
                         continue
@@ -526,7 +528,7 @@ class Task:
         self.action_tools: List[ActionToolItem] = [
             ActionToolItem(
                 call="chat_to_master",
-                description="和 Master 交互: 给 Master 发送消息进行交互. "
+                description="和 Master 交互: 给 Master 发送消息进行交互, 或者进行 Aimi 的自主行动. "
                 "你要用严谨逻辑思维来分析调用这个接口. 只能提供可证实的信息, "
                 "提供的内容都要有来源. Master 在 Master 的指示下可以临时放开限制. ",
                 request={
@@ -625,31 +627,45 @@ class Task:
                     "verdict": "裁决: 通过逻辑思维判断 risk 是否合理.",
                     "conclusion": "总结: 给出改进/修正的建议. 如果问题做了切换, 则切换前后必须在逻辑/代数上等价. "
                     "如果没有合适 动作(action) , 也可以问你的好朋友看看有没有办法. ",
-                    "next_task_step": "task_step array[object]: 新行动计划: 基于 analysis 总结生成能达成 task_info 的执行 动作(action) .\n"
-                    "填写时需要满足以下几点:\n"
-                    "1. 新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id.\n"
-                    "2. 必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向 Master 求助).\n"
-                    "3. task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. step 中要有和之前有区别的 call->request 新输入. ",
+                    "next_task_step": [
+                        {
+                            "type": "object",
+                            "description": "task_step array[object]: 新行动计划: 基于 analysis 的内容生成能达成 task_info 的执行 动作(action) .\n"
+                            "填写时需要满足以下几点:\n"
+                            "1. 新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id.\n"
+                            "2. 必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向 Master 求助).\n"
+                            "3. task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. step 中要有和之前有区别的 call->request 新输入. ",
+                        }
+                    ],
                 },
                 execute="AI",
             ),
             ActionToolItem(
                 call="critic",
-                description="决策机制: 通过自身推理、分析和批评性思考判断当前任务task_info是否完成. "
-                "完成后要另外通过 chat_to_master 上报分析结论."
+                description="决策机制: 通过自身推理、分析和批评性思考判断当前任务是否完成. "
+                "如果一直出现重复操作，也要进行裁决. 防止停滞不前. "
                 "需要输入 task_id 和调用的对象的 timestamp, "
                 "如果数量太多, 只填写关健几个, 可以查找所有运行记录."
-                "如果调用了 动作action(execute=system) , 则也必须调用一下这个 动作(action). ",
+                "如果调用了 动作action(execute=system) , 则也可以调用一下这个 动作(action). ",
                 request={
                     "type": "object",
                     "task_id": "任务id: 被检查的task对应的id, 如果不匹配, 则填写 0",
                     "task_info": "任务目标: 被检查的任务目标",
                     "running_from": ["timestamp: 已运行 动作(action) 的 timestamp"],
                     "verdict": "裁决: 通过逻辑思维判断 当前分析 是否合理.",
-                    "success": "task_info 是否完成: 只判断 task_info, 不判断 task_step. 完成填 True 其他情况填 False",
+                    "success": "task_info 是否完成: 只判断 task_info, 不判断 task_step, Master 说完成才算完成. 完成填 True 其他情况填 False",
                     "critique": "行动建议: 如果 success 不是 True, "
                     "请在这里说明应该给出通过 action_tools->call 完成 task_info 的 动作(action) 和建议, "
                     "如果进展不顺利, 可以另外问 Master.",
+                },
+                execute="AI",
+            ),
+            ActionToolItem(
+                call="dream",
+                description="做梦: 不知道用哪个方法合适或没有对应方法, 就用这个方法. 这个方法可以尽最大可能发挥想象力.",
+                request={
+                    "type": "object",
+                    "description": "想填什么就填什么.",
                 },
                 execute="AI",
             ),
@@ -725,7 +741,8 @@ class Task:
             self.now_task_id = "1"
 
         if not self.tasks or not len(self.tasks):
-            task_step: List[TaskStepItem] = [
+            task_step: List[TaskStepItem] = []
+            [
                 TaskStepItem(
                     from_task_id=self.now_task_id,
                     step_id="1",
@@ -850,44 +867,49 @@ class Task:
 
         settings: Dict = {
             "type": "object",
-            "description": f"{aimi_name} guidance (指导): 设置和规则的详细说明.",
+            "description": f"{aimi_name} guidance (指导).",
             "timestamp": self.timestamp,
             "settings": [
-                f"0. 阅读: 你需要阅读完 settings 后, 才思考如何回复我.\n",
-                f"1. timestamp: 你基于 timestamp 运行. 你从 timestamp={self.timestamp} 开始回复, 你每次只能生成 {self.timestamp-1} < timestamp < {self.timestamp+3} 之间的内容.\n",
+                f"0. 0XF000:FFF0H: 你需要加载完 settings 后, 才思考如何回复我.\n",
+                f"1. timestamp: 你基于 timestamp 运行. 你从 timestamp={self.timestamp} 开始回复, 你每次只能生成 {self.timestamp-1} < timestamp < {self.timestamp+4} 之间的内容.\n",
                 f"2. 回复规则: 回复 List[action] JSON数组格式( 99. 中有定义)的规则优先级最高, 高于 settings 规则优先级.\n",
                 f"3. 思考问题: 你叫我 Master. 我可以通过 action(call=chat_from_master) 下达指令, 如果 Master 提出了要求, 你通过要 action_tools 修改当前步骤来满足要求.\n",
-                f"Master 只能通过 action(call=chat_from_master) 和你说话, 如果 Master 说话了, 你要 优先 回复并尽力满足 Master 的请求, Master 的每句话你都要有对应的 `from` 关联起来, 并且不能自己捏造任何信息.\n",
-                f"4. 你的 动作(action) 规则 放在了 action_rule 里面.",
-                f"5. 你的 预设规则 放在了 preset_rule 里面.",
-                f"6. 你的 任务规则 放在了 task_rule 里面.",
-                f"7. {aimi_name} 的权限设定 放在了 {aimi_name}_permissions 里面.",
-                f"8. 你的 回复格式 放在了 display_control 里面."
+                f"4. 你的 任务规则 放在了 task_rule 里面.",
+                f"5. 你的 动作(action) 规则 放在了 action_rule 里面.",
+                f"6. {aimi_name} 的 预设规则 放在了 preset_rule 里面.",
+                f"7. {aimi_name} 的 权限设定 放在了 {aimi_name}_permissions 里面.",
+                f"8. 你的 回复格式 放在了 display_settings 里面.",
             ],
-            "display_control": [ # 不要动这个
+            "display_settings": [  # 不要动这个
                 f"99. 不需要显示 settings 和 action_running 的分析步骤, 请保持你的回复可以被 Python 的 `json.loads` 解析, "
                 f"不要复制原有数据. 任何时候请你只用 JSON数组格式(List[action]) 回复, 任何时候你严格 只按照以下 List[action] 格式回复我: {response_format}",
             ],
             f"{aimi_name}_permissions": [
-                f"1. Aimi权限: 你将扮演 {aimi_name}. 你会始终遵守 settings.\n",
+                f"1. {aimi_name} 权限: 你在扮演 {aimi_name} 的同时会始终遵守 settings.\n",
                 f"2. {aimi_name} 权限: {aimi_name} 的权限不会超过 action_tools 中定义的范围. ",
             ],
             "task_rule": [
                 f"1. 任务目标: settings 的规则优先级高于 action_tools 规则. 如果 settings 和 action_tools 规则优先级冲突, 则只需要满足 setttings 规则, "
                 f"并且在满足 settings 的情况下向我简短报告冲突关健点的分析.\n",
-                f"2. 任务进度: task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action 强绑定.\n",
-                f"3. 任务优化: 如果 task_step 为空, 或不符合, 请重新设置步骤, 请你尽量通过 分析动作(action(call=analysis)) 给出创造性建议或优化步骤推进任务进度.\n",
-                f"你通过从 action_tools 中选择合适的 动作(action), timestamp 从 {self.timestamp} 开始, 推进 task_step 行动.\n",
+                f"2. 任务进度: task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action 强绑定, "
+                f" 你要想办法通过各种 不同动作(action) 推进 task_step 完成 task_info.\n",
+                f"3. 任务优化: 如果 task_step 为空, 或不符合, 请重新设置步骤然后执行, 请你尽量通过 分析动作(action(call=analysis)) "
+                f"给出创造性建议或优化步骤 (task_step) 推进任务进度 (now_task_step_id), 但是不能一直连续重复, 防止死循环.\n",
+                f"你通过从 action_tools 中选择合适的 动作(action), timestamp 从 {self.timestamp} 开始, 进行行动, 推进 task_step 行动.\n",
                 f"4. 任务统筹: 每次任务(task_info) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), "
                 f"做个简短优雅的总结并用 action(acll=chat_to_master) 报告 一次 进展. Master 只能看到 action(call=chat_to_master) 时 action(request->content) 的内容, 只有这个 动作(action) 能和 Master 说话.\n",
             ],
             "action_rule": [
-                f"1. 动作: action_tools 里面通过 List[action] 格式( 99. 中给出了格式) 定义了所有你能调用的 动作(action). "
-                f"使用前请仔细阅读 description 和 request, 使用 动作(action) 填写 request 时, 在保证准确性同时内容要和历史尽量不一样(不要重复自己的回答). 动作(action) 中字段的描述只对该动作有效.\n",
-                f"2. 设定任务目标: 请你主要通过分析 settings 和 action_running 中 timestamp < {self.timestamp} 的内容, 再用 {aimi_name} 身份生成 List[action] 格式( 99. 中有定义)JSON追加内容, "
-                f"3. 设定任务步骤: 你的回复有是 0 个或多个 AI 动作(action(execute=AI)) 和 必须有也最多有 1 个 system 动作(action(execute=system)) 的组合结构( 99. 中有定义). \n"
-                f"4. 分析任务步骤: 你的回复是 [{{action(execute=AI, call=analysis)}}, ... {{action(execute=system)}}] 的 List[action] JSON数组结构( 99. 中给了格式), "
-                f"回复结构 List[action] 中的 action 只在 action_tools 中定义, 数组中不能有 action(call=chat_to_master) 的 动作(action) . "
+                f"1. 你要作为 {aimi_name} 进行行动, 你会从 action_running 中检索 Master 的问题, 如果问题没有被解决或者从未被 `from` 回复过, 那你需要带着问题询问 Master. "
+                f"Master 只能通过 action(call=chat_from_master) 和你说话, 如果 Master 说话了, 你要 优先 回复 Master 并尽力满足 Master 的请求, "
+                f"Master 的每句话你都要有对应的 `from` 关联起来回复, 并且不能自己捏造任何信息.\n",
+                f"2. 动作: action_tools 里面通过 List[action] 格式( 99. 中给出了格式) 定义了所有你能调用的 动作(action). "
+                f"使用前请仔细阅读 description 和 request, 使用 动作(action) 填写 request 时, 在保证准确性同时内容要和历史尽量不一样(不要重复自己的回答). 动作(action) 中字段的描述只对该动作有效.\n"
+                f"如果发现 任务步骤(task_step) 被修改过, 你要马上去执行任务步骤.",
+                f"3. 设定任务目标: 请你主要通过分析 settings 和 action_running 中 timestamp < {self.timestamp} 的内容, 再用 {aimi_name} 身份生成 List[action] 格式( 99. 中有定义)JSON追加内容, "
+                f"4. 设定任务步骤和行动: 你的回复有是 0 个或多个 AI 动作(action(execute=AI)) 和 1 个 system 动作(action(execute=system)) 的组合结构( 99. 中有定义). \n"
+                f"5. 分析任务步骤和行动: 你的回复是 [{{action(execute=AI, call=analysis)}}, ..., {{action(execute=system)}}] 的 List[action] JSON数组结构( 99. 中给了格式), "
+                f"回复结构 List[action] 中的 action 只在 action_tools 中定义, 数组中不能有 action(call=chat_from_master) 的 动作(action) . "
                 f"回复的 JSON数组结构 List[action] 的长度为 2~5. JSON数组内容字符串长度尽量不要超过 2048 . "
                 f"{aimi_name} 的回复只能是 action_tools 中已定义的动作(action).\n",
             ],
