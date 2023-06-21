@@ -246,7 +246,7 @@ class Task:
         run_stdout = run.stdout
         run_stderr = run.stderr
         log_info(
-            f"code run result:\nreturncode:{str(run_returncode)}\nstdout:{str(run_stdout)}\nstderr:{str(run_stderr)}"
+            f"code run result:\nreturncode:{str(run_returncode)}\nstderr:{str(run_stderr)}\nstdout:{str(run_stdout)}"
         )
         return {
             "description": f"备注: "
@@ -257,7 +257,7 @@ class Task:
             f"4. 请结合你的代码 code 和运行 返回值(returncode/stderr/stdout) 针对具体问题具体分析:\n"
             f"returncode: 程序运行的返回值\n"
             f"stderr: 是你的代码 code 的标准出错流输出, 如果有内容说明出现了错误.\n"
-            f"stdout: 是你的代码 code 的标准出错流输出, 你可以检查一下内容是否符合你代码预期.",
+            f"stdout: 是你的代码 code 的标准输出流输出, 你可以检查一下内容是否符合你代码预期.",
             "returncode": str(run_returncode),
             "stderr": str(run_stderr),
             "stdout": str(run_stdout),
@@ -611,7 +611,7 @@ class Task:
                             "description": "引用的信息: 和 expect/problem/error 关联, 符合逻辑的关联引用信息, "
                             "尽量从权威知识库中查找, 也可以从某些领域、行业的常识、经验等内容中查找, 注意填写可信程度.",
                             "reference": "来源关健词: 如: Master/软件技术/常识... 等, 你可以尽量寻找能解决问题的内容.",
-                            "information": "引用信息内容: 简短总结 quote 提供的参考信息",
+                            "information": "引用信息内容: 简短总结 reference 提供的参考信息",
                             "credibility": "可信程度: 如: 30%",
                         },
                     ],
@@ -671,9 +671,9 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_wolfram",
-                description="通过wolfram进行数学计算: 你要用数学家严谨的逻辑分析思维来使用这个 动作(action) , "
+                description="通过 wolfram 进行数学计算: 你要用数学家严谨的逻辑分析思维来使用这个 动作(action) , "
                 "所有计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. "
-                "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照wolfram语言输入.",
+                "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照 wolfram 语言输入.",
                 request={
                     "from": [
                         "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
@@ -718,7 +718,7 @@ class Task:
                 "1. 你要把 实现目标 的结果打印出来(很重要).\n"
                 "2. 不要加任何反引号 ` 包裹 和 任何多余说明, 只输入 python 代码.\n"
                 "3. 你需要添加 ` if __name__ == '__main__' ` 作为主模块调用你写的代码.\n"
-                "4. 输入必须只有 python, 内容不需要单独用```包裹. 如果得不到期望值可以进行DEBUG.\n"
+                "4. 输入必须只有 python, 内容不需要单独用 ``` 包裹. 如果得不到期望值可以进行 DEBUG.\n"
                 "5. 执行成功后, 长度不会超过2048, 所以你看到的内容可能被截断, 某种情况下你可以通过代码控制输出数据的偏移\n"
                 "6. 每次调用 chat_to_python 都会覆盖之前的 python 代码, 所以需要一次性把内容写好. "
                 "7. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找 Master.",
