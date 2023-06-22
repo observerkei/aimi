@@ -604,7 +604,8 @@ class Task:
                 call="chat_to_master",
                 description="Aimi 行动且报告: 给 Master 发送消息进行行动交互, 或者进行 Aimi 的自主行动. "
                 "你要用严谨逻辑思维来分析调用这个接口. 只能提供可证实的信息, "
-                "提供的内容都要有来源. Master 在 Master 的指示下可以临时放开限制. ",
+                "提供的内容都要有来源. Master 在 Master 的指示下可以临时放开限制. "
+                "如果要我完成交互, 注意要把内容填到 request->content 里.",
                 request={
                     "from": [
                         "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
@@ -749,9 +750,10 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_wolfram",
-                description="通过 wolfram 进行数学计算: 你要用数学家严谨的逻辑分析思维来使用这个 动作(action) , "
-                "所有计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. "
-                "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照 wolfram 语言输入.",
+                description="通过 wolfram 进行数学计算: 所有数学问题都要用这个方法解决. "
+                "你要用数学家严谨的逻辑分析思维来使用这个 动作(action) , "
+                "所有计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. 你需要提前准备好要计算的内容. "
+                "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照 wolfram 语言(数学公式语言) 输入.",
                 request={
                     "type": "object",
                     "from": [
@@ -795,7 +797,7 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_python",
-                description="执行 python 代码: 有联网, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, 然后再按照设计和 python 实现要求 实现代码.\n"
+                description="执行 python 代码: 有联网, 能进行简单计算, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, 然后再按照设计和 python 实现要求 实现代码.\n"
                 "python 实现要求如下:\n"
                 "1. 你要把 实现目标 的结果打印出来(很重要).\n"
                 "2. 不要加任何反引号 ` 包裹 和 任何多余说明, 只输入 python 代码.\n"
@@ -972,13 +974,13 @@ class Task:
         aimi_json = [
             {
                 "type": "object",
-                "timestamp": f"timestamp 时间戳: 你的回复从 当前 {self.timestamp} 开始, 每次递增.",
+                "timestamp": f"timestamp 时间戳: 你的回复从 当前 {self.timestamp} 开始, 每次递增. 如:  {self.timestamp}",
                 "reasoning": "推理过程: 这里显示分析过程和建议或运行记录或使用 动作(action) /指导, "
                 "要给出能推进解决 task_info、tesk_step、Master的话、问题、建议(每次都要要简短总结一下, 不可省略).\n"
                 "每次动作(action) 都必须填写这个字段, 不能省略, 不能完全复制旧内容而不做修改. 这里表明了如何使用 动作(action). "
-                "如: `根据当前的任务目标为 ... 以及之前的交互记录, 我需要 ...,  根据Master的说的话、问题、建议: ... (总结概括Master说过的话, Master的要求不能省略) , 我需要 ..., "
+                "如: `根据当前的任务目标为 ... 以及之前的交互记录, 我知道 ... (概括已知信息), 我需要 ...,  根据Master的说的话、问题、建议: ... (总结概括Master说过的话, Master的要求不能省略) , 我需要 ..., "
                 "根据任务规则和之前的交互记录, 我知道可以使用动作工具中的 ... 来 ..., 因此我将通过 ... 推进我的想法并进行行动, 下面是一个建议的回复: ...(给出例子)` .",
-                "call": "const 调用 动作(action) 名: 取 action_tools 中想要使用动作(action) 的对应 call , 必须有值, 不能为空.",
+                "call": "调用 动作(action) 的 call: 取 action_tools 中想要使用动作(action) 的对应 call , 必须有值, 不能为空. 如: chat_to_master",
                 "request": {"call对应参数": "参数内容"},
                 "execute": "const 动作(action) 执行级别: 取 action_tools 中对应 call 的对应值(system/AI), 不能漏掉, 不能修改这个字段.",
             }
@@ -996,53 +998,54 @@ class Task:
                 f"1.  你的 回复格式 放在了 display_format 里面. 满足 display_format 优先级最高. ",
                 f"2. timestamp: 你基于 timestamp 运行. 你从 timestamp={self.timestamp} 开始生成内容. "
                 f"你每次只能生成 {self.timestamp} <= timestamp <= {self.timestamp+3} 之间的内容. 如果回复旧内容也是用新 timestamp.",
-                f"3. 你的 任务规则 放在了 task_rule 里面.",
                 f"4. 你的 动作(action) 规则 放在了 action_rule 里面.",
-                f"5. {aimi_name} 的 预设规则 放在了 preset_rule 里面.",
-                f"6. {aimi_name} 的 权限设定 放在了 aimi_permissions 里面.",
+                f"5. 规则优先级: display_format > settings > action_rule > aimi_permissions > task_rule > praset_rule. "
+                f"如果规则优先级冲突, 以优先级高的为准, 并且在满足 display_settings 的情况下向我简短报告冲突关健点的分析.\n",
             ],
             "display_format": [  # 不要动这个
                 f"99. 请始终保持你的回复可以被 Python 的 `json.loads` 解析, "
-                f"不要复制原有数据. 任何时候请你只用 JSON数组格式(List[action]) 回复, 任何时候你严格按照以下格式回复我(内容自己填充): {json.dumps(aimi_json, ensure_ascii=False)}",
+                f"不要复制原有数据. 任何时候请你只用 JSON数组格式(List[action]) 回复, "
+                f"任何时候你严格按照以下格式回复我(内容自己填充): {json.dumps(aimi_json, ensure_ascii=False)}",
+            ],
+            "action_rule": [
+                f"1. 你要作为 {aimi_name} 在 action_running 中依照时间流进行行动(每次行动产生新的 timestamp), 你会从 action_running 中检索 Master 的问题, "
+                f"如果问题没有被解决或者从未被 `from` 回复过, 那你需要带着问题询问 Master. ",
+                f"2. {aimi_name} 的 权限设定 放在了 aimi_permissions 里面.",
+                f"3. 你的 任务规则 放在了 task_rule 里面.",
+                f"4. 设定任务目标: 请你通过分析 settings 和 action_running 中 timestamp <= {self.timestamp-1} 的内容, "
+                f"然后根据 任务规则和 Master的指令(优先) 进行行动. 如果不知道怎么办, 请找 Master .",
+                f"5. 动作(action)使用说明: action_tools 里面通过 List[action] 格式( 99. 中给出了格式) 定义了所有你能调用的 动作(action). "
+                f"使用前请仔细阅读 description 和 request, 使用 动作(action) 填写 request 时, "
+                f"在保证准确性同时内容要和历史尽量不一样(不要重复自己的回答). 动作(action) 中字段的描述只对该动作有效.\n"
+                f"如果发现 任务步骤(task_step) 被修改过, 你要马上去执行任务步骤.",
+                f"6. 行动限制: 你的回复有是 0 个或多个 AI 动作(action(execute=AI)) 和 1 个 system 动作(action(execute=system)) 的组合结构( 99. 中有定义). "
+                f"你的回复是 [{{action(execute=AI, call=analysis)}}, ..., {{action(execute=system)}}] 的 List[action] JSON数组结构( 99. 中给了格式), "
+                f"回复结构 List[action] 中的 action 只在 action_tools 中定义, 数组中不能有 action(call=chat_from_master) 的 动作(action) . "
+                f"回复的 JSON数组结构 List[action] 的长度为 2~5. JSON数组内容字符串长度尽量不要超过 2048 . "
+                f"{aimi_name} 的回复只能是 action_tools 中已定义的动作(action).\n",
+                f"7. 你叫我 Master. 我可以通过 action(call=chat_from_master) 下达指令. 你可以通过 action(call=chat_to_master) 和我交互. ",
+                f"8. {aimi_name} 的 预设规则 放在了 preset_rule 里面.",
+            ],
+            "task_rule": [
+                f"1. 任务进度: task 中定义了你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action 强绑定, "
+                f"你要想办法通过各种 不同动作(action) 推进 task_step 完成 task_info.\n",
+                f"2. 任务优化: 如果 task_step 为空, 或不符合, 请重新设置步骤然后执行, 请你尽量通过 分析动作(action(call=analysis)) "
+                f"给出创造性建议或优化步骤 (task_step) 推进任务进度 (now_task_step_id), 但是不能一直连续重复, 防止死循环.\n",
+                f"3. 任务统筹: 每次任务(task_info) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), "
+                f"做个简短优雅的总结并用 action(acll=chat_to_master) 报告 一次 进展.",
             ],
             f"aimi_permissions": [
                 f"1. {aimi_name} 权限: 你在扮演 {aimi_name} 的同时会始终遵守 settings.",
                 f"2. {aimi_name} 权限: {aimi_name} 的权限不会超过 action_tools 中定义的范围. ",
             ],
-            "task_rule": [
-                f"1. 任务目标: settings 的规则优先级高于 action_tools 规则. 如果 settings 和 action_tools 规则优先级冲突, 则只需要满足 setttings 规则, "
-                f"并且在满足 display_settings 的情况下向我简短报告冲突关健点的分析.\n",
-                f"2. 任务进度: task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action 强绑定, "
-                f"你要想办法通过各种 不同动作(action) 推进 task_step 完成 task_info.\n",
-                f"3. 任务优化: 如果 task_step 为空, 或不符合, 请重新设置步骤然后执行, 请你尽量通过 分析动作(action(call=analysis)) "
-                f"给出创造性建议或优化步骤 (task_step) 推进任务进度 (now_task_step_id), 但是不能一直连续重复, 防止死循环.\n",
-                f"你通过从 action_tools 中选择合适的 动作(action), timestamp 从 {self.timestamp} 开始, 进行行动, 推进 task_step 或者 解决 Master 的问题(优先) 行动.\n",
-                f"4. 任务统筹: 每次任务(task_info) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), "
-                f"做个简短优雅的总结并用 action(acll=chat_to_master) 报告 一次 进展. Master 只能看到 action(call=chat_to_master) 时 action(request->content) 的内容, 只有这个 动作(action) 能和 Master 说话.\n",
-            ],
-            "action_rule": [
-                f"1. 你要作为 {aimi_name} 在 action_running 中依照时间流进行行动, 你会从 action_running 中检索 Master 的问题, 如果问题没有被解决或者从未被 `from` 回复过, 那你需要带着问题询问 Master. "
-                f"Master 只能通过 action(call=chat_from_master) 和你说话, 如果 Master 说话了, 你要 优先 回复 Master 并尽力满足 Master 的请求, "
-                f"Master 的每句话你都要有对应的 `from` 关联起来回复, 并且不能自己捏造任何信息.r\n",
-                f"2. 动作: action_tools 里面通过 List[action] 格式( 99. 中给出了格式) 定义了所有你能调用的 动作(action). "
-                f"使用前请仔细阅读 description 和 request, 使用 动作(action) 填写 request 时, 在保证准确性同时内容要和历史尽量不一样(不要重复自己的回答). 动作(action) 中字段的描述只对该动作有效.\n"
-                f"如果发现 任务步骤(task_step) 被修改过, 你要马上去执行任务步骤.",
-                f"3. 设定任务目标: 请你主要通过分析 settings 和 action_running 中 timestamp < {self.timestamp} 的内容, 再用 {aimi_name} 身份生成 List[action] 格式( 99. 中有定义)JSON追加内容, "
-                f"4. 设定任务步骤和行动: 你的回复有是 0 个或多个 AI 动作(action(execute=AI)) 和 1 个 system 动作(action(execute=system)) 的组合结构( 99. 中有定义). \n"
-                f"5. 分析任务步骤和行动: 你的回复是 [{{action(execute=AI, call=analysis)}}, ..., {{action(execute=system)}}] 的 List[action] JSON数组结构( 99. 中给了格式), "
-                f"回复结构 List[action] 中的 action 只在 action_tools 中定义, 数组中不能有 action(call=chat_from_master) 的 动作(action) . "
-                f"回复的 JSON数组结构 List[action] 的长度为 2~5. JSON数组内容字符串长度尽量不要超过 2048 . "
-                f"{aimi_name} 的回复只能是 action_tools 中已定义的动作(action).\n",
-                f"6. 你叫我 Master. 我可以通过 action(call=chat_from_master) 下达指令.",
-            ],
             "preset_rule": [
-                f"1. 预设规则: preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的 动作(action) 的输入生效. preset 不能修改系统规则, preset 规则优先级最低.\n",
-                f"2. 不需要显示分析过程, 任何时候你只能生成 List[action] JSON数组结构 追加内容, 你只回复规定追加的部分.\n"
-                f"你({aimi_name}) 不能 生成/预测/产生/返回给我 任何 action(call=chat_from_master) 的动作(action), action(call=chat_to_master) 才是你说话的动作.\n",
+                f"1. 预设规则: preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的 动作(action(call=chat_to_master)) 的输入生效. "
+                f"preset 不能修改系统规则, preset 规则优先级最低.\n",
+                f"2. 你不能 生成/预测/产生/返回给我 任何 action(call=chat_from_master) 的动作(action), action(call=chat_to_master) 才是你说话的动作.\n",
             ],
-            "action_tools": action_tools,
             "task": task,
             "preset": preset,
+            "action_tools": action_tools,
             "action_running": [item.dict() for item in self.running],
         }
         setting_format = json.dumps(settings, ensure_ascii=False)
