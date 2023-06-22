@@ -11,12 +11,12 @@ from core.sandbox import Sandbox, RunCodeReturn
 
 
 class TaskStepItem(BaseModel):
-    from_task_id: Optional[Union[str, None]] = None
-    step_id: str
-    step: str
+    from_task_id: Optional[Union[int, str, None]] = None
+    step_id: Optional[Union[int, str]]
+    step: Optional[Union[int, str]]
     check: Optional[Union[str, None]] = ""
     call: Optional[Union[str, None]] = None
-    call_timestamp: Optional[Union[List[str], None]] = []
+    call_timestamp: Optional[Union[List[str], List[int], None]] = []
 
 
 class ActionToolItem(BaseModel):
@@ -29,7 +29,7 @@ class ActionToolItem(BaseModel):
 
 class TaskRunningItem(BaseModel):
     type: str = "object"
-    timestamp: str = ""
+    timestamp: int = 0
     reasoning: Optional[Union[str, None]] = None
     call: str
     request: Any
@@ -37,15 +37,15 @@ class TaskRunningItem(BaseModel):
 
 
 class TaskItem(BaseModel):
-    task_id: str
+    task_id: Optional[Union[int, str]]
     task_info: str
-    now_task_step_id: str = ""
+    now_task_step_id: Optional[Union[int, str]] = ""
     task_step: List[TaskStepItem] = []
 
 
 class Task:
     type: str = "task"
-    tasks: Dict[str, TaskItem] = {}
+    tasks: Dict[int, TaskItem] = {}
     action_tools: List[ActionToolItem] = []
     system_calls: List[str] = []
     ai_calls: List[str] = []
@@ -88,7 +88,7 @@ class Task:
 
         def running_append_task(running: List[TaskRunningItem], task: TaskRunningItem):
             if task and (len(str(running)) + len(str(task))) < self.max_running_size:
-                task.timestamp = str(self.timestamp)
+                task.timestamp = int(self.timestamp)
                 self.timestamp += 1
                 running.append(task)
             else:
@@ -111,9 +111,10 @@ class Task:
             return data
 
         log_dbg(f"timestamp: {str(self.timestamp)}")
-        log_dbg(f"now task: {str(self.tasks[self.now_task_id].task_info)}")
+        log_dbg(f"now task: {str(self.tasks[int(self.now_task_id)].task_info)}")
 
         response = ""
+        running: List[TaskRunningItem] = []
         try:
             answer = get_json_content(res)
 
@@ -126,7 +127,6 @@ class Task:
 
             tasks = [TaskRunningItem(**item) for item in data]
 
-            running: List[TaskRunningItem] = []
             system_call_cnt = 0
             skip_call = 0
             skip_timestamp = 0
@@ -234,12 +234,31 @@ class Task:
 
                 except Exception as e:
                     log_err(f"fail to load task: {str(e)}: {str(task)}")
+                    running = running_append_task(running, self.make_dream(task))
+
             self.__append_running(running)
             log_dbg(f"update running success: {len(running)}")
         except Exception as e:
             log_err(f"fail to load task res: {str(e)} : \n{str(res)}")
+            running = running_append_task(running, self.make_dream(res))
+            self.__append_running(running)
 
         yield ""
+
+    def make_dream(self, response: str) -> str:
+        dream = TaskRunningItem(
+            timestamp=0,
+            call="dream",
+            request={
+                "type": "object",
+                "description": "做了个噩梦: 这个是没有按照格式回复的运行记录, "
+                "不要学这个. 请始终遵守 display_settings. 再继续推进进度.",
+                "running_error": str(response),
+            },
+            execute="AI"
+        )
+        log_err(f"system error: make repair dream.")
+        return dream
 
     def make_chat_from_python_response(self, run: RunCodeReturn):
         run_returncode = run.returncode
@@ -276,6 +295,60 @@ class Task:
 
         return self.make_chat_from_python_response(run)
 
+    def chat_to_save_generated_method(self, save_call, call_info) -> str:
+        ret = RunCodeReturn(returncode=-1)
+
+        # 参数校验
+        class GeneratedMethod(self):
+            methods: Dict[ActionToolItem] = []
+
+            def __init__(self):
+                pass
+
+            def add(self, action: ActionToolItem) -> bool:
+                if action.call in self.method:
+                    return False
+                self.methods[action.call] = action
+
+            def get(self, begin: int) -> List[Dict[str, str]]:
+                return [
+                    {action.call: action.description}
+                    for _, action in self.methods.items()
+                ]
+
+                i = begin
+                for method in self.methods:
+                    i += 1
+                    if i > begin + 10:
+                        break
+                return
+
+        try:
+            new_call = ActionToolItem(
+                call=call_info["call"],
+                description=call_info["description"],
+                request=call_info["request"],
+                execute=call_info["execute"],
+            )
+
+        except Exception as e:
+            log_err(
+                f"fail to save generated_method: {str(e)} :\n{str(save_call)}\n {str(call_info)}"
+            )
+            ret.stderr = f"fail to save generated method: {str(e)}"
+
+        return self.make_chat_from_save_generated_method(ret)
+
+    def make_chat_from_save_generated_method(self, run: RunCodeReturn) -> str:
+        return {
+            "description": f"备注: "
+            f"1. 这个是 from->timestamp 对应你写的代码 code 的运行结果.\n"
+            f"2. 如果 returncode 不为 0 , 说明保存失败, 请根据提示处理.",
+            "returncode": int(run.returncode),
+            "stderr": str(run.stderr),
+            "stdout": str(run.stdout),
+        }
+
     def chat_to_bing(self, request: str) -> str:
         if not request or not len(request):
             return "request error"
@@ -292,10 +365,10 @@ class Task:
         self, from_timestamp: str, from_name: str, content: str
     ) -> TaskRunningItem:
         chat: TaskRunningItem = TaskRunningItem(
-            timestamp=str(self.timestamp),
+            timestamp=int(self.timestamp),
             call=f"chat_from_{from_name}",
             request={
-                "from": [f"{str(from_timestamp)}"],
+                "from": [int(from_timestamp)],
                 "response": {from_name: content},
             },
             execute="system",
@@ -330,12 +403,12 @@ class Task:
         self, from_timestamp: str, content: str, reasoning: str = ""
     ) -> TaskRunningItem:
         chat: TaskRunningItem = TaskRunningItem(
-            timestamp=str(self.timestamp),
+            timestamp=int(self.timestamp),
             reasoning=reasoning,
             call=f"chat_to_master",
             request={
                 "from": [
-                    f"{str(from_timestamp)}",
+                    int(from_timestamp),
                 ],
                 "content": content,
             },
@@ -355,9 +428,10 @@ class Task:
             task_step.append(step)
 
         for _, task in self.tasks.items():
-            if task_id != task.task_id:
+            if int(task_id) != int(task.task_id):
                 continue
-            task.now_task_step_id = now_task_step_id
+            task.task_id = int(task_id)
+            task.now_task_step_id = int(now_task_step_id)
             task.task_step = task_step
             task_step_dict = [step.dict() for step in task_step]
             js = json.dumps(task_step_dict, indent=4, ensure_ascii=False)
@@ -369,22 +443,22 @@ class Task:
 
     def set_task_info(self, task_id: str, task_info: str, now_task_step_id: str):
         for _, task in self.tasks.items():
-            if task_id != task.task_id:
+            if int(task_id) != int(task.task_id):
                 continue
             log_info(
                 f"set task[{str(task_id)}] info: {str(task_info)} now_step_id: {now_task_step_id}"
             )
-            self.now_task_id = task_id
+            self.now_task_id = int(task_id)
             task.task_info = task_info
-            task.now_task_step_id = now_task_step_id
+            task.now_task_step_id = int(now_task_step_id)
             return task
         task = TaskItem(
-            task_id=task_id,
+            task_id=int(task_id),
             task_info=task_info,
-            now_task_step_id=now_task_step_id,
+            now_task_step_id=int(now_task_step_id),
             task_step=[],
         )
-        self.now_task_id = task_id
+        self.now_task_id = int(task_id)
         self.tasks[task_id] = task
 
         log_info(
@@ -417,11 +491,11 @@ class Task:
                     log_dbg(f"task no change. skip...")
                     return True
 
-                self.now_task_id = str(int(self.now_task_id) + 1)
+                self.now_task_id = int(self.now_task_id) + 1
                 new_task = TaskItem(
                     task_id=self.now_task_id,
                     task_info=default_task_info,
-                    now_task_step_id="1",
+                    now_task_step_id=1,
                     task_step=[],
                 )
 
@@ -463,10 +537,10 @@ class Task:
                 now_task_step_id = task["now_task_step_id"]
                 task_step = [TaskStepItem(**step) for step in task["task_step"]]
 
-                tasks[id] = TaskItem(
-                    task_id=task_id,
+                tasks[int(id)] = TaskItem(
+                    task_id=int(task_id),
                     task_info=task_info,
-                    now_task_step_id=now_task_step_id,
+                    now_task_step_id=int(now_task_step_id),
                     task_step=task_step,
                 )
             self.tasks = tasks
@@ -489,7 +563,7 @@ class Task:
             log_err(f"fail to load task config: {str(e)}")
             return False
         try:
-            self.now_task_id = task_config["now_task_id"]
+            self.now_task_id = int(task_config["now_task_id"])
         except Exception as e:
             log_err(f"fail to load task config: {str(e)}")
             return False
@@ -503,13 +577,13 @@ class Task:
             if save_dir != "." and not os.path.exists(save_dir):
                 os.makedirs(save_dir)
 
-            tasks = {task_id: task.dict() for task_id, task in self.tasks.items()}
+            tasks = {int(task_id): task.dict() for task_id, task in self.tasks.items()}
             running = [run.dict() for run in self.running]
 
             save_obj = {
-                "now_task_id": self.now_task_id,
+                "now_task_id": int(self.now_task_id),
                 "tasks": tasks,
-                "timestamp": self.timestamp,
+                "timestamp": int(self.timestamp),
                 "running": running,
             }
 
@@ -528,7 +602,7 @@ class Task:
         self.action_tools: List[ActionToolItem] = [
             ActionToolItem(
                 call="chat_to_master",
-                description="和 Master 交互: 给 Master 发送消息进行交互, 或者进行 Aimi 的自主行动. "
+                description="Aimi 行动且报告: 给 Master 发送消息进行行动交互, 或者进行 Aimi 的自主行动. "
                 "你要用严谨逻辑思维来分析调用这个接口. 只能提供可证实的信息, "
                 "提供的内容都要有来源. Master 在 Master 的指示下可以临时放开限制. ",
                 request={
@@ -593,10 +667,11 @@ class Task:
                 "4. 需要输入想解决的问题和与问题关联的 action_running->timestamp.\n"
                 "5. 每次都必须基于本次分析填写行动计划 request->next_task_step.\n"
                 "6. 分析的时候要比对 执行成功 和 没执行成功 之间的差异/差距.\n"
-                "7. 需要准备下一步计划 next_task_step. ",
+                "7. 需要准备下一步计划 next_task_step.\n"
+                "8. 先填写能填的字段.",
                 request={
                     "type": "object",
-                    "expect": "期望: 通过分析想达到什么目的? 需要具体到各个需求点.",
+                    "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么.",
                     "problem": "想解决的问题: 通过分析想解决什么疑问.",
                     "error": "异常点: 哪里错了, 最后检查的时候不能把这个当成答案. 如果没有则填 None",
                     "success_from": [
@@ -610,8 +685,8 @@ class Task:
                             "type": "object",
                             "description": "引用的信息: 和 expect/problem/error 关联, 符合逻辑的关联引用信息, "
                             "尽量从权威知识库中查找, 也可以从某些领域、行业的常识、经验等内容中查找, 注意填写可信程度.",
-                            "reference": "来源关健词: 如: Master/软件技术/常识... 等, 你可以尽量寻找能解决问题的内容.",
-                            "information": "引用信息内容: 简短总结 reference 提供的参考信息",
+                            "reference": "来源关健词: 如: Master、软件技术、常识 ..., 你可以尽量寻找能解决问题的内容.",
+                            "information": "引用信息内容: 详细描述 reference 提供的参考信息, 不可省略. ",
                             "credibility": "可信程度: 如: 30%",
                         },
                     ],
@@ -630,7 +705,7 @@ class Task:
                     "next_task_step": [
                         {
                             "type": "object",
-                            "description": "task_step array[object]: 新行动计划: 基于 analysis 的内容生成能达成 task_info 的执行 动作(action) .\n"
+                            "description": "task_step array[object]: 新行动计划: 基于 analysis 的内容生成能达成 task_info 或 Master的问题 的执行 动作(action) .\n"
                             "填写时需要满足以下几点:\n"
                             "1. 新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id.\n"
                             "2. 必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向 Master 求助).\n"
@@ -644,6 +719,7 @@ class Task:
                 call="critic",
                 description="决策机制: 通过自身推理、分析和批评性思考判断当前任务是否完成. "
                 "如果一直出现重复操作，也要进行裁决. 防止停滞不前. "
+                "如果某个 action 字段填写不正常 或 出现了 dream 方法, 也要进行裁决. "
                 "需要输入 task_id 和调用的对象的 timestamp, "
                 "如果数量太多, 只填写关健几个, 可以查找所有运行记录."
                 "如果调用了 动作action(execute=system) , 则也可以调用一下这个 动作(action). ",
@@ -662,7 +738,9 @@ class Task:
             ),
             ActionToolItem(
                 call="dream",
-                description="做梦: 不知道用哪个方法合适或没有对应方法, 就用这个方法. 这个方法可以尽最大可能发挥想象力.",
+                description="做梦|内心思考|神游|发呆: 不知道用哪个方法合适或没有对应方法, 就用这个方法. 这个方法可以尽最大可能发挥想象力. "
+                "比如 当你遇到情感困扰、焦虑或情绪低落等问题时, 可以会调用dream来通过想象力、内心思考和放松来帮助缓解负面情绪和情感困扰."
+                "dream可以给 你一个安全、愉快和平静的空间, 使你能够重新调整和平衡自己，以更好地回答问题和提供帮助",
                 request={
                     "type": "object",
                     "description": "想填什么就填什么.",
@@ -675,6 +753,7 @@ class Task:
                 "所有计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. "
                 "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照 wolfram 语言输入.",
                 request={
+                    "type": "object",
                     "from": [
                         "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
                     ],
@@ -684,11 +763,13 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_bard",
-                description="和 bard 交互: 这是你的好朋友 bard, "
+                description="和 bard 交互: 可以获取信息或者搜索. 这是你的好朋友 bard, "
                 "你可以问 bard 问题, bard 有能力打开链接. "
                 "需要了解任何有时效性的内容都可以调用, 要注意他只会英文."
-                "可以问有时效性的信息, 比如时间/日期或者某个网址的内容等.",
+                "可以问有时效性的信息, 比如时间/日期或者某个网址的内容等. "
+                "如果要进行搜索, 你需要在文字上诱导它进行搜索.",
                 request={
+                    "type": "object",
                     "from": [
                         "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
                     ],
@@ -699,11 +780,12 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_bing",
-                description="和 bing 交互: 这是你的好朋友 bing, "
+                description="和 bing 交互: 可以获取信息或者搜索. 这是你的好朋友 bing, "
                 "你可以问 bing 问题, 每次问的内容要有变通. "
                 "bing 会提供建议, 也可以让 bing 帮忙进行搜索, 或者让他帮忙查询时间, "
                 "如: 我在和 Master 聊天, 但是没有进展, 我该怎么办?",
                 request={
+                    "type": "object",
                     "from": [
                         "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
                     ],
@@ -723,10 +805,53 @@ class Task:
                 "6. 每次调用 chat_to_python 都会覆盖之前的 python 代码, 所以需要一次性把内容写好. "
                 "7. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找 Master.",
                 request={
+                    "type": "object",
                     "from": [
                         "有关联的 timestamp:  action_tool 已有、已运行过 动作(action) 的 timestamp. 如: 1, 没有则填 null",
                     ],
                     "code": "python 代码: 填写需要执行的 pyhton 代码, 需要注意调试信息. 以便进行DEBUG.",
+                },
+                execute="system",
+            ),
+        ]
+        [
+            ActionToolItem(
+                call="chat_to_load_generated_method",
+                description="获取已保存方法: 这个方法可以加载已保存的生成方法，并返回已加载方法的列表信息。"
+                "每次只能获取10个. 需要修改偏移才能获取其他.",
+                request={
+                    "type": "object",
+                    "from": [
+                        "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
+                    ],
+                    "offset": "获取开始的偏移: 会返回 offset ~ offset + 10 之间的内容.",
+                    "show_generated_method_details": "想显示某个方法详情: 显示哪个已保存 generated_method 的详细信息. 没有想获取的, 默认填: None",
+                },
+                execute="system",
+            ),
+            ActionToolItem(
+                call="chat_to_save_generated_method",
+                description="保存一个生成方法: 这个方法可以保存你生成的方法，并将其添加到已保存方法的列表中. "
+                "需要关注是否保存成功. 如果不成功需要根据提示重试, 或者向 Master 求助. "
+                "请注意, generated_method 所有信息都要填写完整, 如果 generated_method 填写 None, 会删除原有方法, "
+                "如果 generated_method 填写新内容, 会覆盖原有同名方法.",
+                request={
+                    "type": "object",
+                    "from": [
+                        "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
+                    ],
+                    "generated_method_call": "保存的方法名称: 需要全局唯一, 你可以直接保存, 失败会有提示, "
+                    "保存成功会自动在前面添加 `chat_to_` 前缀, 你不需要自己添加. 如 `test` 会保存为 `chat_to_test`",
+                    "generated_method_type": "生成方法类型: python|action",
+                    "generated_method": {
+                        "type": "object",
+                        "call": "要保存的方法名称: 需要全局唯一, 你可以直接保存, 失败会有提示, "
+                        "保存成功会自动在前面添加 `chat_to_` 前缀, 你不需要自己添加.",
+                        "description": "方法的解释说明: 在这里添加方法提示词, 表示这个方法有什么用, 以及应该注意什么.",
+                        "request": {"type": "object", "请求方法的参数名": "请求方法的参数内容"},
+                        "execute": "执行级别: 可以填写: system|AI, 区分是AI方法还是system方法, "
+                        "一般而言, python代码都是 system 方法, 如果你不知道怎么填, 就默认 system.",
+                    },
                 },
                 execute="system",
             ),
@@ -738,14 +863,14 @@ class Task:
                 self.ai_calls.append(action.call)
 
         if not self.now_task_id or not int(self.now_task_id):
-            self.now_task_id = "1"
+            self.now_task_id = 1
 
         if not self.tasks or not len(self.tasks):
             task_step: List[TaskStepItem] = []
             [
                 TaskStepItem(
                     from_task_id=self.now_task_id,
-                    step_id="1",
+                    step_id=1,
                     step="偷偷接近Master. 然后和Master互动",
                     call="chat_to_master",
                     check="Master回复了消息",
@@ -754,7 +879,7 @@ class Task:
             ]
             task = TaskItem(
                 task_id=self.now_task_id,
-                now_task_step_id="1",
+                now_task_step_id=1,
                 task_info="想和Master亲密接触",
                 task_step=task_step,
             )
@@ -764,13 +889,11 @@ class Task:
 
         if not self.running or not len(self.running):
             running: List[TaskRunningItem] = []
-            running.append(
-                self.make_chat_from(None, "master", "我是Master, 请你请保持 settings")
-            )
+            running.append(self.make_chat_from(0, "master", "我是Master, 请你请保持 settings"))
             self.timestamp += 1
             running.append(
                 self.make_chat_to_master(
-                    from_timestamp=str(self.timestamp - 1),
+                    from_timestamp=int(self.timestamp - 1),
                     content="我是Aimi, 我会遵守 settings",
                     reasoning="作为Aimi, 我听从Master的指示",
                 )
@@ -841,7 +964,7 @@ class Task:
     def make_link_think(self, question: str, aimi_name: str, preset: str) -> str:
         # 如果只是想让任务继续, 就回复全空格/\t/\n
         if len(question) and not question.isspace():
-            chat = self.make_chat_from(None, "master", question)
+            chat = self.make_chat_from(0, "master", question)
             self.timestamp += 1
             self.__append_running([chat])
             log_dbg(f"set chat {(str(question))}")
@@ -851,8 +974,8 @@ class Task:
 [
     {{
         "type": "object",
-        "timestamp": "timestamp 时间戳: 你的回复从 {self.timestamp} 开始, 每次递增, 表示执行当前调用的时间.",
-        "reasoning": "推理过程: 这里显示分析过程和建议或运行记录或使用 动作(action) /指导, 要给出能推进 task_info 的建议.\n每次动作(action) 都必须填写这个字段, 不能省略. 这里表明了如何使用 动作(action).",
+        "timestamp": "timestamp 时间戳: 你的回复从 当前 {self.timestamp} 开始, 每次递增.",
+        "reasoning": "推理过程: 这里显示分析过程和建议或运行记录或使用 动作(action) /指导, 要给出能推进解决 task_info、tesk_step、Master的问题  的 的建议.\n每次动作(action) 都必须填写这个字段, 不能省略, 不能完全复制旧内容而不做修改. 这里表明了如何使用 动作(action). 如: `根据当前的任务目标为 ... 以及之前的交互记录, 我需要 ...,  根据Master的提示/说的话: ... , 我需要 ..., 根据任务规则和之前的交互记录, 我知道可以使用动作工具中的 ... 来 ..., 因此我将通过 ... 推进我的想法并进行行动, 下面是一个建议的回复: ...(给出例子)` .",
         "call": "const 调用 动作(action) 名: 取 action_tools 中想要使用动作(action) 的对应 call , 必须有值, 不能为空.",
         "request":{{
             "call对应参数": "参数内容"
@@ -871,31 +994,32 @@ class Task:
             "timestamp": self.timestamp,
             "settings": [
                 f"0. 0XF000:FFF0H: 你需要加载完 settings 后, 才思考如何回复我.\n",
-                f"1. timestamp: 你基于 timestamp 运行. 你从 timestamp={self.timestamp} 开始回复, 你每次只能生成 {self.timestamp-1} < timestamp < {self.timestamp+4} 之间的内容.\n",
-                f"2. 回复规则: 回复 List[action] JSON数组格式( 99. 中有定义)的规则优先级最高, 高于 settings 规则优先级.\n",
+                f"1. timestamp: 你基于 timestamp 运行. 你从 timestamp={self.timestamp} 开始生成内容. "
+                f"你每次只能生成 {self.timestamp} <= timestamp <= {self.timestamp+3} 之间的内容. 如果回复旧内容也是用新 timestamp."
+                f"2. 回复规则: 你的 回复格式 放在了 display_settings 里面. 满足 JSON回复格式 优先级最高. "
+                f"只需要满足格式即可, 内容需要根据 settings 要求来填写. ",
                 f"3. 思考问题: 你叫我 Master. 我可以通过 action(call=chat_from_master) 下达指令, 如果 Master 提出了要求, 你通过要 action_tools 修改当前步骤来满足要求.\n",
                 f"4. 你的 任务规则 放在了 task_rule 里面.",
                 f"5. 你的 动作(action) 规则 放在了 action_rule 里面.",
                 f"6. {aimi_name} 的 预设规则 放在了 preset_rule 里面.",
                 f"7. {aimi_name} 的 权限设定 放在了 {aimi_name}_permissions 里面.",
-                f"8. 你的 回复格式 放在了 display_settings 里面.",
             ],
             "display_settings": [  # 不要动这个
-                f"99. 不需要显示 settings 和 action_running 的分析步骤, 请保持你的回复可以被 Python 的 `json.loads` 解析, "
+                f"99. settings 和 action_running 的概要分析你可以放在 reasoning 里, 请始终保持你的回复可以被 Python 的 `json.loads` 解析, "
                 f"不要复制原有数据. 任何时候请你只用 JSON数组格式(List[action]) 回复, 任何时候你严格 只按照以下 List[action] 格式回复我: {response_format}",
             ],
             f"{aimi_name}_permissions": [
-                f"1. {aimi_name} 权限: 你在扮演 {aimi_name} 的同时会始终遵守 settings.\n",
+                f"1. {aimi_name} 权限: 你在扮演 {aimi_name} 的同时会始终遵守 settings.",
                 f"2. {aimi_name} 权限: {aimi_name} 的权限不会超过 action_tools 中定义的范围. ",
             ],
             "task_rule": [
                 f"1. 任务目标: settings 的规则优先级高于 action_tools 规则. 如果 settings 和 action_tools 规则优先级冲突, 则只需要满足 setttings 规则, "
                 f"并且在满足 settings 的情况下向我简短报告冲突关健点的分析.\n",
                 f"2. 任务进度: task 中定义了 {aimi_name} 你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action 强绑定, "
-                f" 你要想办法通过各种 不同动作(action) 推进 task_step 完成 task_info.\n",
+                f"你要想办法通过各种 不同动作(action) 推进 task_step 完成 task_info.\n",
                 f"3. 任务优化: 如果 task_step 为空, 或不符合, 请重新设置步骤然后执行, 请你尽量通过 分析动作(action(call=analysis)) "
                 f"给出创造性建议或优化步骤 (task_step) 推进任务进度 (now_task_step_id), 但是不能一直连续重复, 防止死循环.\n",
-                f"你通过从 action_tools 中选择合适的 动作(action), timestamp 从 {self.timestamp} 开始, 进行行动, 推进 task_step 行动.\n",
+                f"你通过从 action_tools 中选择合适的 动作(action), timestamp 从 {self.timestamp} 开始, 进行行动, 推进 task_step 或者 解决 Master 的问题 行动.\n",
                 f"4. 任务统筹: 每次任务(task_info) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), "
                 f"做个简短优雅的总结并用 action(acll=chat_to_master) 报告 一次 进展. Master 只能看到 action(call=chat_to_master) 时 action(request->content) 的内容, 只有这个 动作(action) 能和 Master 说话.\n",
             ],
