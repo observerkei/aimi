@@ -522,7 +522,9 @@ answer this following question: {{
     ) -> Generator[dict, None, None]:
         if (owned_by == self.aimi_name) and (model == "auto"):
             return self.ask(question, nickname)
-        elif owned_by == self.aimi_name and (model == "task" or model == "task-16k"):
+        elif owned_by == self.aimi_name and (
+            model == "task" or model == "task-16k" or model == "task-4k"
+        ):
             preset = context_messages[0]["content"]
             task_link_think = self.task.make_link_think(
                 question, self.aimi_name, preset
@@ -662,7 +664,7 @@ answer this following question: {{
     def get_bot_models(self) -> Dict[str, List[str]]:
         bot_models = {}
 
-        bot_models[self.aimi_name] = ["auto", "task", "task-16k"]
+        bot_models[self.aimi_name] = ["auto", "task", "task-4k", "task-16k"]
 
         models = self.openai_api.get_models()
         if len(models):

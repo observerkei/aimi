@@ -249,7 +249,15 @@ class ChatWeb:
 
                 # get model
                 model = web_request["model"]
-                owned_by = web_request["owned_by"]
+                owned_by = ''
+                if 'owned_by' in web_request:
+                    owned_by = web_request["owned_by"]
+
+                model_info = model.split('--')
+                if len(model_info) == 2:
+                    owned_by = model_info[0]
+                    model = model_info[1]
+
                 log_dbg(f"use model: {model}")
                 log_dbg(f"model owned_by: {owned_by}")
             except Exception as e:

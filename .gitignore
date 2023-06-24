@@ -148,3 +148,6 @@ qq_server_data/
 
 # plugin
 /aimi_plugin
+
+#vscode
+.vscode/
