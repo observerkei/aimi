@@ -62,10 +62,17 @@ const handler = async (req: Request): Promise<Response> => {
             };
           } else */
           {
+            let model_id = model.id
+            let owned_by = model.owned_by
+            const parts = model.id.split("--");
+            if (parts.length > 1) {
+              owned_by = parts[0]
+              model_id = parts[1]
+            }
             return {
-              id: `[${model.owned_by}] ${model.id}`,
-              name: model.id,
-              owned_by: model.owned_by,
+              id: `[${owned_by}] ${model_id}`,
+              name: model_id,
+              owned_by: owned_by,
               tokenLimit: model.tokenLimit ? model.tokenLimit : 4000,
             };
           }
