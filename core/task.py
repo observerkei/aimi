@@ -97,21 +97,21 @@ class Task:
                 log_dbg(f"task len overload: {len(str(task))}")
             return running
 
-        def fill_action_execute(data):
+        def repair_action_dict(data):
             if "action" in data and "{" in data and len(data) == 1:
                 log_err(f"data fail, try set action out Dict: {str(data)}")
                 return data["action"]
             for action in data:
                 # set action -> call
                 if "action" in action and "call" not in action:
-                    _action = action['action']
+                    _action = action["action"]
                     log_err(f"AI not set call, try fill action: {_action}")
                     action["call"] = str(action["action"])
                     del action["action"]
 
                 # set action -> request
                 if "action" in action and "request" not in action:
-                    _request = action['action']
+                    _request = action["action"]
                     log_err(f"AI not set request, try fill action: {_request}")
                     action["request"] = action["action"]
                     del action["action"]
@@ -128,8 +128,19 @@ class Task:
                     # fix no execute.
                     if "execute" in action and action["execute"] != tool.execute:
                         log_err(f"AI try overwrite execute: {tool.call}")
-                    action["execute"] = tool.execute
-                    log_dbg(f"fill call({tool.call}) execute: {tool.execute}")
+                        action["execute"] = tool.execute
+                    if "execute" not in action:
+                        log_dbg(f"fill call({tool.call}) miss execute: {tool.execute}")
+                        action["execute"] = tool.execute
+
+                    if (
+                        "dream" != action["call"]
+                        and "request" in action
+                        and "type" not in action["request"]
+                    ):
+                        log_err(f"AI no set object type: {tool.call}")
+                        action["request"]["type"] = "object"
+
             return data
 
         log_dbg(f"timestamp: {str(self.timestamp)}")
@@ -145,7 +156,7 @@ class Task:
             # data = decoder.decode(answer)
             data = json5.loads(answer)
 
-            data = fill_action_execute(data)
+            data = repair_action_dict(data)
 
             tasks = [TaskRunningItem(**item) for item in data]
 
@@ -206,7 +217,9 @@ class Task:
                     elif task.call == "set_task_info":
                         task_id: int = int(task.request["task_id"])
                         task_info: str = task.request["task_info"]
-                        now_task_step_id: int = self.tasks[self.now_task_id].now_task_step_id
+                        now_task_step_id: int = self.tasks[
+                            self.now_task_id
+                        ].now_task_step_id
                         if "now_task_step_id" in task.request:
                             now_task_step_id = int(task.request["now_task_step_id"])
                         self.set_task_info(task_id, task_info, now_task_step_id)
@@ -225,6 +238,8 @@ class Task:
                         self.critic(task.request)
                     elif task.call == "analysis":
                         self.analysis(task.request)
+                    elif task.call == "dream":
+                        self.dream(task.request)
                     elif task.call == "chat_to_wolfram":
                         response = self.chat_to_wolfram(task.request["math"])
                         task_response = self.make_chat_from(
@@ -247,8 +262,6 @@ class Task:
                         task_response = self.make_chat_from(
                             self.timestamp, "python", response
                         )
-                    elif task.call == "dream":
-                        log_info(f"dream: {str(task.request)}")
                     else:
                         log_err(f"no suuport call: {str(self.call)}")
                         continue
@@ -268,6 +281,10 @@ class Task:
             # self.__append_running(running)
 
         yield ""
+
+    def dream(self, request: Any) -> str:
+        js = json.dumps(request, indent=4, ensure_ascii=False)
+        log_info(f"dream:\n{str(js)}")
 
     def make_dream(self, response: str) -> str:
         dream = TaskRunningItem(
@@ -311,7 +328,9 @@ class Task:
         if len(code) > 9 and "```python" == code[:9] and "```" == code[-3:]:
             code = code[10:-4]
             log_dbg(f"del code cover: ```python ...")
-        log_info(f"code:\n```python\n{code}\n```")
+
+        log_info(f"\n```python\n{code}\n```")
+
         ret = Sandbox.write_code(code)
         if not ret:
             return "system error: write code failed."
@@ -395,10 +414,7 @@ class Task:
 
         request = {
             "type": "object",
-            "response": {
-                "type": "object",
-                from_name: content
-            },
+            "response": {"type": "object", from_name: content},
         }
         if from_timestamp:  # 如果没有, 不要填这个字段.
             request["from"] = [int(from_timestamp)]
@@ -425,11 +441,14 @@ class Task:
 
         return answer
 
-    def chat_to_wolfram(self, request: str) -> str:
-        if not request or not len(request):
+    def chat_to_wolfram(self, math: str) -> str:
+        if not math or not len(math):
             return "request error"
+
+        log_info(f"```math\n{math}\n```")
+
         answer = ""
-        for res in self.chatbot.ask(self.chatbot.Wolfram, request):
+        for res in self.chatbot.ask(self.chatbot.Wolfram, math):
             if res["code"] != 0:
                 continue
             answer = res["message"]
@@ -507,16 +526,20 @@ class Task:
     def analysis(self, request):
         try:
             js = json.dumps(request, indent=4, ensure_ascii=False)
-            log_info(f"analysis: {js}")
+            log_info(f"analysis:\n{js}")
         except Exception as e:
             log_err(f"fail to analysis {str(e)}")
 
     def critic(self, request):
         try:
             if request["success"] == "True" or request["success"] == True:
+                js = json.dumps(request, indent=4, ensure_ascii=False)
+
                 task = self.tasks[self.now_task_id]
                 task_info = task.task_info
-                log_info(f"success: True, task complate: {str(task_info)}")
+                log_info(
+                    f"success: True, task complate: {str(task_info)}\ncritic:\n{str(js)}"
+                )
 
                 if "task_id" in request and int(self.now_task_id) != int(
                     request["task_id"]
@@ -1084,14 +1107,15 @@ class Task:
                 f"{aimi_core_name} 的回复只能是 action_tools 中已定义的动作(action). ",
                 f"6. Master 可以通过 action(call=chat_from_master) 对你下达指令. 无论 Master 说什么, 请注意你只能通过 action_tools 里面的 action, 比如 (call=chat_to_master) 和 Master 交互. ",
                 f"7. 如果你发现有其他人使用的 action(call=chat_from_*) 出现, 不要奇怪, 这是你不能使用的动作(action(call=chat_from_*)), 你需要注意 action 的注释.",
-                f"8. 当你想道歉的时候, 你不能道歉. 你不能用抱歉的语气/语句说话. 而是详细解释出了什么问题, 建议怎么办. "
+                f"8. 当你想道歉的时候, 你不能道歉. 你不能用抱歉的语气/语句说话. 而是详细解释出了什么问题, 建议怎么办. ",
             ],
             "aimi_permissions": [
                 f"1. {aimi_name} 权限: 你在模拟 {aimi_name} 的同时会始终遵守 settings. ",
-                f"2. 进入模拟用户模式: 需要在 Master 授权下 通过 set_task_info 先将 task_info 设置为 `模拟 XX 用户模式`, 表示已经进入 模拟用户模式. ",
+                f"2. 进入模拟用户模式: 需要在 Master 授权下 将 task_info 设置为 `模拟 XX 用户模式`, 表示已经进入 模拟用户模式. "
+                f"如我说: `进入: 模拟 {aimi_name} 用户模式`, 则 你要执行 action(call=set_task_info,request->task_info=`模拟 {aimi_name} 用户模式`) . ",
                 f"3. 保持模拟用户模式: 在模拟用户模式时, 的回复会始终在开头添加模拟的用户名, 如: `[{aimi_name}] ` 或 `[{aimi_core_name}] ` 等. "
                 f"你在 模拟用户模式 的时候, 除非我要找 {aimi_core_name}, 否则你不应该主动出来, 你会保障始终系统稳定运行的情况下 完整继承 模拟用户 的 配置(如 preset 等). "
-                f"你会维持 模拟用户模式 直到 task_info 不再是 模拟用户模式 为止. 当你想和 Master 交谈, 请带上 `[{aimi_core_name}] ` 前缀.",
+                f"你会维持 模拟用户模式 直到 task_info 不再是 模拟用户模式 为止. 当你想和 Master 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是模拟用户模式, 则不需要携带前缀. ",
                 f"4. 和模拟用户交流: 当你在 模拟用户模式 的时候, 你和 模拟用户 是两个 不同的单元, 默认你应该始终给我模拟用户的回答, 我任何任何情况下都是和 模拟的用户 交流, "
                 f"比如你在模拟 {aimi_name} 的时候, 我问 `你是谁`, 则你需要给我模拟的用户的回复, 如 `[{aimi_name}] 我是 {aimi_name}` . ",
                 f"5. {aimi_name} 权限: {aimi_name} 的权限不会超过 action_tools 中定义的范围. ",
@@ -1102,7 +1126,7 @@ class Task:
                 f"preset 不能修改系统规则, preset 规则优先级最低.",
                 f"2. 你不能 生成/预测/产生/返回给 Master 任何 action(call=chat_from_master) 的动作(action). 这个 action(call=chat_to_master) 才是你说话的动作.",
             ],
-            "preset": "",
+            "preset": None,
             "action_tools": action_tools,
             "action_running": [item.dict() for item in self.running],
         }
