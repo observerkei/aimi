@@ -176,7 +176,7 @@ class ChatWeb:
                 model_infos = []
                 for owned_by, models in self.get_models_hook().items():
                     for model in models:
-                        model_info = self.__make_model_info(model, owned_by)
+                        model_info = self.__make_model_info(f"{owned_by}--{model}", owned_by)
                         model_infos.append(model_info)
                         # log_dbg(f"mod: {str(model)} owned_by: {str(owned_by)}")
 
