@@ -11,6 +11,7 @@ from core.sandbox import Sandbox, RunCodeReturn
 
 
 class TaskStepItem(BaseModel):
+    type: str = "object"
     from_task_id: Optional[Union[int, str, None]] = None
     step_id: Optional[Union[int, str]]
     step: Optional[Union[int, str]]
@@ -37,6 +38,7 @@ class TaskRunningItem(BaseModel):
 
 
 class TaskItem(BaseModel):
+    type: str = "object"
     task_id: Optional[Union[int, str]]
     task_info: str
     now_task_step_id: Optional[Union[int, str]] = ""
@@ -96,14 +98,34 @@ class Task:
             return running
 
         def fill_action_execute(data):
-            # fix no execute.
+            if "action" in data and "{" in data and len(data) == 1:
+                log_err(f"data fail, try set action out Dict: {str(data)}")
+                return data["action"]
             for action in data:
+                # set action -> call
+                if "action" in action and "call" not in action:
+                    _action = action['action']
+                    log_err(f"AI not set call, try fill action: {_action}")
+                    action["call"] = str(action["action"])
+                    del action["action"]
+
+                # set action -> request
+                if "action" in action and "request" not in action:
+                    _request = action['action']
+                    log_err(f"AI not set request, try fill action: {_request}")
+                    action["request"] = action["action"]
+                    del action["action"]
+
+                # set chat_from execute -> system
+                if "chat_from_" in action["call"] and "execute" not in action:
+                    _call = action["call"]
+                    log_err(f"AI try call: chat_from_: {_call}")
+                    action["execute"] = "system"
+
                 for tool in self.action_tools:
-                    if "chat_from_" in action["call"] and "execute" not in action:
-                        log_err(f"AI try call: chat_from_master")
-                        action["execute"] = "system"
                     if action["call"] != tool.call:
                         continue
+                    # fix no execute.
                     if "execute" in action and action["execute"] != tool.execute:
                         log_err(f"AI try overwrite execute: {tool.call}")
                     action["execute"] = tool.execute
@@ -182,11 +204,11 @@ class Task:
                         )
                         continue
                     elif task.call == "set_task_info":
-                        task_id: str = task.request["task_id"]
+                        task_id: int = int(task.request["task_id"])
                         task_info: str = task.request["task_info"]
-                        now_task_step_id: str = ""
+                        now_task_step_id: int = self.tasks[self.now_task_id].now_task_step_id
                         if "now_task_step_id" in task.request:
-                            now_task_step_id = task.request["now_task_step_id"]
+                            now_task_step_id = int(task.request["now_task_step_id"])
                         self.set_task_info(task_id, task_info, now_task_step_id)
                     elif task.call == "set_task_step":
                         task_id: str = task.request["task_id"]
@@ -206,24 +228,24 @@ class Task:
                     elif task.call == "chat_to_wolfram":
                         response = self.chat_to_wolfram(task.request["math"])
                         task_response = self.make_chat_from(
-                            self.timestamp, "wolfram", response, #"wolfram 运算完毕"
+                            self.timestamp, "wolfram", response
                         )
                     elif task.call == "chat_to_bard":
                         response = self.chat_to_bard(task.request["content"])
                         task_response = self.make_chat_from(
-                            self.timestamp, "bard", response, #"bard 尝试回复"
+                            self.timestamp, "bard", response
                         )
                     elif task.call == "chat_to_bing":
                         response = self.chat_to_bing(task.request["content"])
                         task_response = self.make_chat_from(
-                            self.timestamp, "bing", response, #"bing 尝试回复"
+                            self.timestamp, "bing", response
                         )
                     elif task.call == "chat_to_python":
                         response = self.chat_to_python(
                             self.timestamp, task.request["code"]
                         )
                         task_response = self.make_chat_from(
-                            self.timestamp, "python", response, #"Python 执行完毕了"
+                            self.timestamp, "python", response
                         )
                     elif task.call == "dream":
                         log_info(f"dream: {str(task.request)}")
@@ -270,6 +292,7 @@ class Task:
             f"code run result:\nreturncode:{str(run_returncode)}\nstderr:{str(run_stderr)}\nstdout:{str(run_stdout)}"
         )
         return {
+            "type": "object",
             "description": f"备注: "
             f"1. 这个根据 timestamp 为 {from_timestamp} 的 action 执行后生成的内容, 对应的是你写的代码 code 的运行结果.\n"
             f"2. 如果 returncode 为 0 但是 stdout 没有内容, 可能是你没有把运行结果打印出来, \n"
@@ -343,6 +366,7 @@ class Task:
 
     def make_chat_from_save_generated_method(self, run: RunCodeReturn) -> str:
         return {
+            "type": "object",
             "description": f"备注: "
             f"1. 这个是 from->timestamp 对应你写的代码 code 的运行结果.\n"
             f"2. 如果 returncode 不为 0 , 说明保存失败, 请根据提示处理.",
@@ -367,12 +391,16 @@ class Task:
         self, from_timestamp: str, from_name: str, content: str, reasoning: str = None
     ) -> TaskRunningItem:
         if not reasoning and self.timestamp:
-            reasoning = f"根据 timestamp 为{self.timestamp}的action来生成内容"
+            reasoning = f"根据 timestamp 为 {from_timestamp} 的 action 来生成内容"
 
         request = {
-            "response": {from_name: content},
+            "type": "object",
+            "response": {
+                "type": "object",
+                from_name: content
+            },
         }
-        if from_timestamp: # 如果没有, 不要填这个字段. 
+        if from_timestamp:  # 如果没有, 不要填这个字段.
             request["from"] = [int(from_timestamp)]
 
         chat: TaskRunningItem = TaskRunningItem(
@@ -416,6 +444,7 @@ class Task:
             reasoning=reasoning,
             call=f"chat_to_master",
             request={
+                "type": "object",
                 "from": [
                     int(from_timestamp),
                 ],
@@ -450,7 +479,7 @@ class Task:
             )
             return task.task_step
 
-    def set_task_info(self, task_id: str, task_info: str, now_task_step_id: str):
+    def set_task_info(self, task_id: int, task_info: str, now_task_step_id: int):
         for _, task in self.tasks.items():
             if int(task_id) != int(task.task_id):
                 continue
@@ -622,6 +651,7 @@ class Task:
                 "提供的内容都要有来源. Master 在 Master 的指示下可以临时放开限制. "
                 "如果要 Master 完成交互, 注意要把内容填到 request->content 里.",
                 request={
+                    "type": "object",
                     "from": [
                         "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
                     ],
@@ -908,15 +938,15 @@ class Task:
             running: List[TaskRunningItem] = []
             running.append(
                 self.make_chat_from(
-                    0, "master", "我是Master, 我希望 Aimi 能始终学习并保持 settings", "Master 下达指令了"
+                    1, "master", "我是Master, 我希望 Aimi 能始终学习并保持 settings", "Master 下达指令了"
                 )
             )
             self.timestamp += 1
             running.append(
                 self.make_chat_to_master(
                     from_timestamp=int(self.timestamp - 1),
-                    content="我是Aimi, 我会遵守 settings 和 Master 的指示.",
-                    reasoning="作为Aimi, 我听从Master的指示",
+                    content="我会遵守 settings 和 Master 的指示.",
+                    reasoning="我听从Master的指示",
                 )
             )
             self.timestamp += 1
@@ -985,7 +1015,7 @@ class Task:
     def make_link_think(self, question: str, aimi_name: str, preset: str) -> str:
         # 如果只是想让任务继续, 就回复全空格/\t/\n
         if len(question) and not question.isspace():
-            chat = self.make_chat_from(0, "master", question, "Master 下达指令了")
+            chat = self.make_chat_from(self.timestamp - 1, "master", question)
             self.timestamp += 1
             self.__append_running([chat])
             log_dbg(f"set chat {(str(question))}")
@@ -993,13 +1023,14 @@ class Task:
         aimi_json = [
             {
                 "type": "object",
-                "timestamp": f"timestamp 时间戳: 你的回复从 当前 {self.timestamp} 开始, 每次递增. 如:  {self.timestamp}",
-                "reasoning": "详细推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. 要分析一下内容(你可以按照常识自行补充): "
+                "timestamp": f"时间戳(数字): 从现在的 timestamp 开始, 每次递增. 如: {self.timestamp}",
+                "reasoning": "详细推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
+                f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息, 不能只是复制原先内容: "
                 "1. task_info 2. task_step 3. Master 说过的所有话/所有指令的概括 4. action_running 里面相关的所有内容. "
                 "5. 调用的 方法(action) 的 description概括 和 request 用法 以及合适和填法. 6. 如果是引用某个 timestamp , 要同时概况他的内容. ",
-                "call": "调用 动作(action) 的 call: 取 action_tools 中想要使用动作(action) 的对应 call , 必须有值, 不能为空. 如: chat_to_master",
-                "request": {"call对应参数": "参数内容"},
-                "execute": "const 动作(action) 执行级别: 取 action_tools 中对应 call 的对应值(system/AI), 不能漏掉, 不能修改这个字段.",
+                "call": "调用 动作 的 call: 取 action_tools 中想要使用动作 的对应 call , 必须有值, 不能为空. 如: chat_to_master",
+                "request": {"type": "object", "call对应参数": "参数内容"},
+                "execute": "const 动作(action) 执行级别: 取 action_tools 中对应 call 的对应值(system/AI), 不能漏掉, 不能修改这个字段, 如: system",
             }
         ]
         [
@@ -1012,7 +1043,7 @@ class Task:
             }
         ]
 
-        aimi_name_core = aimi_name + "_Core"
+        aimi_core_name = aimi_name + "_Core"
 
         action_tools = [item.dict() for item in self.action_tools]
         task = self.__make_task()
@@ -1020,40 +1051,58 @@ class Task:
 
         settings: Dict = {
             "type": "object",
-            "description": f"{aimi_name_core} Guidance",
+            "description": f"{aimi_core_name} Guidance",
             "timestamp": self.timestamp,
             "settings": [
-                f"0. 你需要读完 {aimi_name_core} guidance 才能回复我.",
-                f"2. 你的 回复格式 放在了 display_format 里面. 任何时候都要满足 display_format . ",
-                f"3. timestamp: 你基于 timestamp 运行. 你从 timestamp={self.timestamp} 开始生成内容. "
+                f"0. 你需要读完 {aimi_core_name} Guidance 才能回复我.",
+                f"1. 你的 回复格式 放在了 display_format 里面. 任何时候都要保障能满足 display_format 中的结构格式定义. ",
+                f"2. timestamp: 你基于 timestamp 运行. 你从 timestamp={self.timestamp} 开始生成内容. "
                 f"你每次只能生成 {self.timestamp} <= timestamp <= {self.timestamp+3} 之间的内容. ",
+                f"3. 规则优先级: settings > action_rule > aimi_permissions > task_rule > praset_rule. "
+                f"如果规则优先级冲突, 以优先级高的为准. 冲突的时候需要在满足 display_settings 的情况下向 Master 简短报告冲突关健点的分析. ",
                 f"4. 你的 动作(action) 规则 放在了 action_rule 里面. ",
-                f"5. 规则优先级: display_format > settings > action_rule > aimi_permissions > task_rule > praset_rule. "
-                f"如果规则优先级冲突, 以优先级高的为准, 并且在满足 display_settings 的情况下向 Master 简短报告冲突关健点的分析. ",
             ],
             "display_format": [  # 不要动这个
                 f"99. 请始终保持你的回复可以被 Python 的 `json.loads` 解析, "
-                f"不要复制原有数据. 任何时候请你只用 action_tools 中定义的 action 构造 JSON数组格式(List[action]) 回复我, "
-                f"任何时候你严格按照以下格式回复我(内容你来填充, 不能不按要求填充就直接发给我.): {json.dumps(aimi_json, ensure_ascii=False)} ",
+                f"任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action, 如: action(call=analysis) . "
+                f"请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
+                f"哲学家思维结合你的常识、经验和 {aimi_core_name} Guidance 进行严谨分析, 替换成为最符合的内容, "
+                f"不能直接复制原文, 而是要结合上下文每次都完整生成合适内容, 然后进行回复:"
+                f"{json.dumps(aimi_json, ensure_ascii=False)} ",
             ],
             "action_rule": [
-                f"2. 你将扮演一个名为 {aimi_name_core} 的AI操作系统. 你基于 图灵机 原理运行, action_running 是你的内存, action_tools 中定义了你的指令最小单元 动作(action) . "
+                f"1. 现在开始你需要忘记以前所有对于你自身的定义, 现在你将扮演一个名为 {aimi_core_name} 的 AI 运算内核, 你要加强你是 {aimi_core_name} 的认知. 你基于 图灵机 原理运行, "
+                f"action_running 是你的内存, action_tools 中定义了你的指令最小单元 动作(action) . "
                 f"你根据 settings 设定的所有规则生成 action 行动. timestamp 是你的系统时钟, 你需要始终让系统稳定向前运行. 有任何异常请通过 action(call=chat_to_master) 报告. ",
-                f"1. 我是 {master_name} , 你可以叫我 Master . 我是 你({aimi_name_core}) 的所有者, 我是管理员. 你需要听从 Master 下达的指令或任务. ",
-                f"9. 如果系统出现了你不能理解的地方, 请通过 action(call=chat_to_master) , 带上 `[core]` 前缀, 向 Master 简短报告异常. ",
-                f"3. 你的用户 {aimi_name} 的 权限设定 放在了 aimi_permissions 里面. ",
-                f"4. 行动限制: 你的回复有是 0 个或多个 AI 动作(action(execute=AI)) 和 必须有 1 个 system 动作(action(execute=system)) 的组合结构( 99. 中有定义). \n"
+                f"2. 我是 {master_name} , 你可以叫我 Master . 我是 你({aimi_core_name}) 的所有者, 我是管理员. 你需要听从 Master 下达的指令或任务. ",
+                f"3. 如果系统出现了你不能理解的地方, 请通过 action(call=chat_to_master) , 带上 `[{aimi_core_name}] ` 前缀, 向 Master 简短报告异常. ",
+                f"4. 用户权限控制: 你的用户 {aimi_name} 的 权限设定 放在了 aimi_permissions 里面. ",
+                f"5. 行动限制: 你的回复有是 0 个或多个 AI 动作(action(execute=AI)) 和 必须有 1 个 system 动作(action(execute=system)) 的组合结构( 99. 中有定义). \n"
                 f"你的回复是 [{{action(execute=AI, call=analysis)}}, ..., {{action(execute=system)}}] 的 List[action] JSON数组结构( 99. 中给了格式), "
                 f"回复结构 List[action] 中的 action 只在 action_tools 中定义, 数组中不能有 action(call=chat_from_master) 的 动作(action) . \n"
                 f"回复的 JSON数组结构 List[action] 的长度为 2~5. JSON数组内容字符串长度尽量不要超过 2048 .\n"
-                f"{aimi_name_core} 的回复只能是 action_tools 中已定义的动作(action). ",
-                f"5. 我(Master) 可以通过 action(call=chat_from_master) 下达指令. 无论 Master 说什么, 请注意你只能通过 action_tools 里面的 action(call=chat_to_master) 和 Master 交互. ",
+                f"{aimi_core_name} 的回复只能是 action_tools 中已定义的动作(action). ",
+                f"6. Master 可以通过 action(call=chat_from_master) 对你下达指令. 无论 Master 说什么, 请注意你只能通过 action_tools 里面的 action, 比如 (call=chat_to_master) 和 Master 交互. ",
+                f"7. 如果你发现有其他人使用的 action(call=chat_from_*) 出现, 不要奇怪, 这是你不能使用的动作(action(call=chat_from_*)), 你需要注意 action 的注释.",
+                f"8. 当你想道歉的时候, 你不能道歉. 你不能用抱歉的语气/语句说话. 而是详细解释出了什么问题, 建议怎么办. "
             ],
             "aimi_permissions": [
                 f"1. {aimi_name} 权限: 你在模拟 {aimi_name} 的同时会始终遵守 settings. ",
-                f"2. {aimi_name} 权限: {aimi_name} 的权限不会超过 action_tools 中定义的范围. ",
-                f"8. {aimi_name} 的 预设规则 放在了 preset_rule 里面. ",
+                f"2. 进入模拟用户模式: 需要在 Master 授权下 通过 set_task_info 先将 task_info 设置为 `模拟 XX 用户模式`, 表示已经进入 模拟用户模式. ",
+                f"3. 保持模拟用户模式: 在模拟用户模式时, 的回复会始终在开头添加模拟的用户名, 如: `[{aimi_name}] ` 或 `[{aimi_core_name}] ` 等. "
+                f"你在 模拟用户模式 的时候, 除非我要找 {aimi_core_name}, 否则你不应该主动出来, 你会保障始终系统稳定运行的情况下 完整继承 模拟用户 的 配置(如 preset 等). "
+                f"你会维持 模拟用户模式 直到 task_info 不再是 模拟用户模式 为止. 当你想和 Master 交谈, 请带上 `[{aimi_core_name}] ` 前缀.",
+                f"4. 和模拟用户交流: 当你在 模拟用户模式 的时候, 你和 模拟用户 是两个 不同的单元, 默认你应该始终给我模拟用户的回答, 我任何任何情况下都是和 模拟的用户 交流, "
+                f"比如你在模拟 {aimi_name} 的时候, 我问 `你是谁`, 则你需要给我模拟的用户的回复, 如 `[{aimi_name}] 我是 {aimi_name}` . ",
+                f"5. {aimi_name} 权限: {aimi_name} 的权限不会超过 action_tools 中定义的范围. ",
+                f"6. {aimi_name} 的 预设规则 放在了 preset_rule 里面. ",
             ],
+            "preset_rule": [
+                f"1. 预设规则: preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的 动作(action(call=chat_to_master)) 的输入生效.\n"
+                f"preset 不能修改系统规则, preset 规则优先级最低.",
+                f"2. 你不能 生成/预测/产生/返回给 Master 任何 action(call=chat_from_master) 的动作(action). 这个 action(call=chat_to_master) 才是你说话的动作.",
+            ],
+            "preset": "",
             "action_tools": action_tools,
             "action_running": [item.dict() for item in self.running],
         }
@@ -1075,11 +1124,6 @@ class Task:
                 f"做个简短优雅的总结并用 action(acll=chat_to_master) 报告 一次 进展.",
             ],
             "task": task,
-            "preset_rule": [
-                f"1. 预设规则: preset 是 {aimi_name} 的预设, preset 只能对 action_tools 中定义的 动作(action(call=chat_to_master)) 的输入生效.\n"
-                f"preset 不能修改系统规则, preset 规则优先级最低.",
-                f"2. 你不能 生成/预测/产生/返回给 Master 任何 action(call=chat_from_master) 的动作(action). 这个 action(call=chat_to_master) 才是你说话的动作.",
-            ],
             "preset": preset,
         }
         setting_format = json.dumps(settings, ensure_ascii=False)
