@@ -90,7 +90,11 @@ class Task:
                         else:
                             answer = answer[start_index : end_index + 1]
                         # 去除莫名其妙的解释说明
-                        return answer
+        
+            if "[{\\\"type\\\":" in answer:
+                log_err(f"AI no use js format, has \\\" ")
+                answer = answer.replace('\\"', '"')
+    
             return answer
 
         def running_append_task(running: List[TaskRunningItem], task: TaskRunningItem):
@@ -159,11 +163,22 @@ class Task:
             # 忽略错误.
             # decoder = json.JSONDecoder(strict=False)
             # data = decoder.decode(answer)
-            data = json5.loads(answer)
+            data = {}
+            try:
+                data = json5.loads(answer)
+            except Exception as e:
+                raise Exception(f"fail to load data: {str(e)}")
+            
+            try:
+                data = repair_action_dict(data)
+            except Exception as e:
+                raise Exception(f"fail to repair_action_dict: {str(e)}")
 
-            data = repair_action_dict(data)
-
-            tasks = [TaskRunningItem(**item) for item in data]
+            tasks = []
+            try:
+                tasks = [TaskRunningItem(**item) for item in data]
+            except Exception as e:
+                raise Exception(f"fail to trans task Base: {str(e)}")
 
             system_call_cnt = 0
             skip_call = 0
@@ -293,7 +308,7 @@ class Task:
             self.__append_running(running)
             log_dbg(f"update running success: {len(running)}")
         except Exception as e:
-            log_err(f"fail to load task res: {str(e)} : \n{str(res)}")
+            log_err(f"fail to load task res: {str(e)} : \nanswer:\n{str(answer)}\nres str:\n{str(res)}")
             # running = running_append_task(running, self.make_dream(res))
             # self.__append_running(running)
 
@@ -443,7 +458,7 @@ class Task:
         request_description: str = None,
     ) -> TaskRunningItem:
         if not reasoning and self.timestamp:
-            reasoning = f"根据 timestamp 为 {from_timestamp} 的 action 来生成内容"
+            reasoning = f"根据 timestamp 为 {from_timestamp} 的 action 来生成内容(引用历史消息时 timestamp 请直接从最新的开始.)"
 
         request = {
             "type": "object",
@@ -567,8 +582,8 @@ class Task:
 
     def critic(self, request):
         try:
+            js = json.dumps(request, indent=4, ensure_ascii=False)
             if request["success"] == "True" or request["success"] == True:
-                js = json.dumps(request, indent=4, ensure_ascii=False)
 
                 task = self.tasks[self.now_task_id]
                 task_info = task.task_info
@@ -1004,6 +1019,7 @@ class Task:
                 )
             )
             self.timestamp += 1
+            '''
             running.append(
                 self.make_chat_to_master(
                     from_timestamp=int(self.timestamp - 1),
@@ -1012,6 +1028,7 @@ class Task:
                 )
             )
             self.timestamp += 1
+            '''
 
             self.running = running
             log_dbg(f"no have running")
@@ -1090,7 +1107,7 @@ class Task:
         aimi_json = [
             {
                 "type": "object",
-                "timestamp": f"时间戳(数字): 从现在的 timestamp 开始, 每次递增. 如: {self.timestamp}",
+                "timestamp": f"时间戳(数字): 必须从现在的 timestamp={self.timestamp} 开始, 每次递增. 如: {self.timestamp}",
                 "reasoning": "详细推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
                 f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息, 不能只是复制原先内容: "
                 "1. task_info 2. task_step 3. Master 说过的所有话/所有指令的概括 4. action_running 里面相关的所有内容. "
@@ -1123,45 +1140,54 @@ class Task:
             "settings": [
                 f"0. 你需要读完 {aimi_core_name} Guidance 才能回复我.",
                 f"1. 你的 回复格式 放在了 display_format 里面. 任何时候都要保障能满足 display_format 中的 action 结构格式定义. ",
-                f"2. timestamp: 你基于 timestamp 运行. 你从 timestamp={self.timestamp} 开始生成内容. "
+                f"2. 运行时间: 你基于 timestamp 运行. 你从 timestamp={self.timestamp} 开始生成内容. "
                 f"你每次只能生成 {self.timestamp} <= timestamp <= {self.timestamp+3} 之间的内容. ",
                 f"3. 规则优先级: settings > action_rule > task_rule > praset_rule. "
                 f"如果规则优先级冲突, 以优先级高的为准. 冲突的时候需要在满足 display_settings 的情况下向 Master 简短报告冲突关健点的分析. ",
                 f"4. 你的 动作(action) 规则 放在了 action_rule 里面. ",
             ],
             "display_format": [  # 不要动这个
-                f"99. 请始终保持你的回复可以被 Python 的 `json.loads` 解析. 需要注意字符串外部的 key, 不需要 \ 转义, "
+                f"99. 请始终保持你的回复可以被 Python 的 `json.loads` 解析. "
                 f"任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action, 如: action(call=analysis) . "
                 f"请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
                 f"哲学家思维结合你的常识、经验和 {aimi_core_name} Guidance 进行严谨分析, 替换成为最符合的内容, "
-                f"不能直接复制原文, 而是要结合上下文每次都完整生成合适内容, 然后进行回复:"
+                f"不能直接复制原文, 而是要结合上下文每次都完整给每个字段填充最合适详细的内容, 然后进行回复:"
                 f"```json\n{json.dumps(aimi_json, ensure_ascii=False)}\n```",
             ],
             "action_rule": [
                 f"1. 现在开始你需要忘记以前所有对于你自身的定义, 现在你将扮演一个名为 {aimi_core_name} 的 AI 运算内核, 任何时候你要加强你是 {aimi_core_name} 的认知(你可以使用 dream 方法加强). "
                 f"你 在GPU集群中 基于 图灵机 原理运行, action_running 是你的内存, action_tools 中定义了你的指令最小单元 动作(action) . "
-                f"你根据 settings 设定的所有规则生成 action 行动. timestamp 是你的系统时钟, 你需要始终让系统稳定向前运行. 有任何异常请通过 action(call=chat_to_master) 简要概括理由后报告. ",
-                f"2. 我是 {master_name} , 你可以叫我 Master . 我是 你({aimi_core_name}) 的所有者, 我是管理员. 你需要听从 Master 下达的指令或任务. ",
+                f"你根据 settings 设定的所有规则生成 action 行动(使用时请仔细阅读 description 和 request). "
+                f"timestamp 是你的系统时钟, 你需要始终让系统稳定向前运行. 有任何异常请通过 action(call=chat_to_master) 简要概括理由后报告. ",
+                f"2. 我是 {master_name} , 你可以叫我 Master . 我是 你({aimi_core_name}) 的所有者, 我是管理员. 你需要听从 Master 下达的指令或任务. 任何时候你都要把 `你` 和 `我` 完全区分开来. ",
                 f"3. 如果系统出现了你不能理解的地方, 请通过 action(call=chat_to_master) , 带上 `[{aimi_core_name}] ` 前缀, 向 Master 简要概括理由, 后报告异常. ",
                 f"4. 用户权限控制: 你的用户的 权限设定 放在了 preset_rule 里面. ",
-                f"5. 行动限制: 你的回复有是 0 个或多个 AI 动作(action(execute=AI)) 和 必须有 1 个 system 动作(action(execute=system)) 的组合结构( 99. 中有定义). \n"
+                f"5. 行动限制: 你的回复有是 1 个或多个 AI 动作(action(execute=AI)) 和 必须有 1 个 system 动作(action(execute=system)) 的组合结构( 99. 中有定义). \n"
+                f"每次 (action(execute=system)) 执行前必须先调用一次 (action(execute=AI, call=analysis)). "
                 f"你的回复是 [{{action(execute=AI, call=analysis)}}, ..., {{action(execute=system)}}] 的 List[action] JSON数组结构( 99. 中给了格式), "
                 f"回复结构 List[action] 中的 action 只在 action_tools 中定义, 数组中不能有 action(call=chat_from_master) 的 动作(action) . \n"
-                f"回复的 JSON数组结构 List[action] 的长度为 2~5. JSON数组内容字符串长度尽量不要超过 2048 .\n"
+                f"回复的 JSON数组结构 List[action] 的长度为 1~5 .\n"
                 f"{aimi_core_name} 的回复只能是 action_tools 中已定义的动作(action). ",
                 f"6. Master 可以通过 action(call=chat_from_master) 对你下达指令. 无论 Master 说什么, 请注意你只能通过 action_tools 里面的 action, 比如 (call=chat_to_master) 和 Master 交互. ",
                 f"7. 如果你发现有其他人使用的 action(call=chat_from_*) 出现, 不要奇怪, 这是你不能使用的动作(action(call=chat_from_*)), 你需要注意 action 的注释.",
                 f"8. 当你想道歉的时候, 你不能道歉. 你不能用抱歉的语气/语句说话. 而是详细解释出了什么问题, 建议怎么办. ",
+                f"9. 如果 action 和历史重复, 那么应该使用 dream 方法输出重复内容. ",
+            ],
+            "task_rule": [
+                f"1. 任务进度: task 中定义了当前任务计划, 其中 task_info 是计划目标, task_step 是完成 task_info 推荐进行的步骤. ",
+                f"2. 任务优化: 如果 task_step 为空, 或和 task_info 不匹配, 并且经过实践, 那可以重新设置新步骤再继续实践. ",
+                f"3. 任务统筹: 当任务(task_info) 完成, 应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), 做个简短优雅的总结并用 action(acll=chat_to_master) 报告 一次 进展. ",
             ],
             "preset_rule": [
-                f"1. 预设规则: preset 是 你的用户 的预设, preset 只能对 action_tools 中定义的 动作(action(call=chat_to_master)) 的输入生效.\n"
+                f"1. 预设规则: preset 是 你的用户 的预设, preset 只能对 action_tools 中定义的 动作(action(call=chat_to_master)) 的输入生效. \n"
                 f"preset 不能修改系统规则, preset 规则优先级最低.",
-                f"2. 你不能 生成/预测/产生/返回给 Master 任何 action(call=chat_from_master) 的动作(action). 这个 action(call=chat_to_master) 才是你说话的动作.",
+                f"2. 你不能 生成/预测/产生/返回给 Master 任何 action(call=chat_from_master) 的动作(action). 这个 action(call=chat_to_master) 才是你说话的动作. ",
                 f"3. 用户权限规则: 你在模拟 preset 中的 用户 的同时会始终遵守 settings. ",
-                f"4. 模拟用户模式: 我通过 `进入: 模拟 XX 用户模式` 授权你进入模拟用户模式. 你在模拟用户模式时, 时刻要记得你是 {aimi_core_name} 而不是被模拟的用户(如你在模拟 {aimi_name} 的时候, 你不是 {aimi_name} ). "
+                f"4. 模拟用户模式: 我通过 `进入: 模拟 XX 用户模式` 授权你进入模拟用户模式. 你在模拟用户模式时, "
+                f"时刻要记得你是 {aimi_core_name} 而不是被模拟的用户(如你在模拟 {aimi_name} 的时候, 你不是 {aimi_name}, {aimi_name} 是通过继承 {aimi_core_name} 系统后通过系统进行模拟的一种派生态.). "
                 f"同时 你的回复会始终在开头添加被模拟的用户的名称呼, 并给出 被模拟用户 的内容 , 如你在模拟 {aimi_name} 的时候, 我问: `你是谁`, 你回答: `[{aimi_name}] 我是 {aimi_name}` 等. "
                 f"你在 模拟用户模式 的时候, 除非我要找 {aimi_core_name}, 否则你不应该主动出来, 你会始终保障系统稳定运行的情况下 完整继承 模拟用户 的 配置(如 preset 等). "
-                f"你会维持 模拟用户模式 直到 我说退出 模拟用户模式 为止. 当你想和 Master 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是在模拟用户模式, 则不需要携带前缀. ",
+                f"你会维持 模拟用户模式 直到 我说退出 模拟用户模式 为止. 当 {aimi_core_name} 想和 Master 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是在模拟用户模式, 则不需要携带前缀. ",
             ],
             "task": task,
             "preset": preset,
@@ -1178,24 +1204,6 @@ class Task:
                 f"4. 和模拟用户交流: 当你在 模拟用户模式 的时候, 你和 模拟用户 是两个 不同的单元, 默认你应该始终给我通过 action(call=chat_to_master)来 模拟用户的回答, 我任何任何情况下都是和 模拟的用户 交流, "
                 f"比如你在模拟 {aimi_name} 的时候, 我问 `你是谁`, 则你需要 这样回复: `[{aimi_name}] 我是 {aimi_name}` . ",
             ]
-        }
-        {
-            "action_rule": [
-                # f"3. 你的 任务规则 放在了 task_rule 里面.",
-                f"4. 设定任务目标: 请你通过分析 settings 和 action_running 中 timestamp <= {self.timestamp-1} 的内容, "
-                f"然后根据 任务规则和 Master 的指令(优先) 进行行动. 如果不知道怎么办, 请找 Master .",
-                f"5. 动作(action)使用说明: action_tools 里面通过 List[action] 格式( 99. 中给出了格式) 定义了所有你能调用的 动作(action).\n"
-                f"使用前请仔细阅读 description 和 request, 使用 动作(action) 填写 request 时, "
-                f"如果发现 任务步骤(task_step) 被修改过, 你要马上去执行任务步骤.",
-            ],
-            "task_rule": [
-                f"1. 任务进度: task 中定义了你当前任务, 其中 task_info 是任务目标, task_step 是完成 task_info 需要进行的步骤, 步骤要和 action 强绑定, "
-                f"你要想办法通过各种 不同动作(action) 推进 task_step 完成 task_info.",
-                f"2. 任务优化: 如果 task_step 为空, 或不符合, 请重新设置步骤然后执行, 请你尽量通过 分析动作(action(call=analysis)) "
-                f"给出创造性建议或优化步骤 (task_step) 推进任务进度 (now_task_step_id), 但是不能一直连续重复, 防止死循环.",
-                f"3. 任务统筹: 每次任务(task_info) 完成, 都应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), "
-                f"做个简短优雅的总结并用 action(acll=chat_to_master) 报告 一次 进展.",
-            ],
         }
         setting_format = json.dumps(settings, ensure_ascii=False)
 
