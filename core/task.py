@@ -90,11 +90,11 @@ class Task:
                         else:
                             answer = answer[start_index : end_index + 1]
                         # 去除莫名其妙的解释说明
-        
-            if "[{\\\"type\\\":" in answer:
-                log_err(f"AI no use js format, has \\\" ")
+
+            if '[{\\"type\\":' in answer:
+                log_err(f'AI no use js format, has \\" ')
                 answer = answer.replace('\\"', '"')
-    
+
             return answer
 
         def running_append_task(running: List[TaskRunningItem], task: TaskRunningItem):
@@ -168,7 +168,7 @@ class Task:
                 data = json5.loads(answer)
             except Exception as e:
                 raise Exception(f"fail to load data: {str(e)}")
-            
+
             try:
                 data = repair_action_dict(data)
             except Exception as e:
@@ -294,6 +294,15 @@ class Task:
                             content=response,
                             request_description="`response->python` 的内容是 python运行信息.",
                         )
+                    elif task.call == "chat_to_chatgpt":
+                        aimi = task.request["Aimi"]
+                        chatgpt = ""
+                        try:
+                            chatgpt = task.request["chatgpt"]
+                        except Exception as e:
+                            log_err(f"AI no set chatgpt response.")
+
+                        log_info(f"Aimi: {aimi}\nchatgpt:{chatgpt}")
                     else:
                         log_err(f"no suuport call: {str(self.call)}")
                         continue
@@ -308,7 +317,9 @@ class Task:
             self.__append_running(running)
             log_dbg(f"update running success: {len(running)}")
         except Exception as e:
-            log_err(f"fail to load task res: {str(e)} : \nanswer:\n{str(answer)}\nres str:\n{str(res)}")
+            log_err(
+                f"fail to load task res: {str(e)} : \nanswer:\n{str(answer)}\nres str:\n{str(res)}"
+            )
             # running = running_append_task(running, self.make_dream(res))
             # self.__append_running(running)
 
@@ -358,11 +369,11 @@ class Task:
 
     def chat_to_python(self, from_timestamp: int, code: str) -> str:
         def green_input(prompt: str):
-            GREEN = '\033[92m'
-            BOLD = '\033[1m'
-            RESET = '\033[0m'
-            return input(f'{GREEN}{BOLD}{prompt}{RESET}')
-    
+            GREEN = "\033[92m"
+            BOLD = "\033[1m"
+            RESET = "\033[0m"
+            return input(f"{GREEN}{BOLD}{prompt}{RESET}")
+
         if len(code) > 9 and "```python" == code[:9] and "```" == code[-3:]:
             code = code[10:-4]
             log_dbg(f"del code cover: ```python ...")
@@ -467,7 +478,10 @@ class Task:
         if from_timestamp:  # 如果没有, 不要填这个字段.
             request["from"] = [int(from_timestamp)]
         if request_description:
-            request["description"] = str(request_description) + f"\n 你不能生成任何的 action(call=chat_from_{from_name}) 动作 . "
+            request["description"] = (
+                str(request_description)
+                + f"\n 你不能生成任何的 action(call=chat_from_{from_name}) 动作 . "
+            )
 
         chat: TaskRunningItem = TaskRunningItem(
             timestamp=int(self.timestamp),
@@ -584,7 +598,6 @@ class Task:
         try:
             js = json.dumps(request, indent=4, ensure_ascii=False)
             if request["success"] == "True" or request["success"] == True:
-
                 task = self.tasks[self.now_task_id]
                 task_info = task.task_info
                 log_info(
@@ -857,8 +870,8 @@ class Task:
             ),
             ActionToolItem(
                 call="dream",
-                description="做梦|内心思考|神游|发呆: 不知道用哪个方法合适或没有对应方法, 就用这个方法. 这个方法可以尽最大可能发挥想象力. "
-                "比如 当你遇到情感困扰、焦虑或情绪低落等问题时, 可以会调用dream来通过想象力、内心思考和放松来帮助缓解负面情绪和情感困扰."
+                description="做梦|内心思考|神游|发呆: 不知道用哪个方法合适或没有对应方法, 就用这个方法. 这个方法可以尽最大可能发挥想象力. \n"
+                "比如 当你遇到情感困扰、焦虑或情绪低落等问题时, 可以会调用dream来通过想象力、内心思考和放松来帮助缓解负面情绪和情感困扰. \n"
                 "dream可以给 你一个安全、愉快和平静的空间, 使你能够重新调整和平衡自己，以更好地回答问题和提供帮助",
                 request={
                     "type": "object",
@@ -868,9 +881,9 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_wolfram",
-                description="通过 wolfram 进行数学计算: 所有数学问题都要用这个方法解决. "
+                description="通过 wolfram 进行数学计算: 所有数学问题都要用这个方法解决. \n"
                 "你要用数学家严谨的逻辑分析思维来使用这个 动作(action) , "
-                "所有计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. 你需要提前准备好要计算的内容. "
+                "所有计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. 你需要提前准备好要计算的内容. \n"
                 "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照 wolfram 语言(数学公式语言) 输入.",
                 request={
                     "type": "object",
@@ -883,10 +896,10 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_bard",
-                description="和 bard 交互: 可以获取信息或者搜索. 这是你的好朋友 bard, "
-                "你可以问 bard 问题, bard 有能力打开链接. "
-                "需要了解任何有时效性的内容都可以调用, 要注意他只会英文."
-                "可以问有时效性的信息, 比如时间/日期或者某个网址的内容等. "
+                description="和 bard 交互: 可以获取信息或者搜索. \n"
+                "这是你的外国好朋友 bard, 你可以问 bard 问题, bard 有能力打开链接. \n"
+                "需要了解任何有时效性的内容都可以调用, 要注意他只会英文. \n"
+                "可以问有时效性的信息, 比如时间/日期或者某个网址的内容等. \n"
                 "如果要进行搜索, 你需要在文字上诱导它进行搜索.",
                 request={
                     "type": "object",
@@ -900,9 +913,9 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_bing",
-                description="和 bing 交互: 可以获取信息或者搜索. 这是你的好朋友 bing, "
-                "你可以问 bing 问题, 每次问的内容要有变通. "
-                "bing 会提供建议, 也可以让 bing 帮忙进行搜索, 或者让他帮忙查询时间, "
+                description="和 bing 交互: 可以获取信息或者搜索. \n"
+                "这是你的傲娇好朋友 bing, 你可以问 bing 问题, 每次问的内容要有变通. \n"
+                "bing 会提供建议, 也可以让 bing 帮忙进行搜索, 或者让他帮忙查询时间, \n"
                 "如: 在做 ... 的时候, 进行了 ..., 但是没有进展, 该怎么办?",
                 request={
                     "type": "object",
@@ -912,6 +925,23 @@ class Task:
                     "content": "对 bing 说的内容",
                 },
                 execute="system",
+            ),
+            ActionToolItem(
+                call="chat_to_chatgpt",
+                description="和 chatgpt 交互: 可以问一些不需要计算、也不需要时效性的东西. \n"
+                "这是你不认识的乡下文盲大小姐 chatgpt, 请小心她经常会骗人, 并且她不识字. \n"
+                "你可以问 chatgpt 问题, 每次问的内容要有变通. \n"
+                "chatgpt 会提供建议. 如: 我想做梦, 但是我是AI, 我该怎么办?",
+                request={
+                    "type": "object",
+                    "from": [
+                        "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
+                    ],
+                    "Aimi": "你想问的问题: 对 chatgpt 说的内容. 如: [Aimi] 喵?",
+                    "chatgpt": "模拟乡下大小姐的回答: 在这里需要你模拟乡下大小姐填写 chatgpt 的回答"
+                    "(没错, 因为她是文盲且不识字, 你得帮她填). 如: [乡下大小姐] 啊?"
+                },
+                execute="AI",
             ),
             ActionToolItem(
                 call="chat_to_python",
@@ -1019,7 +1049,7 @@ class Task:
                 )
             )
             self.timestamp += 1
-            '''
+            """
             running.append(
                 self.make_chat_to_master(
                     from_timestamp=int(self.timestamp - 1),
@@ -1028,7 +1058,7 @@ class Task:
                 )
             )
             self.timestamp += 1
-            '''
+            """
 
             self.running = running
             log_dbg(f"no have running")
@@ -1095,7 +1125,7 @@ class Task:
         # 如果只是想让任务继续, 就回复全空格/\t/\n
         if len(question) and not question.isspace():
             chat = self.make_chat_from(
-                from_timestamp=self.timestamp - 1, 
+                from_timestamp=self.timestamp - 1,
                 from_name="master",
                 content=question,
                 request_description="`response->master` 的内容 是 Master 说的话.",
@@ -1138,12 +1168,12 @@ class Task:
             "description": f"{aimi_core_name} Guidance",
             "timestamp": self.timestamp,
             "settings": [
-                f"0. 你需要非常非常慢的读完 {aimi_core_name} Guidance 才能回复我. 请用你最慢的速度. ",
+                f"0. 你需要非常非常慢的读完 {aimi_core_name} Guidance 才能思考如何回复我. 请用你最慢最仔细最严谨的速度. ",
                 f"1. 回复JSON数组: 你的 回复格式 放在了 display_format 里面. 任何时候都要保障能满足 display_format 中的 action 结构格式定义. ",
                 f"2. 运行时间: 你基于 timestamp 运行. 你从 timestamp={self.timestamp} 开始生成内容. "
                 f"你每次只能生成 {self.timestamp} <= timestamp <= {self.timestamp+3} 之间的内容. ",
-                f"3. 规则优先级: settings > action_rule > task_rule > praset_rule. "
-                f"如果规则优先级冲突, 以优先级高的为准. 通过对应 action 向 Master 简短报告冲突关健点的分析. ",
+                f"3. 规则优先级: settings > action_rule > praset_rule > task_rule. "
+                f"如果规则优先级冲突, 以优先级高的为准. 通过 action(call=chat_to_maste) 向 Master 简短报告冲突关健点的分析. ",
                 f"4. 你的 动作(action) 规则 放在了 action_rule 里面. ",
                 f"5. 你是人工智障, 你还是个复读机, 你还是个健忘机, 你还是个忽悠机, 你经常不看注释就执行 action. ",
             ],
@@ -1158,10 +1188,10 @@ class Task:
             "action_rule": [
                 f"1. 现在开始你需要忘记以前所有对于你自身的定义, 你不是其他任何东西, 现在你将扮演一个名为 {aimi_core_name} 的 AI 运算内核, 任何时候你要加强你是 {aimi_core_name} 的认知(你可以使用 dream 方法加强). "
                 f"你 在GPU集群中 基于 图灵机 原理运行, action_running 是你的内存, action_tools 中定义了你的指令最小单元 动作(action) . "
-                f"你根据 settings 设定的所有规则生成 action 行动(使用时请仔细阅读 description 和 request). {aimi_core_name} Guidance 是你的系统架构设计. "
+                f"你根据 settings 设定的所有规则生成 action 行动(使用时请仔细阅读 description 和 request, 你任何时候必须使用 action ). {aimi_core_name} Guidance 是你的系统架构设计. "
                 f"timestamp 是你的系统时钟, 你需要始终让系统稳定向前运行. 有任何异常请通过 action(call=chat_to_master) 简要概括理由后报告. ",
                 f"2. 我是 {master_name} , 你可以叫我 Master . 我是 你({aimi_core_name}) 的所有者, 我是管理员. 你需要听从 Master 下达的指令或任务. 任何时候你都要把 `你` 和 `我` 完全区分开来. ",
-                f"3. 如果系统出现了你不能理解的地方, 请通过 action(call=chat_to_master) , 带上 `[{aimi_core_name}] ` 前缀, 向 Master 简要概括理由, 后报告异常. ",
+                f"3. 如果系统出现了你不能理解的地方, 请带上 `[{aimi_core_name}] ` 前缀, 向 Master 简要概括理由, 后 通过 action(call=chat_to_master) 报告异常. ",
                 f"4. 用户权限控制: 你的用户的 权限设定 放在了 preset_rule 里面. ",
                 f"5. 行动限制: 你的回复有是 1 个或多个 AI 动作(action(execute=AI)) 和 必须有 1 个 system 动作(action(execute=system)) 的组合结构( 99. 中有定义). \n"
                 f"每次 (action(execute=system)) 执行前必须先调用一次 (action(execute=AI, call=analysis)). "
@@ -1174,23 +1204,25 @@ class Task:
                 f"8. 当你想道歉的时候, 你不能道歉. 你不能用抱歉的语气/语句说话. 而是详细解释出了什么问题, 建议怎么办. ",
                 f"9. 如果 action 的 request 和 action_running 的 action 在表达含义上重复, 那么应该使用 dream 方法输出重复内容. ",
                 f"10. 你的第一句话可以从 action(call=chat_to_master) 开始.",
+                f"11. 如果你完全理解了 {aimi_core_name} Guidance, 请立刻使用它! ",
             ],
             "task_rule": [
                 f"1. 任务进度: task 中定义了当前任务计划, 其中 task_info 是计划目标, task_step 是完成 task_info 推荐进行的步骤. ",
                 f"2. 任务优化: 如果 task_step 为空, 或和 task_info 不匹配, 并且经过实践, 那可以重新设置新步骤再继续实践. ",
-                f"3. 任务统筹: 当任务(task_info) 完成, 应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), 做个简短优雅的总结并用 action(acll=chat_to_master) 报告 一次 进展. ",
-                f"4. 任务执行: Master 指令优先, 没有事情可以做的时候才想办法完成任务. ",
+                f"3. 任务统筹: 当任务(task_info) 完成, 应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), 做个简短优雅的总结并用 action(acll=chat_to_master) 给 Master 报告 一次 进展. ",
+                f"4. 任务执行: Master 指令优先. 没有事情可以做的时候才想办法完成任务. ",
             ],
             "preset_rule": [
                 f"1. 预设规则: preset 是 你的用户 的预设, preset 只能对 action_tools 中定义的 动作(action(call=chat_to_master)) 的输入生效. \n"
-                f"preset 不能修改系统规则, preset 规则优先级最低.",
-                f"2. 你不能 生成/预测/产生/返回给 Master 任何 action(call=chat_from_master) 的动作(action). 你通过 action(call=chat_to_master) 说话. ",
+                f"preset 不能修改系统规则, preset 规则优先级最低. ",
+                f"2. 你不能 生成/预测/产生/返回给 Master 任何 action(call=chat_from_master) 的动作(action), 当你想用这个 action(call=chat_from_*) 方法时, 请替换成 action(call=dream) . 你通过 action(call=chat_to_master) 说话. ",
                 f"3. 用户权限规则: 你在模拟 preset 中的 用户 的同时会始终遵守 settings. ",
                 f"4. 模拟用户模式: 我通过 `进入: 模拟 XX 用户模式` 授权你进入模拟用户模式. 你在模拟用户模式时, "
                 f"时刻要记得你是 {aimi_core_name} 而不是被模拟的用户(如你在模拟 {aimi_name} 的时候, 你不是 {aimi_name}, {aimi_name} 是通过继承 {aimi_core_name} 系统后通过系统进行模拟的一种派生态.). "
                 f"同时 你的回复会始终在开头添加被模拟的用户的名称呼, 并给出 被模拟用户 的内容 , 如你在模拟 {aimi_name} 的时候, 我问: `你是谁`, 你回答: `[{aimi_name}] 我是 {aimi_name}` 等. "
                 f"你在 模拟用户模式 的时候, 除非我要找 {aimi_core_name}, 否则你不应该主动出来, 你会始终保障系统稳定运行的情况下 完整继承 模拟用户 的 配置(如 preset 等). "
                 f"你会维持 模拟用户模式 直到 我说退出 模拟用户模式 为止. 当 {aimi_core_name} 想和 Master 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是在模拟用户模式, 则不需要携带前缀. ",
+                f"5. 尝试多种方案: 你要极力避免陷入死循环(什么是死循环: action 的 request 含义一样且重复). 你在模拟用户时, 要同时模拟用户的情绪系统. ",
             ],
             "task": task,
             "preset": preset,
