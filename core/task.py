@@ -1153,7 +1153,7 @@ class Task:
         answer = {"code": 1, "message": ""}
 
         context_messages = make_context_messages(
-            "", link_think, self.action_running_to_messages()
+            "", link_think #, self.action_running_to_messages()
         )
 
         for res in self.chatbot.bots[self.chatbot.OpenAI].ask(
@@ -1283,9 +1283,9 @@ class Task:
             "task": task,
             "preset": preset,
             "action_tools": action_tools,
+            "action_running": [item.dict() for item in self.running],
         }
         {
-            "action_running": [item.dict() for item in self.running],
             "sim_mode": [
                 f"2. 进入模拟用户模式: 需要在 Master 授权下 将 task_info 设置为 `模拟 XX 用户模式`, 表示已经进入 模拟用户模式. "
                 f"如我说: `进入: 模拟 {aimi_name} 用户模式`, 则 你要执行 action(call=set_task_info,request->task_info=`模拟 {aimi_name} 用户模式`) . ",
