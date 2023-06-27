@@ -125,7 +125,8 @@ def make_context_messages(
     if len(preset):
         context_messages = [{"role": "system", "content": preset}]
     context_messages.extend(talk_history)
-    context_messages.append({"role": "user", "content": question})
+    if len(question):
+        context_messages.append({"role": "user", "content": question})
 
     return context_messages
 

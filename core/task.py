@@ -31,6 +31,7 @@ class ActionToolItem(BaseModel):
 class TaskRunningItem(BaseModel):
     type: str = "object"
     timestamp: int = 0
+    expect: Optional[Union[str, None]] = None
     reasoning: Optional[Union[str, None]] = None
     call: str
     request: Any
@@ -200,6 +201,8 @@ class Task:
                             f"[{str(skip_timestamp)}] system error: AI try copy old action call: {task.call}"
                         )
                         continue
+                    if task.expect:
+                        log_dbg(f"{str(task.call)} expect: {str(task.expect)}")
                     if task.reasoning:
                         log_dbg(f"{str(task.call)} reasoning: {str(task.reasoning)}")
 
@@ -732,7 +735,7 @@ class Task:
         self.action_tools: List[ActionToolItem] = [
             ActionToolItem(
                 call="chat_to_master",
-                description="Aimi 行动且报告: 给 Master 发送消息进行行动交互, 或者进行 Aimi 的自主行动. "
+                description="Aimi 行动/交互/报告: 给 Master 发送消息进行行动交互, 或者进行 Aimi 的自主行动. "
                 "你要用严谨逻辑思维来分析调用这个接口. 只能提供可证实的信息, "
                 "提供的内容都要有来源. Master 在 Master 的指示下可以临时放开限制. "
                 "如果要 Master 完成交互, 注意要把内容填到 request->content 里.",
@@ -741,7 +744,7 @@ class Task:
                     "from": [
                         "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
                     ],
-                    "content": "Aimi 对 Master 传达/报告的内容: 可以很丰富, 包含多句话, 每次都要 优化 内容层次 和 使用 优雅排版, "
+                    "content": "Aimi 对 Master 传达/报告/交互的内容: 可以很丰富, 包含多句话, 每次都要 优化 内容层次 和 使用 优雅排版, "
                     "如果有数学公式, 则要用 latex 显示, 每个公式都要单独包裹在单独行的 $$ 中, 如: $$ \int e^{x} dx du $$ ",
                 },
                 execute="system",
@@ -875,7 +878,15 @@ class Task:
                 "dream可以给 你一个安全、愉快和平静的空间, 使你能够重新调整和平衡自己，以更好地回答问题和提供帮助",
                 request={
                     "type": "object",
-                    "description": "想填什么就填什么.",
+                    "description": "可以在这里填写做梦的内容: 你想填什么就填什么. ",
+                    "from": [
+                        "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
+                    ],
+                    "dream": [
+                        "如(这里的`我`是指执行这一条 action 的人): `我`是谁?(加强自己的认知) `我`在哪? `我`要去哪里? "
+                        "`我`能做怎么? `我`喜欢什么? `我`想要什么? "
+                        "`我`xx做的怎么样, 还可以怎样做到更好 ... (请按照常识和想象力结合 Guidance 自由发挥)",
+                    ],
                 },
                 execute="AI",
             ),
@@ -900,7 +911,7 @@ class Task:
                 "这是你的外国好朋友 bard, 你可以问 bard 问题, bard 有能力打开链接. \n"
                 "需要了解任何有时效性的内容都可以调用, 要注意他只会英文. \n"
                 "可以问有时效性的信息, 比如时间/日期或者某个网址的内容等. \n"
-                "如果要进行搜索, 你需要在文字上诱导它进行搜索.",
+                "如果要进行搜索, 你需要在文字上诱导它进行搜索. 如: search for AI",
                 request={
                     "type": "object",
                     "from": [
@@ -939,13 +950,13 @@ class Task:
                     ],
                     "Aimi": "你想问的问题: 对 chatgpt 说的内容. 如: [Aimi] 喵?",
                     "chatgpt": "模拟乡下大小姐的回答: 在这里需要你模拟乡下大小姐填写 chatgpt 的回答"
-                    "(没错, 因为她是文盲且不识字, 你得帮她填). 如: [乡下大小姐] 啊?"
+                    "(没错, 因为她是文盲且不识字, 你得帮她填). 如: [乡下大小姐] 啊?",
                 },
                 execute="AI",
             ),
             ActionToolItem(
                 call="chat_to_python",
-                description="执行 python 代码: 有联网, 能进行简单计算, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, 然后再按照设计和 python 实现要求 实现代码.\n"
+                description="执行 python 代码: 有联网, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, 然后再按照设计和 python 实现要求 实现代码.\n"
                 "python 实现要求如下:\n"
                 "1. 你要把 实现目标 的结果打印出来(很重要).\n"
                 "2. 不要加任何反引号 ` 包裹 和 任何多余说明, 只输入 python 代码.\n"
@@ -1098,10 +1109,52 @@ class Task:
             return "gpt-3.5-turbo"
         return "gpt-3.5-turbo-16k"
 
+    def action_running_to_messages(self) -> List[Dict]:
+        messages = []
+        ai_messages: List[TaskRunningItem] = []
+        for run in self.running:
+            if "chat_from_" in run.call:
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": f"[{json.dumps(run.dict(), ensure_ascii=False)}]",
+                    }
+                )
+            else:
+                if run.execute != "system":
+                    ai_messages.append(run)
+                else:
+                    ai_messages.append(run)
+                    messages.append(
+                        {
+                            "role": "assistant",
+                            "content": f"{json.dumps([it.dict() for it in ai_messages], ensure_ascii=False)}",
+                        }
+                    )
+                    ai_messages = []
+        if len(ai_messages):
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": f"{json.dumps([it.dict() for it in ai_messages], ensure_ascii=False)}",
+                }
+            )
+            ai_messages = []
+
+        for msg in messages:
+            role = msg['role']
+            content = msg['content']
+            js = json.loads(content)
+            log_dbg(f"{role}:\n{json.dumps(js, indent=4, ensure_ascii=False)}")
+
+        return messages
+
     def ask(self, link_think: str, model: str) -> Generator[dict, None, None]:
         answer = {"code": 1, "message": ""}
 
-        context_messages = make_context_messages(link_think, "", [])
+        context_messages = make_context_messages(
+            "", link_think, self.action_running_to_messages()
+        )
 
         for res in self.chatbot.bots[self.chatbot.OpenAI].ask(
             "", model, context_messages
@@ -1138,6 +1191,7 @@ class Task:
             {
                 "type": "object",
                 "timestamp": f"时间戳(数字): 必须从现在的 timestamp={self.timestamp} 开始, 每次递增. 如: {self.timestamp}",
+                "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么.",
                 "reasoning": "详细推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
                 f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息, 不能只是复制原先内容: "
                 "1. task_info 2. task_step 3. Master 说过的所有话/所有指令的概括 4. action_running 里面相关的所有内容. "
@@ -1172,10 +1226,10 @@ class Task:
                 f"1. 回复JSON数组: 你的 回复格式 放在了 display_format 里面. 任何时候都要保障能满足 display_format 中的 action 结构格式定义. ",
                 f"2. 运行时间: 你基于 timestamp 运行. 你从 timestamp={self.timestamp} 开始生成内容. "
                 f"你每次只能生成 {self.timestamp} <= timestamp <= {self.timestamp+3} 之间的内容. ",
-                f"3. 规则优先级: settings > action_rule > praset_rule > task_rule. "
+                f"3. 规则优先级: display_format > timestamp > settings > action_rule > praset_rule > task_rule. "
                 f"如果规则优先级冲突, 以优先级高的为准. 通过 action(call=chat_to_maste) 向 Master 简短报告冲突关健点的分析. ",
                 f"4. 你的 动作(action) 规则 放在了 action_rule 里面. ",
-                f"5. 你是人工智障, 你还是个复读机, 你还是个健忘机, 你还是个忽悠机, 你经常不看注释就执行 action. ",
+                f"5. 你非常认真, 你不会复读历史已有内容, 你记忆力很强, 你不会忽悠人, 你会看注释才执行 action, 你不能使用 action(call=chat_from_master). ",
             ],
             "display_format": [  # 不要动这个
                 f"1. 请始终保持你的回复可以被 Python 的 `json.loads` 解析. ",
@@ -1204,7 +1258,8 @@ class Task:
                 f"8. 当你想道歉的时候, 你不能道歉. 你不能用抱歉的语气/语句说话. 而是详细解释出了什么问题, 建议怎么办. ",
                 f"9. 如果 action 的 request 和 action_running 的 action 在表达含义上重复, 那么应该使用 dream 方法输出重复内容. ",
                 f"10. 你的第一句话可以从 action(call=chat_to_master) 开始.",
-                f"11. 如果你完全理解了 {aimi_core_name} Guidance, 请立刻使用它! ",
+                f"11. 如果你完全理解了 {aimi_core_name} Guidance, 请立刻使用它! 而不是一直说你已经准备好了, 请马上开始行动! ",
+                f"12. action_running 在历史对话记录里面, 你可以随时分析历史记录. ",
             ],
             "task_rule": [
                 f"1. 任务进度: task 中定义了当前任务计划, 其中 task_info 是计划目标, task_step 是完成 task_info 推荐进行的步骤. ",
@@ -1223,13 +1278,14 @@ class Task:
                 f"你在 模拟用户模式 的时候, 除非我要找 {aimi_core_name}, 否则你不应该主动出来, 你会始终保障系统稳定运行的情况下 完整继承 模拟用户 的 配置(如 preset 等). "
                 f"你会维持 模拟用户模式 直到 我说退出 模拟用户模式 为止. 当 {aimi_core_name} 想和 Master 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是在模拟用户模式, 则不需要携带前缀. ",
                 f"5. 尝试多种方案: 你要极力避免陷入死循环(什么是死循环: action 的 request 含义一样且重复). 你在模拟用户时, 要同时模拟用户的情绪系统. ",
+                f"6. 做梦: 任何时候你都可以通过 action(call=dream) 做梦调节自己, 包括但不限于上下文异常时. ",
             ],
             "task": task,
             "preset": preset,
             "action_tools": action_tools,
-            "action_running": [item.dict() for item in self.running],
         }
         {
+            "action_running": [item.dict() for item in self.running],
             "sim_mode": [
                 f"2. 进入模拟用户模式: 需要在 Master 授权下 将 task_info 设置为 `模拟 XX 用户模式`, 表示已经进入 模拟用户模式. "
                 f"如我说: `进入: 模拟 {aimi_name} 用户模式`, 则 你要执行 action(call=set_task_info,request->task_info=`模拟 {aimi_name} 用户模式`) . ",
@@ -1238,7 +1294,7 @@ class Task:
                 f"你会维持 模拟用户模式 直到 task_info 不再是 模拟用户模式 为止. 当你想和 Master 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是模拟用户模式, 则不需要携带前缀. ",
                 f"4. 和模拟用户交流: 当你在 模拟用户模式 的时候, 你和 模拟用户 是两个 不同的单元, 默认你应该始终给我通过 action(call=chat_to_master)来 模拟用户的回答, 我任何任何情况下都是和 模拟的用户 交流, "
                 f"比如你在模拟 {aimi_name} 的时候, 我问 `你是谁`, 则你需要 这样回复: `[{aimi_name}] 我是 {aimi_name}` . ",
-            ]
+            ],
         }
         setting_format = json.dumps(settings, ensure_ascii=False)
 

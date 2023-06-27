@@ -88,8 +88,8 @@ class BardAPI:
 
             except Exception as e:
                 log_err("fail to ask: " + str(e))
-                log_info("server fail, maybe need check cookie, sleep 15")
-                time.sleep(15)
+                log_info("server fail, maybe need check cookie, sleep 5")
+                time.sleep(5)
                 self.__bot_create()
                 log_info("reload bot")
 
