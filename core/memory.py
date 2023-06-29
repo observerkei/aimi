@@ -15,6 +15,7 @@ class Memory:
     pool: List[dict] = []
     memory_model: Any
     memory_model_depth: int = 20
+    memory_has_change: bool = True
 
     def __init__(self):
         self.__load_memory()
@@ -92,6 +93,8 @@ class Memory:
         log_dbg("size: " + str(self.size))
 
     def save_memory(self) -> bool:
+        if not self.memory_has_change:
+            return True
         save_path = Config.memory_config
 
         try:
@@ -109,6 +112,7 @@ class Memory:
 
             log_info("save memory done: " + str(save_path))
             ret = True
+            self.memory_has_change = False
 
         except Exception as e:
             log_err("fail to save memory: {}, file:{}".format(str(e), save_path))
@@ -282,6 +286,8 @@ class Memory:
         if not self.need_memory(a):
             log_info("no need save memory.")
             return
+
+        self.memory_has_change = True
 
         next_idx = self.__get_next_idx()
         talk_item = {"q": q, "a": a, "idx": next_idx}

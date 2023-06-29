@@ -7,7 +7,16 @@ import os
 from typing import Dict, List
 
 
+def log_disable():
+    global __log_disable
+    __log_disable = True
+
+
 def log_init():
+    global __log_disable
+    if __log_disable:
+        return None
+
     # 创建一个 logger 对象
     logger = logging.getLogger(__name__)
 
@@ -57,6 +66,9 @@ def log_init():
 
 
 def log_err(message: str, is_plugin: bool = False):
+    global __log_disable
+    if __log_disable:
+        return None
     caller_file = get_caller_filename(is_plugin)
     caller_func = get_caller_function_name(is_plugin)
     caller_line = get_caller_lineno(is_plugin)
@@ -64,6 +76,9 @@ def log_err(message: str, is_plugin: bool = False):
 
 
 def log_dbg(message: str, is_plugin: bool = False):
+    global __log_disable
+    if __log_disable:
+        return None
     caller_file = get_caller_filename(is_plugin)
     caller_func = get_caller_function_name(is_plugin)
     caller_line = get_caller_lineno(is_plugin)
@@ -71,6 +86,9 @@ def log_dbg(message: str, is_plugin: bool = False):
 
 
 def log_info(message: str, is_plugin: bool = False):
+    global __log_disable
+    if __log_disable:
+        return None
     caller_file = get_caller_filename(is_plugin)
     caller_func = get_caller_function_name(is_plugin)
     caller_line = get_caller_lineno(is_plugin)
@@ -131,4 +149,7 @@ def make_context_messages(
     return context_messages
 
 
-logger = log_init()
+__log_disable: bool = False
+
+if not __log_disable:
+    logger = log_init()

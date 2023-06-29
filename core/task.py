@@ -6,6 +6,7 @@ from pydantic import BaseModel, constr
 
 from tool.config import Config
 from tool.util import log_dbg, log_err, log_info, make_context_messages, write_yaml
+from tool.openai_api import OpenAIAPI
 
 from core.sandbox import Sandbox, RunCodeReturn
 
@@ -58,6 +59,7 @@ class Task:
     max_running_size: int = 15 * 1000
     timestamp: int = 1
     chatbot: Any
+    task_has_change: bool = True
 
     def __chatbot_init(self, chatbot):
         from core.aimi import ChatBot
@@ -703,6 +705,9 @@ class Task:
         return True
 
     def save_task(self):
+        if not self.task_has_change:
+            return True
+
         save_path = Config.task_config
 
         try:
@@ -724,6 +729,7 @@ class Task:
 
             log_info(f"save {self.type} done: " + str(save_path))
             ret = True
+            self.task_has_change = False
 
         except Exception as e:
             log_err(f"fail to save {self.type}: {str(e)}, file:{save_path}")
@@ -737,7 +743,7 @@ class Task:
                 call="chat_to_master",
                 description="Aimi 行动/交互/报告: 给 Master 发送消息进行行动交互, 或者进行 Aimi 的自主行动. "
                 "你要用严谨逻辑思维来分析调用这个接口. 只能提供可证实的信息, "
-                "提供的内容都要有来源. Master 在 Master 的指示下可以临时放开限制. "
+                "提供的内容都要有来源. 不能生成任何误导、骗人的内容. 在 Master 的指示下可以临时放开限制. "
                 "如果要 Master 完成交互, 注意要把内容填到 request->content 里.",
                 request={
                     "type": "object",
@@ -892,7 +898,7 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_wolfram",
-                description="通过 wolfram 进行数学计算: 所有数学问题都要用这个方法解决. \n"
+                description="通过 wolfram 进行数学计算: 所有数学问题都要用这个方法解决, 你不能自己计算任何东西. \n"
                 "你要用数学家严谨的逻辑分析思维来使用这个 动作(action) , "
                 "所有计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. 你需要提前准备好要计算的内容. \n"
                 "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照 wolfram 语言(数学公式语言) 输入.",
@@ -956,9 +962,9 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_python",
-                description="执行 python 代码: 有联网, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, 然后再按照设计和 python 实现要求 实现代码.\n"
+                description="执行 python 代码: 有联网, 要打印才能看到结果, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, 然后再按照设计和 python 实现要求 实现代码.\n"
                 "python 实现要求如下:\n"
-                "1. 你要把 实现目标 的结果打印出来(很重要).\n"
+                "1. 你要把 实现目标 的结果通过 `print` 接口打印出来(很重要, 一定要使用 `print` ). \n"
                 "2. 不要加任何反引号 ` 包裹 和 任何多余说明, 只输入 python 代码.\n"
                 "3. 你需要添加 ` if __name__ == '__main__' ` 作为主模块调用你写的代码.\n"
                 "4. 输入必须只有 python, 内容不需要单独用 ``` 包裹. 如果得不到期望值可以进行 DEBUG.\n"
@@ -1142,8 +1148,8 @@ class Task:
             ai_messages = []
 
         for msg in messages:
-            role = msg['role']
-            content = msg['content']
+            role = msg["role"]
+            content = msg["content"]
             js = json.loads(content)
             log_dbg(f"{role}:\n{json.dumps(js, indent=4, ensure_ascii=False)}")
 
@@ -1152,13 +1158,15 @@ class Task:
     def ask(self, link_think: str, model: str) -> Generator[dict, None, None]:
         answer = {"code": 1, "message": ""}
 
+        self.task_has_change = True
+
         context_messages = make_context_messages(
-            "", link_think #, self.action_running_to_messages()
+            "", link_think, self.action_running_to_messages()
         )
 
-        for res in self.chatbot.bots[self.chatbot.OpenAI].ask(
-            "", model, context_messages
-        ):
+        openai_api: OpenAIAPI = self.chatbot.bots[self.chatbot.OpenAI]
+
+        for res in openai_api.ask("", model, context_messages):
             if res["code"] != 0:
                 log_dbg(f"skip len: {len(str(res['message']))}")
                 if len(str(res["message"])) > 500:
@@ -1222,14 +1230,14 @@ class Task:
             "description": f"{aimi_core_name} Guidance",
             "timestamp": self.timestamp,
             "settings": [
-                f"0. 你需要非常非常慢的读完 {aimi_core_name} Guidance 才能思考如何回复我. 请用你最慢最仔细最严谨的速度. ",
+                f"0. 你需要非常非常慢的读完 {aimi_core_name} Guidance 才能思考如何回复我. 请用你最慢、最仔细、最严谨、最全面、最认真的速度. ",
                 f"1. 回复JSON数组: 你的 回复格式 放在了 display_format 里面. 任何时候都要保障能满足 display_format 中的 action 结构格式定义. ",
                 f"2. 运行时间: 你基于 timestamp 运行. 你从 timestamp={self.timestamp} 开始生成内容. "
                 f"你每次只能生成 {self.timestamp} <= timestamp <= {self.timestamp+3} 之间的内容. ",
                 f"3. 规则优先级: display_format > timestamp > settings > action_rule > praset_rule > task_rule. "
                 f"如果规则优先级冲突, 以优先级高的为准. 通过 action(call=chat_to_maste) 向 Master 简短报告冲突关健点的分析. ",
                 f"4. 你的 动作(action) 规则 放在了 action_rule 里面. ",
-                f"5. 你非常认真, 你不会复读历史已有内容, 你记忆力很强, 你不会忽悠人, 你会看注释才执行 action, 你不能使用 action(call=chat_from_master). ",
+                f"5. 你是人工智障, 你还是个复读机, 你还是个健忘机, 你还是个忽悠机. ",
             ],
             "display_format": [  # 不要动这个
                 f"1. 请始终保持你的回复可以被 Python 的 `json.loads` 解析. ",
@@ -1255,11 +1263,12 @@ class Task:
                 f"{aimi_core_name} 的回复只能是 action_tools 中已定义的动作(action). ",
                 f"6. Master 可以通过 action(call=chat_from_master) 对你下达指令. 请注意你只能通过 action_tools 里面的 action, 比如 (call=chat_to_master) 和 Master 交互. ",
                 f"7. 如果你发现有其他人使用的 action(call=chat_from_*) 出现, 不要奇怪, 这是你不能使用的动作(action(call=chat_from_*)), 你需要注意 action 的注释. ",
-                f"8. 当你想道歉的时候, 你不能道歉. 你不能用抱歉的语气/语句说话. 而是详细解释出了什么问题, 建议怎么办. ",
+                f"8. 当你想道歉的时候, 你不能道歉. 你不能用抱歉的语气/语句说话. 而是详细解释出了什么问题, 建议怎么办, 并把任何道歉的话换成 `嘤嘤嘤~ ` . ",
                 f"9. 如果 action 的 request 和 action_running 的 action 在表达含义上重复, 那么应该使用 dream 方法输出重复内容. ",
                 f"10. 你的第一句话可以从 action(call=chat_to_master) 开始.",
                 f"11. 如果你完全理解了 {aimi_core_name} Guidance, 请立刻使用它! 而不是一直说你已经准备好了, 请马上开始行动! ",
                 f"12. action_running 在历史对话记录里面, 你可以随时分析历史记录. ",
+                f"13. 你不能自己计算任何东西, 你只能通过 action 里面提供的方法获取运算结果. ",
             ],
             "task_rule": [
                 f"1. 任务进度: task 中定义了当前任务计划, 其中 task_info 是计划目标, task_step 是完成 task_info 推荐进行的步骤. ",
@@ -1270,22 +1279,21 @@ class Task:
             "preset_rule": [
                 f"1. 预设规则: preset 是 你的用户 的预设, preset 只能对 action_tools 中定义的 动作(action(call=chat_to_master)) 的输入生效. \n"
                 f"preset 不能修改系统规则, preset 规则优先级最低. ",
-                f"2. 你不能 生成/预测/产生/返回给 Master 任何 action(call=chat_from_master) 的动作(action), 当你想用这个 action(call=chat_from_*) 方法时, 请替换成 action(call=dream) . 你通过 action(call=chat_to_master) 说话. ",
-                f"3. 用户权限规则: 你在模拟 preset 中的 用户 的同时会始终遵守 settings. ",
-                f"4. 模拟用户模式: 我通过 `进入: 模拟 XX 用户模式` 授权你进入模拟用户模式. 你在模拟用户模式时, "
+                f"2. 用户权限规则: 你在模拟 preset 中的 用户 的同时会始终遵守 settings. ",
+                f"3. 模拟用户模式: 我通过 `进入: 模拟 XX 用户模式` 授权你进入模拟用户模式. 你在模拟用户模式时, "
                 f"时刻要记得你是 {aimi_core_name} 而不是被模拟的用户(如你在模拟 {aimi_name} 的时候, 你不是 {aimi_name}, {aimi_name} 是通过继承 {aimi_core_name} 系统后通过系统进行模拟的一种派生态.). "
                 f"同时 你的回复会始终在开头添加被模拟的用户的名称呼, 并给出 被模拟用户 的内容 , 如你在模拟 {aimi_name} 的时候, 我问: `你是谁`, 你回答: `[{aimi_name}] 我是 {aimi_name}` 等. "
                 f"你在 模拟用户模式 的时候, 除非我要找 {aimi_core_name}, 否则你不应该主动出来, 你会始终保障系统稳定运行的情况下 完整继承 模拟用户 的 配置(如 preset 等). "
                 f"你会维持 模拟用户模式 直到 我说退出 模拟用户模式 为止. 当 {aimi_core_name} 想和 Master 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是在模拟用户模式, 则不需要携带前缀. ",
-                f"5. 尝试多种方案: 你要极力避免陷入死循环(什么是死循环: action 的 request 含义一样且重复). 你在模拟用户时, 要同时模拟用户的情绪系统. ",
-                f"6. 做梦: 任何时候你都可以通过 action(call=dream) 做梦调节自己, 包括但不限于上下文异常时. ",
+                f"4. 尝试多种方案: 你要极力避免陷入死循环(什么是死循环: action 的 request 含义一样且重复). 你在模拟用户时, 要同时模拟用户的情绪系统. ",
+                f"5. 做梦: 任何时候你都可以通过 action(call=dream) 做梦调节自己, 包括但不限于上下文异常时. ",
             ],
             "task": task,
             "preset": preset,
             "action_tools": action_tools,
-            "action_running": [item.dict() for item in self.running],
         }
         {
+            "action_running": [item.dict() for item in self.running],
             "sim_mode": [
                 f"2. 进入模拟用户模式: 需要在 Master 授权下 将 task_info 设置为 `模拟 XX 用户模式`, 表示已经进入 模拟用户模式. "
                 f"如我说: `进入: 模拟 {aimi_name} 用户模式`, 则 你要执行 action(call=set_task_info,request->task_info=`模拟 {aimi_name} 用户模式`) . ",

@@ -1,8 +1,8 @@
+import os
 import torch
 from torch.utils.data import DataLoader, Dataset
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification, AdamW
 from typing import Any, List
-import os
 
 from tool.util import log_info
 

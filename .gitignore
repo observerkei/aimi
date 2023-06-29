@@ -145,6 +145,7 @@ qq_server_data/
 /run/wolfram*.txt
 /run/task.yml.*
 /run/sandbox.py
+/run/clash
 
 # plugin
 /aimi_plugin

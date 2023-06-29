@@ -2,19 +2,19 @@ import atexit
 import signal
 import threading
 import time
-from typing import Generator, List, Dict, Any
 import random
+from typing import Generator, List, Dict, Any
 from contextlib import suppress
 
 from tool.config import Config
 from tool.util import log_dbg, log_err, log_info, make_context_messages
-from chat.qq import ChatQQ
-from chat.web import ChatWeb
 from tool.openai_api import OpenAIAPI
 from tool.bing_api import BingAPI
 from tool.bard_api import BardAPI
 from tool.aimi_plugin import AimiPlugin
 from tool.wolfram_api import WolframAPI
+from chat.qq import ChatQQ
+from chat.web import ChatWeb
 
 from core.md2img import Md
 from core.memory import Memory
@@ -132,20 +132,20 @@ class ReplyStep:
 
     class MathList:
         has_start: bool = False
-
-        def is_math_format(self, line: str) -> bool:
+    
+        def __is_math_format(md: Md, line: str) -> bool:
             if "=" in line:
                 return True
-            if self.md.has_latex(line):
+            if md.has_latex(line):
                 log_dbg("match: is latex")
                 return True
-            if self.md.has_html(line):
+            if md.has_html(line):
                 log_dbg("match: is html")
                 return True
             return False
 
-        def is_math_list(self, line: str) -> bool:
-            if self.is_math_format(line):
+        def is_math_list(self, md: Md, line: str) -> bool:
+            if self.__is_math_format(md, line):
                 self.has_start = True
                 return True
 
@@ -239,7 +239,7 @@ class Aimi:
 {history}
 }}.
 
-请根据设定和最新对话历史和你的历史回答,不用“{self.aimi_name}:”开头,回答如下问题: {{
+请根据设定和最新对话历史和你的历史回答, 不用“{self.aimi_name}:”开头, 回答如下问题: {{
 {nickname}说: “{question}”
 }}.
 """
@@ -252,20 +252,20 @@ preset: {{
 Please answer the following question based on the preset, 
 the latest conversation history, and your previous answers.
 and without starting with '{self.aimi_name}:'
-You should extract my question directly from the structure here and answer it directly:{{
+You should extract my question directly from the structure here and answer it directly: {{
 {nickname} said: '{question}'
 }}
 """
         elif "" == self.bing_api.type:
             link_think = f"""
-故事主题如下：故事中有两个人到了异世界里面开咖啡厅.
-故事情节如下：其中主人公自称Master({self.master_name}),他有一个助理,名叫{self.aimi_name},他们两个在聊天.
+故事主题如下: 故事中有两个人到了异世界里面开咖啡厅.
+故事情节如下: 其中主人公自称Master({self.master_name}), 他有一个助理, 名叫{self.aimi_name}, 他们两个在聊天.
 故事背景如下: {{
 {preset}
 {self.aimi_name}能问她的朋友 Bing 来尽力解答Master的问题.
 }}
 
-请不显示故事主题/情节/背景的分析过程,以“{self.aimi_name}”的身份,让聊天足够自然,接下以下聊天：{{
+请不显示故事主题/情节/背景的分析过程, 以“{self.aimi_name}”的身份, 让聊天足够自然, 接下以下聊天: {{
 {nickname}说: '{question}'
 }}
 """
@@ -321,15 +321,17 @@ answer this following question: {{
         chat_qq_server = threading.Thread(target=self.chat_qq.server)
         chat_web_server = threading.Thread(target=self.chat_web.server)
         aimi_dream = threading.Thread(target=self.memory.dream)
+
         # 同时退出
         aimi_read.setDaemon(True)
-        aimi_read.start()
-        chat_qq_server.setDaemon(True)
-        chat_qq_server.start()
-        chat_web_server.setDaemon(True)
-        chat_web_server.start()
         aimi_dream.setDaemon(True)
+        chat_qq_server.setDaemon(True)
+        chat_web_server.setDaemon(True)
+
+        aimi_read.start()
         aimi_dream.start()
+        chat_qq_server.start()
+        chat_web_server.start()
 
         cnt = 0
         while self.running:
@@ -341,10 +343,11 @@ answer this following question: {{
                 cnt = 0
 
             try:
-                if self.memory.save_memory():
-                    log_info("save self.memory done")
-                if self.task.save_task():
-                    log_info("save task done")
+                if not self.memory.save_memory():
+                    log_err("save memory failed")
+                if not self.task.save_task():
+                    log_err("save task failed")
+
             except Exception as e:
                 log_err("fail to save: " + str(e))
 
@@ -378,7 +381,7 @@ answer this following question: {{
             "......",
             "那个...",
             "这个...",
-            "？",
+            "?",
             "喵喵喵？",
             "*和未知敌人战斗中*",
             "*大脑宕机*",
@@ -395,7 +398,7 @@ answer this following question: {{
                 time.sleep(1)
                 continue
 
-            for msg in chat_qq:
+            for msg in self.chat_qq:
                 log_info("recv msg, try analyse")
                 nickname = self.chat_qq.get_name(msg)
                 question = self.chat_qq.get_question(msg)
@@ -419,9 +422,6 @@ answer this following question: {{
 
                     reply = answer["message"]
 
-                    # log_dbg('reply: ' + str(reply))
-                    # log_dbg('reply_div: ' + str(reply_div))
-                    # log_dbg('message: ' + str(message))
                     reply_div_len = len(reply_div)
                     log_dbg(
                         f"code: {str(code)} div: {str(reply_div_len)} line: {str(reply_line)}"
@@ -434,7 +434,7 @@ answer this following question: {{
                         reply_line = ""
 
                         reply_div = self.reply_adjust(reply_div, api_type)
-                        log_dbg("send div: " + str(reply_div))
+                        log_dbg(f"send div: {str(reply_div)}")
                         self.chat_qq.reply_question(msg, reply_div)
 
                         break
@@ -442,11 +442,7 @@ answer this following question: {{
                         if not len(reply_div):
                             reply_div = self.__busy_reply
                         reply_div = self.reply_adjust(reply_div, api_type)
-                        log_dbg(
-                            "fail: {}, send div: {}".format(
-                                str(reply_line), str(reply_div)
-                            )
-                        )
+                        log_dbg(f"fail: {str(reply_line)}, send div: {str(reply_div)}")
                         self.chat_qq.reply_question(msg, reply_div)
                         reply_line = ""
                         reply_div = ""
@@ -460,7 +456,7 @@ answer this following question: {{
                             reply_div += reply_line
                             reply_line = ""
                             continue
-                        elif math_list.is_math_list(reply_line):
+                        elif math_list.is_math_list(self.md, reply_line):
                             reply_div += reply_line
                             reply_line = ""
                             continue
@@ -479,15 +475,15 @@ answer this following question: {{
                         reply_div = reply_line
                         reply_line = ""
 
-                log_dbg("answer: " + str(type(answer)) + " " + str(answer))
+                log_dbg(f"answer: {str(type(answer))} {str(answer)}")
                 reply = self.reply_adjust(reply, api_type)
-                log_dbg("adjust: " + str(reply))
+                log_dbg(f"adjust: {str(reply)}")
 
-                log_info("{}: {}".format(nickname, question))
-                log_info("{}: {}".format(self.aimi_name, str(reply)))
+                log_info(f"{nickname}: {question}")
+                log_info(f"{self.aimi_name}: {str(reply)}")
 
                 if code == 0:
-                    pass  # self.chat_qq.reply_question(msg, reply)
+                    pass # self.chat_qq.reply_question(msg, reply)
 
                 # server failed
                 if code == -1:
@@ -506,7 +502,7 @@ answer this following question: {{
 
     def reply_adjust(self, reply: str, res_api: str) -> str:
         if res_api == self.bing_api.type:
-            reply = reply.replace("必应", " {}通过必应得知: ".format(self.aimi_name))
+            reply = reply.replace("必应", f" {self.aimi_name}通过必应得知: ")
             reply = reply.replace("你好", " Master你好 ")
             reply = reply.replace("您好", " Master您好 ")
 

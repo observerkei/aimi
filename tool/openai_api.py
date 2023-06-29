@@ -23,7 +23,7 @@ class OpenAIAPI:
     chat_completions_models: List[str] = [
         "gpt-3.5-turbo",
         "gpt-3.5-turbo-0301",
-        "gpt-3.5-turbo-0613	",
+        "gpt-3.5-turbo-0613",
         "gpt-3.5-turbo-16k",
         "gpt-3.5-turbo-16k-0613",
         "gpt-4",
@@ -145,7 +145,7 @@ class OpenAIAPI:
         ):
             bot_model = self.__get_bot_model(question)
         log_dbg(f"use model: {bot_model}")
-        log_dbg(f"msg: {str(messages)}")
+        #log_dbg(f"msg: {str(messages)}")
 
         while req_cnt < self.max_repeat_times:
             req_cnt += 1
