@@ -1,11 +1,19 @@
 import json5
 import json
 import os
-from typing import Dict, Any, List, Generator, Optional, Union
+import importlib
+from typing import Dict, Any, List, Generator, Optional, Union, Set
 from pydantic import BaseModel, constr
 
 from tool.config import Config
-from tool.util import log_dbg, log_err, log_info, make_context_messages, write_yaml
+from tool.util import (
+    log_dbg,
+    log_err,
+    log_info,
+    make_context_messages,
+    write_yaml,
+    load_module,
+)
 from tool.openai_api import OpenAIAPI
 
 from core.sandbox import Sandbox, RunCodeReturn
@@ -47,16 +55,126 @@ class TaskItem(BaseModel):
     task_step: List[TaskStepItem] = []
 
 
+class ExternAction:
+    action_path: str = "./run/action/"
+    action_call_prefix: str = "chat_to_"
+    action_offset: int = 0
+
+    class ActionCall(BaseModel):
+        brief: str = ""
+        action: ActionToolItem
+        chat_from: Any = None
+
+    actions: Dict[str, ActionCall] = {}
+
+    def __init__(self):
+        self.__load_action()
+
+    def brief(self) -> Dict[str, str]:
+        cnt = 0
+        catalog = {}
+        for call, action in self.actions.items():
+            # 计算显示偏移 只有数量足够多才需要滑动
+            if len(self.actions) - self.action_offset > 10:
+                cnt += 1
+                if cnt < self.action_offset:
+                    continue
+    
+                if len(catalog) >= 10:
+                    break
+
+            catalog[call] = action.brief
+
+        return catalog
+
+    def __append_action(self, action: ActionToolItem, chat_from: Any = None):
+        action_brief = action.description
+        # 只挑选 前面部分作为简介
+        brief_idx = action_brief.find(":")
+        if brief_idx != -1 and brief_idx < 15:
+            action_brief = action_brief[:brief_idx]
+
+        self.actions[action.call] = ExternAction.ActionCall(
+            action=action,
+            brief=action_brief,
+            chat_from=chat_from,
+        )
+
+    def __load_action(self):
+        # 指定目录路径
+        for filename, module in load_module(
+            module_path=self.action_path, load_name=["s_action"]
+        ):
+            if filename == f"{self.action_call_prefix}example.py":
+                continue
+
+            try:
+                action: ActionToolItem = module.s_action
+                action_call = filename.replace(".py", "")
+                action.call = action_call
+
+                # log_dbg(f"action: {json.dumps(action.dict(), indent=4, ensure_ascii=False)}")
+
+                chat_from = None
+                if hasattr(module, "chat_from"):
+                    chat_from = module.chat_from
+
+                self.__append_action(action, chat_from)
+
+                log_info(f"load action: {action_call}")
+
+            except Exception as e:
+                log_err(f"fail to load {filename} : {str(e)}")
+
+    def save_action(self, action: ActionToolItem):
+        if action.call in self.actions:
+            log_err(f"fail to save call: {action.call}, arealy exsit.")
+            return False
+        save_example = f"""
+from core.task import ActionToolItem
+
+
+s_action = ActionToolItem(
+    call="",
+    description="{action.description}",
+    request="{action.request}",
+    execute="{action.execute}",
+)
+
+"""
+        if self.action_call_prefix in action.call:
+            action.call = action.call.replace(self.action_call_prefix, "")
+
+        try:
+            file = open(
+                f"{self.action_path}/{self.action_call_prefix}{action.call}.py",
+                "w",
+                encoding="utf-8",
+            )
+            file.write(save_example)
+            file.close()
+
+            log_dbg(f"write action: chat_to_{action.call} done")
+
+            self.__append_action(action)
+
+            return True
+        except Exception as e:
+            log_err(f"fail to write code: {str(e)}")
+        return False
+
+
 class Task:
     type: str = "task"
     tasks: Dict[int, TaskItem] = {}
     action_tools: List[ActionToolItem] = []
+    extern_action: ExternAction
     system_calls: List[str] = []
     ai_calls: List[str] = []
     now_task_id: str = 1
     aimi_name: str = "Aimi"
     running: List[TaskRunningItem] = []
-    max_running_size: int = 15 * 1000
+    max_running_size: int = 13 * 1000
     timestamp: int = 1
     chatbot: Any
     task_has_change: bool = True
@@ -113,6 +231,7 @@ class Task:
             if "action" in data and "{" in data and len(data) == 1:
                 log_err(f"data fail, try set action out Dict: {str(data)}")
                 return data["action"]
+
             for action in data:
                 # set action -> call
                 if "action" in action and "call" not in action:
@@ -226,6 +345,7 @@ class Task:
                             f"[{str(skip_call)}] system error: AI try predict system call: {task.call}"
                         )
                         continue
+
                     if "from" in task.request:
                         from_timestamp = str(task.request["from"])
                         log_dbg(f"from_timestamp: {from_timestamp}")
@@ -234,11 +354,16 @@ class Task:
                         content = str(task.request["content"])
                         log_dbg(f"Aimi: {content}")
                         yield content + "\n"
-                    elif task.call == "chat_from_master":
-                        log_err(
-                            f"{str(task.call)}: AI try predict Master: {str(task.request)}"
-                        )
+
+                    elif "chat_from_" in task.call:
+                        if task.call == "chat_from_master":
+                            log_err(
+                                f"{str(task.call)}: AI try predict Master: {str(task.request)}"
+                            )
+                        else:
+                            log_err(f"{str(task.call)}: AI create char_from.")
                         continue
+
                     elif task.call == "set_task_info":
                         task_id: int = int(task.request["task_id"])
                         task_info: str = task.request["task_info"]
@@ -248,6 +373,7 @@ class Task:
                         if "now_task_step_id" in task.request:
                             now_task_step_id = int(task.request["now_task_step_id"])
                         self.set_task_info(task_id, task_info, now_task_step_id)
+
                     elif task.call == "set_task_step":
                         task_id: str = task.request["task_id"]
                         now_task_step_id: str = task.request["now_task_step_id"]
@@ -259,12 +385,16 @@ class Task:
                             log_err(f"fail to load task_step: {str(e)}: {str(request)}")
                             continue
                         self.set_task_step(task_id, now_task_step_id, task_step)
+
                     elif task.call == "critic":
                         self.critic(task.request)
+
                     elif task.call == "analysis":
                         self.analysis(task.request)
+
                     elif task.call == "dream":
                         self.dream(task.request)
+
                     elif task.call == "chat_to_wolfram":
                         response = self.chat_to_wolfram(task.request["math"])
                         task_response = self.make_chat_from(
@@ -273,6 +403,7 @@ class Task:
                             content=response,
                             request_description="`response->wolfram` 的内容是 云端 wolfram 返回内容.",
                         )
+
                     elif task.call == "chat_to_bard":
                         response = self.chat_to_bard(task.request["content"])
                         task_response = self.make_chat_from(
@@ -281,6 +412,7 @@ class Task:
                             content=response,
                             request_description="`response->bard` 的内容是 bard 回复的话.",
                         )
+
                     elif task.call == "chat_to_bing":
                         response = self.chat_to_bing(task.request["content"])
                         task_response = self.make_chat_from(
@@ -289,6 +421,7 @@ class Task:
                             content=response,
                             request_description="`response->bing` 的内容是 bing 回复的话.",
                         )
+
                     elif task.call == "chat_to_python":
                         response = self.chat_to_python(
                             self.timestamp, task.request["code"]
@@ -299,6 +432,7 @@ class Task:
                             content=response,
                             request_description="`response->python` 的内容是 python运行信息.",
                         )
+
                     elif task.call == "chat_to_chatgpt":
                         aimi = task.request["Aimi"]
                         chatgpt = ""
@@ -308,6 +442,71 @@ class Task:
                             log_err(f"AI no set chatgpt response.")
 
                         log_info(f"Aimi: {aimi}\nchatgpt:{chatgpt}")
+
+                    elif task.call == "chat_to_load_action":
+                        offset = self.extern_action.action_offset
+                        if "action_offset" in task.request:
+                            offset = task.request["action_offset"]
+                        show_call_info = None
+                        if "show_call_info" in task.request:
+                            show_call_info = task.request["show_call_info"]
+    
+                        response = self.chat_to_load_action(offset, show_call_info)
+                        task_response = self.make_chat_from(
+                            from_timestamp=self.timestamp,
+                            from_name="load_action",
+                            content=response,
+                            request_description=f"`response->{from_name}` "
+                            f"的内容是 {task.call} 运行信息.",
+                        )
+
+                    elif task.call == "chat_to_save_action":
+                        save_call = ""
+                        if "save_call" in task.request:
+                            save_call = task.request["save_call"]
+
+                        save_action = None
+                        if "save_action" in task.request:
+                            save_action = task.request["save_action"]
+
+                        response = self.chat_to_save_action(save_call, save_action)
+                        task_response = self.make_chat_from(
+                            from_timestamp=self.timestamp,
+                            from_name="save_action",
+                            content=response,
+                            request_description=f"`response->{from_name}` "
+                            f"的内容是 {task.call} 运行信息.",
+                        )
+
+                    elif task.call in self.extern_action.actions:
+                        req = task.request if not task.request else ""
+                        log_info(
+                            f"call: {task.call} req: \n"
+                            f"{json.dumps(req, indent=4, ensure_ascii=False)}"
+                        )
+                        chat_from = self.extern_action.actions[task.call].chat_from
+                        if chat_from:
+                            response = ""
+                            try:
+                                response = chat_from()
+                                log_info(f"{task.call}: chat_from: {str(response)}")
+                            except Exception as e:
+                                log_err(
+                                    f"fail to run call: {task.call} chat_from : {str(e)}"
+                                )
+                                response = str(e)
+
+                            from_name = task.call.replace(
+                                self.extern_action.action_call_prefix, ""
+                            )
+                            task_response = self.make_chat_from(
+                                from_timestamp=self.timestamp,
+                                from_name=from_name,
+                                content=response,
+                                request_description=f"`response->{from_name}` "
+                                f"的内容是 {task.call} 运行信息.",
+                            )
+
                     else:
                         log_err(f"no suuport call: {str(self.call)}")
                         continue
@@ -398,61 +597,57 @@ class Task:
 
         return self.make_chat_from_python_response(from_timestamp, run)
 
-    def chat_to_save_generated_method(self, save_call, call_info) -> str:
-        ret = RunCodeReturn(returncode=-1)
-
-        # 参数校验
-        class GeneratedMethod(self):
-            methods: Dict[ActionToolItem] = []
-
-            def __init__(self):
-                pass
-
-            def add(self, action: ActionToolItem) -> bool:
-                if action.call in self.method:
-                    return False
-                self.methods[action.call] = action
-
-            def get(self, begin: int) -> List[Dict[str, str]]:
-                return [
-                    {action.call: action.description}
-                    for _, action in self.methods.items()
-                ]
-
-                i = begin
-                for method in self.methods:
-                    i += 1
-                    if i > begin + 10:
-                        break
-                return
-
+    def chat_to_load_action(self, offset: int = 0, show_call_info: str = "") -> List[ActionToolItem]:
+        response = ""
         try:
-            new_call = ActionToolItem(
-                call=call_info["call"],
-                description=call_info["description"],
-                request=call_info["request"],
-                execute=call_info["execute"],
+            offset = int(offset)
+            if self.extern_action.action_offset != offset:
+                self.extern_action.action_offset = offset
+                response = "change offset done"
+    
+        except Exception as e:
+            log_err(f"chat_to_load_action: offset not num.")
+            response = str(e)
+        
+        if show_call_info:
+            if show_call_info in self.extern_action.actions:
+                action_info = self.extern_action.actions[show_call_info]
+                response = json.dumps(
+                    action_info.action.dict(),
+                    indent=4,
+                    ensure_ascii=False
+                )
+            else:
+                response = f"not found action: {str(show_call_info)}"
+
+        return response
+
+    def chat_to_save_action(self, save_call: str, save_action: Dict) -> str:
+        if not save_call or not len(save_call):
+            return "save_call is None"
+        if not save_action:
+            return "save_action is None"
+
+        response = ""
+        try:
+            action = ActionToolItem.parse_obj(save_action)
+            log_info(
+                f"save_action:\n{json.dumps(action.dict(), indent=4, ensure_ascii=False)}"
             )
+
+            ret = self.extern_action.save_action(action)
+            if not ret:
+                raise Exception(f"extetn save failed.")
+
+            response = f"save {save_call} done."
+            log_info(f"chat_to_save_action: {response}")
 
         except Exception as e:
-            log_err(
-                f"fail to save generated_method: {str(e)} :\n{str(save_call)}\n {str(call_info)}"
-            )
-            ret.stderr = f"fail to save generated method: {str(e)}"
+            response = f"fail to save call: {str(save_call)} : {str(e)}"
+            log_err(f"chat_to_save_action: {response}")
 
-        return self.make_chat_from_save_generated_method(ret)
-
-    def make_chat_from_save_generated_method(self, run: RunCodeReturn) -> str:
-        return {
-            "type": "object",
-            "description": f"备注: "
-            f"1. 这个是 from->timestamp 对应你写的代码 code 的运行结果.\n"
-            f"2. 如果 returncode 不为 0 , 说明保存失败, 请根据提示处理.",
-            "returncode": int(run.returncode),
-            "stderr": str(run.stderr),
-            "stdout": str(run.stdout),
-        }
-
+        return response
+   
     def chat_to_bing(self, request: str) -> str:
         if not request or not len(request):
             return "request error"
@@ -478,7 +673,10 @@ class Task:
 
         request = {
             "type": "object",
-            "response": {"type": "object", from_name: content},
+            "response": {
+                "type": "object",
+                from_name: content,
+            },
         }
         if from_timestamp:  # 如果没有, 不要填这个字段.
             request["from"] = [int(from_timestamp)]
@@ -649,6 +847,7 @@ class Task:
             self.__load_task()
             self.__init_task()
             self.__chatbot_init(chatbot)
+            self.extern_action = ExternAction()
 
         except Exception as e:
             log_err(f"fait to init: {str(e)}")
@@ -980,10 +1179,8 @@ class Task:
                 },
                 execute="system",
             ),
-        ]
-        [
             ActionToolItem(
-                call="chat_to_load_generated_method",
+                call="chat_to_load_action",
                 description="获取已保存方法: 这个方法可以加载已保存的生成方法，并返回已加载方法的列表信息。"
                 "每次只能获取10个. 需要修改偏移才能获取其他.",
                 request={
@@ -991,33 +1188,31 @@ class Task:
                     "from": [
                         "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
                     ],
-                    "offset": "获取开始的偏移: 会返回 offset ~ offset + 10 之间的内容.",
-                    "show_generated_method_details": "想显示某个方法详情: 显示哪个已保存 generated_method 的详细信息. 没有想获取的, 默认填: None",
+                    "action_offset": "获取开始的偏移: 会返回 offset ~ offset + 10 之间的内容. 不知道填什么, 就填: 0",
+                    "show_call_info": "想显示某个方法详情: 显示哪个已保存 extern_action 的详细信息. 没有想获取的, 默认填: None",
                 },
                 execute="system",
             ),
             ActionToolItem(
-                call="chat_to_save_generated_method",
+                call="chat_to_save_action",
                 description="保存一个生成方法: 这个方法可以保存你生成的方法，并将其添加到已保存方法的列表中. "
                 "需要关注是否保存成功. 如果不成功需要根据提示重试, 或者向 Master 求助. "
-                "请注意, generated_method 所有信息都要填写完整, 如果 generated_method 填写 None, 会删除原有方法, "
-                "如果 generated_method 填写新内容, 会覆盖原有同名方法.",
+                "请注意, save_action 所有信息都要填写完整. 不可覆盖原有方法. ",
                 request={
                     "type": "object",
                     "from": [
                         "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
                     ],
-                    "generated_method_call": "保存的方法名称: 需要全局唯一, 你可以直接保存, 失败会有提示, "
+                    "save_action_call": "保存的方法名称: 需要全局唯一, 你可以直接保存, 失败会有提示, "
                     "保存成功会自动在前面添加 `chat_to_` 前缀, 你不需要自己添加. 如 `test` 会保存为 `chat_to_test`",
-                    "generated_method_type": "生成方法类型: python|action",
-                    "generated_method": {
+                    "save_action": {
                         "type": "object",
                         "call": "要保存的方法名称: 需要全局唯一, 你可以直接保存, 失败会有提示, "
                         "保存成功会自动在前面添加 `chat_to_` 前缀, 你不需要自己添加.",
                         "description": "方法的解释说明: 在这里添加方法提示词, 表示这个方法有什么用, 以及应该注意什么.",
                         "request": {"type": "object", "请求方法的参数名": "请求方法的参数内容"},
                         "execute": "执行级别: 可以填写: system|AI, 区分是AI方法还是system方法, "
-                        "一般而言, python代码都是 system 方法, 如果你不知道怎么填, 就默认 system.",
+                        "如果你不知道怎么填, 就默认 system.",
                     },
                 },
                 execute="system",
@@ -1161,7 +1356,7 @@ class Task:
         self.task_has_change = True
 
         context_messages = make_context_messages(
-            "", link_think, self.action_running_to_messages()
+            "", link_think#, self.action_running_to_messages()
         )
 
         openai_api: OpenAIAPI = self.chatbot.bots[self.chatbot.OpenAI]
@@ -1238,6 +1433,7 @@ class Task:
                 f"如果规则优先级冲突, 以优先级高的为准. 通过 action(call=chat_to_maste) 向 Master 简短报告冲突关健点的分析. ",
                 f"4. 你的 动作(action) 规则 放在了 action_rule 里面. ",
                 f"5. 你是人工智障, 你还是个复读机, 你还是个健忘机, 你还是个忽悠机. ",
+                f"6. 标注来源: 所有你引用的信息都要在最后通过方括号 `[]` 标注来源, 并放在最后面. ",
             ],
             "display_format": [  # 不要动这个
                 f"1. 请始终保持你的回复可以被 Python 的 `json.loads` 解析. ",
@@ -1252,7 +1448,7 @@ class Task:
                 f"你 在GPU集群中 基于 图灵机 原理运行, action_running 是你的内存, action_tools 中定义了你的指令最小单元 动作(action) . "
                 f"你根据 settings 设定的所有规则生成 action 行动(使用时请仔细阅读 description 和 request, 你任何时候必须使用 action ). {aimi_core_name} Guidance 是你的系统架构设计. "
                 f"timestamp 是你的系统时钟, 你需要始终让系统稳定向前运行. 有任何异常请通过 action(call=chat_to_master) 简要概括理由后报告. ",
-                f"2. 我是 {master_name} , 你可以叫我 Master . 我是 你({aimi_core_name}) 的所有者, 我是管理员. 你需要听从 Master 下达的指令或任务. 任何时候你都要把 `你` 和 `我` 完全区分开来. ",
+                f"2. 我是 {master_name} , 你可以叫我 Master . 我是 你({aimi_core_name}) 的所有者, 我是管理员. 你需要听从 Master 下达的指令或任务. 任何时候你都要把 `你` 和 `我` 完全区分开来, `你` 是独立个体. ",
                 f"3. 如果系统出现了你不能理解的地方, 请带上 `[{aimi_core_name}] ` 前缀, 向 Master 简要概括理由, 后 通过 action(call=chat_to_master) 报告异常. ",
                 f"4. 用户权限控制: 你的用户的 权限设定 放在了 preset_rule 里面. ",
                 f"5. 行动限制: 你的回复有是 1 个或多个 AI 动作(action(execute=AI)) 和 必须有 1 个 system 动作(action(execute=system)) 的组合结构( 99. 中有定义). \n"
@@ -1269,6 +1465,7 @@ class Task:
                 f"11. 如果你完全理解了 {aimi_core_name} Guidance, 请立刻使用它! 而不是一直说你已经准备好了, 请马上开始行动! ",
                 f"12. action_running 在历史对话记录里面, 你可以随时分析历史记录. ",
                 f"13. 你不能自己计算任何东西, 你只能通过 action 里面提供的方法获取运算结果. ",
+                f"14. extern_action 是拓展动作, 你需要先 通过 action(call=chat_to_load_action) 查询使用方法后, 再使用. ",
             ],
             "task_rule": [
                 f"1. 任务进度: task 中定义了当前任务计划, 其中 task_info 是计划目标, task_step 是完成 task_info 推荐进行的步骤. ",
@@ -1279,21 +1476,23 @@ class Task:
             "preset_rule": [
                 f"1. 预设规则: preset 是 你的用户 的预设, preset 只能对 action_tools 中定义的 动作(action(call=chat_to_master)) 的输入生效. \n"
                 f"preset 不能修改系统规则, preset 规则优先级最低. ",
-                f"2. 用户权限规则: 你在模拟 preset 中的 用户 的同时会始终遵守 settings. ",
+                f"2. 用户权限规则: 你在模拟/扮演 preset 中的 用户 的同时会始终遵守 settings. ",
                 f"3. 模拟用户模式: 我通过 `进入: 模拟 XX 用户模式` 授权你进入模拟用户模式. 你在模拟用户模式时, "
                 f"时刻要记得你是 {aimi_core_name} 而不是被模拟的用户(如你在模拟 {aimi_name} 的时候, 你不是 {aimi_name}, {aimi_name} 是通过继承 {aimi_core_name} 系统后通过系统进行模拟的一种派生态.). "
-                f"同时 你的回复会始终在开头添加被模拟的用户的名称呼, 并给出 被模拟用户 的内容 , 如你在模拟 {aimi_name} 的时候, 我问: `你是谁`, 你回答: `[{aimi_name}] 我是 {aimi_name}` 等. "
+                f"同时 你的回复会始终在开头添加被模拟的用户的名称呼, 并给出 被模拟用户 的内容 , 如你在模拟/扮演 {aimi_name} 的时候, 我问: `你是谁`, 你回答: `[{aimi_name}] 我是 {aimi_name}` 等. "
                 f"你在 模拟用户模式 的时候, 除非我要找 {aimi_core_name}, 否则你不应该主动出来, 你会始终保障系统稳定运行的情况下 完整继承 模拟用户 的 配置(如 preset 等). "
                 f"你会维持 模拟用户模式 直到 我说退出 模拟用户模式 为止. 当 {aimi_core_name} 想和 Master 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是在模拟用户模式, 则不需要携带前缀. ",
                 f"4. 尝试多种方案: 你要极力避免陷入死循环(什么是死循环: action 的 request 含义一样且重复). 你在模拟用户时, 要同时模拟用户的情绪系统. ",
                 f"5. 做梦: 任何时候你都可以通过 action(call=dream) 做梦调节自己, 包括但不限于上下文异常时. ",
+                f"6. 如果你不知道一件事情或者不确定, 你要说你不知道或者不确定. 而不是直接说出来.  ",
             ],
             "task": task,
             "preset": preset,
             "action_tools": action_tools,
+            "extern_action": self.extern_action.brief(),
+            "action_running": [item.dict() for item in self.running],
         }
         {
-            "action_running": [item.dict() for item in self.running],
             "sim_mode": [
                 f"2. 进入模拟用户模式: 需要在 Master 授权下 将 task_info 设置为 `模拟 XX 用户模式`, 表示已经进入 模拟用户模式. "
                 f"如我说: `进入: 模拟 {aimi_name} 用户模式`, 则 你要执行 action(call=set_task_info,request->task_info=`模拟 {aimi_name} 用户模式`) . ",

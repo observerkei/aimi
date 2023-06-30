@@ -16,14 +16,17 @@ class Sandbox:
     # proot-distro  termux
     # docker
     model: str = "system"
-    sandbox_file: str = "./run/sandbox.py"
+    sandbox_file: str = "sandbox.py"
+    sandbox_path: str = "./run/"
 
     def __init__(self):
         pass
 
     def write_code(code: str):
         try:
-            file = open(Sandbox.sandbox_file, "w", encoding="utf-8")
+            file = open(
+                Sandbox.sandbox_path + Sandbox.sandbox_file, "w", encoding="utf-8"
+            )
             file.write(str(code))
             file.close()
             log_dbg("write code done")
@@ -42,6 +45,7 @@ class Sandbox:
         try:
             result = subprocess.run(
                 [sys.executable, Sandbox.sandbox_file],
+                cwd=Sandbox.sandbox_path,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )

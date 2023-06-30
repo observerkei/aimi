@@ -2,7 +2,7 @@ import os
 import importlib.util
 from typing import Any, List, Generator, Dict
 
-from tool.util import log_info, log_err, log_dbg
+from tool.util import log_info, log_err, log_dbg, load_module
 from tool.config import Config
 
 
@@ -103,33 +103,22 @@ class AimiPlugin:
 
     def __load_bot(self):
         # 遍历目录中的文件
-        for filename in os.listdir(self.plugin_path):
+        for filename, module in load_module(
+            module_path=self.plugin_path, load_name=["Bot"], file_start="bot_"
+        ):
             # skip example
             if self.bot_obj.plugin_prefix + "example.py" == filename:
                 continue
 
-            # 如果文件名以指定前缀开头并且是 Python 脚本
-            if filename.startswith(self.bot_obj.plugin_prefix) and filename.endswith(
-                ".py"
-            ):
-                # 使用 importlib 加载模块
-                module_name = filename[:-3]  # 去掉 .py 后缀
-                module_path = os.path.join(self.plugin_path, filename)
-                spec = importlib.util.spec_from_file_location(module_name, module_path)
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
-
-                # 实例化模块中的类
-                if hasattr(module, "Bot"):
-                    try:
-                        bot = module.Bot()
-                        bot_type = bot.type
-                        if bot_type in self.bots:
-                            raise Exception(f"{bot_type} has in bots")
-                        self.bots[bot_type] = bot
-                        log_info(f"add plugin bot_type:{bot_type} bot:{module_name}")
-                    except Exception as e:
-                        log_err(f"fail to add plugin bot: {e}")
+            try:
+                bot = module.Bot()
+                bot_type = bot.type
+                if bot_type in self.bots:
+                    raise Exception(f"{bot_type} has in bots")
+                self.bots[bot_type] = bot
+                log_info(f"add plugin bot_type:{bot_type}  from: {filename}")
+            except Exception as e:
+                log_err(f"fail to add plugin bot: {e} file: {filename}")
 
     def bot_has_type(self, type) -> bool:
         if not len(self.bots):

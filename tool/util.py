@@ -3,8 +3,9 @@ import logging
 import colorlog
 import inspect
 import os
+import importlib
 
-from typing import Dict, List
+from typing import Dict, List, Generator
 
 
 def log_disable():
@@ -147,6 +148,34 @@ def make_context_messages(
         context_messages.append({"role": "user", "content": question})
 
     return context_messages
+
+
+def load_module(
+    module_path: str, load_name: List[str], file_start: str = "", file_end: str = ".py"
+) -> Generator[dict, None, None]:
+    if not module_path.endswith("/"):
+        module_path += "/"
+
+    # 遍历目录中的文件
+    for filename in os.listdir(module_path):
+        # 如果文件名以指定前缀开头并且是 Python 脚本
+        if (not len(file_start) or filename.startswith(file_start)) and (
+            not len(file_end) or filename.endswith(file_end)
+        ):
+            # 使用 importlib 加载模块
+            module_name = filename[:-3]  # 去掉 .py 后缀
+            load_module_path = os.path.join(module_path, filename)  # 补全路径
+            spec = importlib.util.spec_from_file_location(module_name, load_module_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            # 实例化模块中的类
+            for check_name in load_name:
+                if not hasattr(module, check_name):
+                    log_err(f"load file: {filename} no load_name: {check_name}")
+                    continue
+
+            yield filename, module
 
 
 __log_disable: bool = False
