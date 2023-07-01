@@ -128,9 +128,11 @@ class ExternAction:
                 log_err(f"fail to load {filename} : {str(e)}")
 
     def save_action(self, action: ActionToolItem, save_chat_from: str = None):
+        response = ""
         if action.call in self.actions:
-            log_err(f"fail to save call: {action.call}, arealy exsit.")
-            return False
+            response = f"fail to save call: {action.call}, arealy exsit."
+            log_err(response)
+            return False, response
 
         save_example = f"""
 from core.task import ActionToolItem
@@ -186,12 +188,16 @@ def chat_from(request: dict = None):
 
                 chat_from = module.chat_from
 
+            if save_chat_from and not chat_from:
+                raise Exception(f"can't load {action.call} chat_from")
+
             self.__append_action(action, chat_from)
 
-            return True
+            return True, "save done"
         except Exception as e:
-            log_err(f"fail to write code: {str(e)}")
-        return False
+            response = f"fail to save {action.call} : {str(e)}"
+            log_err(response)
+        return False, response
 
 
 class Task:
@@ -690,9 +696,9 @@ class Task:
                         log_err(f"未授权保存 {save_action_call} 的回调代码.")
                         return "permission exception: unauthorized operation."
 
-            ret = self.extern_action.save_action(action, save_chat_from)
+            ret, err = self.extern_action.save_action(action, save_chat_from)
             if not ret:
-                raise Exception(f"extetn save failed.")
+                raise Exception(f"extetn save failed : {str(err)}")
 
             response = f"save {save_action_call} done."
             log_info(f"chat_to_save_action: {response}")

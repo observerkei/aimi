@@ -1,5 +1,3 @@
-import datetime
-
 from core.task import ActionToolItem
 
 
@@ -9,7 +7,7 @@ s_action = ActionToolItem(
     call="",
     # 当前 action 的描述
     # 说明这个action应该怎么使用
-    description="获取当前系统时间: 时间是准确的.",
+    description="功能概要: 功能解释说明",
     # 调用接口的时候填写的参数说明
     request=None,
     # 这里指明执行类型
@@ -24,9 +22,4 @@ s_action = ActionToolItem(
 # 不需要执行的话, 不需要写 chat_from
 # request: 调用方法的时候的传参, 默认 None
 def chat_from(request: dict = None):
-    def get_current_time():
-        import datetime
-        now = datetime.datetime.now()
-        return now.strftime("%Y-%m-%d %H:%M:%S")
-
-    return get_current_time()
+    return '填写调用返回值'
