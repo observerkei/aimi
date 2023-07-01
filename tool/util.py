@@ -165,9 +165,15 @@ def load_module(
             # 使用 importlib 加载模块
             module_name = filename[:-3]  # 去掉 .py 后缀
             load_module_path = os.path.join(module_path, filename)  # 补全路径
-            spec = importlib.util.spec_from_file_location(module_name, load_module_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+
+            module = None
+            try:
+                spec = importlib.util.spec_from_file_location(module_name, load_module_path)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+            except Exception as e:
+                log_err(f"fail to load {filename} : {str(e)}")
+                continue
 
             # 实例化模块中的类
             for check_name in load_name:
@@ -176,6 +182,13 @@ def load_module(
                     continue
 
             yield filename, module
+
+
+def green_input(prompt: str):
+    GREEN = "\033[92m"
+    BOLD = "\033[1m"
+    RESET = "\033[0m"
+    return input(f"{GREEN}{BOLD}{prompt}{RESET}")
 
 
 __log_disable: bool = False

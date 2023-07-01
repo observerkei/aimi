@@ -13,6 +13,7 @@ from tool.util import (
     make_context_messages,
     write_yaml,
     load_module,
+    green_input,
 )
 from tool.openai_api import OpenAIAPI
 
@@ -126,10 +127,11 @@ class ExternAction:
             except Exception as e:
                 log_err(f"fail to load {filename} : {str(e)}")
 
-    def save_action(self, action: ActionToolItem):
+    def save_action(self, action: ActionToolItem, save_chat_from: str = None):
         if action.call in self.actions:
             log_err(f"fail to save call: {action.call}, arealy exsit.")
             return False
+
         save_example = f"""
 from core.task import ActionToolItem
 
@@ -142,12 +144,31 @@ s_action = ActionToolItem(
 )
 
 """
+        if save_chat_from:
+            # 设置缩进
+            save_chat_from = "    " + save_chat_from
+            save_chat_from = save_chat_from.replace("\n", "\n    ")
+            if save_chat_from.endswith("\n    "):
+                save_chat_from = save_chat_from[:-4]  # 去除末尾四个空格
+
+            save_chat_from_example = f"""
+def chat_from(request: dict = None):
+{save_chat_from}
+
+"""
+            save_example += save_chat_from_example
+            log_dbg("append chat_from code.")
+
         if self.action_call_prefix in action.call:
             action.call = action.call.replace(self.action_call_prefix, "")
+            log_err(f"fix action call chat_to_ prefix")
+
+        action.call = f"{self.action_call_prefix}{action.call}"
 
         try:
+            save_filename = f"{action.call}.py"
             file = open(
-                f"{self.action_path}/{self.action_call_prefix}{action.call}.py",
+                f"{self.action_path}/{save_filename}",
                 "w",
                 encoding="utf-8",
             )
@@ -156,7 +177,16 @@ s_action = ActionToolItem(
 
             log_dbg(f"write action: chat_to_{action.call} done")
 
-            self.__append_action(action)
+            chat_from = None
+            for filename, module in load_module(
+                module_path=self.action_path, load_name=["chat_from"]
+            ):
+                if filename != save_filename:
+                    continue
+
+                chat_from = module.chat_from
+
+            self.__append_action(action, chat_from)
 
             return True
         except Exception as e:
@@ -178,6 +208,7 @@ class Task:
     timestamp: int = 1
     chatbot: Any
     task_has_change: bool = True
+    run_model = Sandbox.RunModel.system
 
     def __chatbot_init(self, chatbot):
         from core.aimi import ChatBot
@@ -456,39 +487,49 @@ class Task:
                             from_timestamp=self.timestamp,
                             from_name="load_action",
                             content=response,
-                            request_description=f"`response->{from_name}` "
+                            request_description=f"`response->load_action` "
                             f"的内容是 {task.call} 运行信息.",
                         )
 
                     elif task.call == "chat_to_save_action":
-                        save_call = ""
-                        if "save_call" in task.request:
-                            save_call = task.request["save_call"]
+                        save_action_call = ""
+                        if "save_action_call" in task.request:
+                            save_action_call = task.request["save_action_call"]
 
                         save_action = None
                         if "save_action" in task.request:
                             save_action = task.request["save_action"]
 
-                        response = self.chat_to_save_action(save_call, save_action)
+                        save_chat_from = None
+                        if "save_chat_from" in task.request:
+                            save_chat_from = task.request["save_chat_from"]
+                            if save_chat_from and (
+                                "None" == save_chat_from or "null" == save_chat_from
+                            ):
+                                save_chat_from = None
+
+                        response = self.chat_to_save_action(
+                            save_action_call, save_action, save_chat_from
+                        )
                         task_response = self.make_chat_from(
                             from_timestamp=self.timestamp,
                             from_name="save_action",
                             content=response,
-                            request_description=f"`response->{from_name}` "
+                            request_description=f"`response->save_action` "
                             f"的内容是 {task.call} 运行信息.",
                         )
 
                     elif task.call in self.extern_action.actions:
                         req = task.request if not task.request else ""
                         log_info(
-                            f"call: {task.call} req: \n"
+                            f"call: {task.call} req: "
                             f"{json.dumps(req, indent=4, ensure_ascii=False)}"
                         )
                         chat_from = self.extern_action.actions[task.call].chat_from
                         if chat_from:
                             response = ""
                             try:
-                                response = chat_from()
+                                response = chat_from(task.request)
                                 log_info(f"{task.call}: chat_from: {str(response)}")
                             except Exception as e:
                                 log_err(
@@ -558,13 +599,13 @@ class Task:
         return {
             "type": "object",
             "description": f"备注: "
-            f"1. 这个根据 timestamp 为 {from_timestamp} 的 action 执行后生成的内容, 对应的是你写的代码 code 的运行结果.\n"
-            f"2. 如果 returncode 为 0 但是 stdout 没有内容, 可能是你没有把运行结果打印出来, \n"
+            f"1. 这个根据 timestamp 为 {from_timestamp} 的 action 执行后生成的内容, 对应的是你写的代码 code 的运行结果.\n "
+            f"2. 如果 returncode 为 0 但是 stdout 没有内容, 可能是你没有把运行结果打印出来,\n "
             f"3. 如果 stdout/stderr 不正确, 也有可能是你加了非 python 的说明, "
-            f"也有可能是你没有把之前写的代码也拼在一起. \n"
-            f"4. 请结合你的代码 code 和运行 返回值(returncode/stderr/stdout) 针对具体问题具体分析:\n"
-            f"returncode: 程序运行的返回值\n"
-            f"stderr: 是你的代码 code 的标准出错流输出, 如果有内容说明出现了错误.\n"
+            f"也有可能是你没有把之前写的代码也拼在一起.\n "
+            f"4. 请结合你的代码 code 和运行 返回值(returncode/stderr/stdout) 针对具体问题具体分析:\n "
+            f"returncode: 程序运行的返回值\n "
+            f"stderr: 是你的代码 code 的标准出错流输出, 如果有内容说明出现了错误.\n "
             f"stdout: 是你的代码 code 的标准输出流输出, 你可以检查一下内容是否符合你代码预期.",
             "returncode": str(run_returncode),
             "stderr": str(run_stderr),
@@ -572,19 +613,13 @@ class Task:
         }
 
     def chat_to_python(self, from_timestamp: int, code: str) -> str:
-        def green_input(prompt: str):
-            GREEN = "\033[92m"
-            BOLD = "\033[1m"
-            RESET = "\033[0m"
-            return input(f"{GREEN}{BOLD}{prompt}{RESET}")
-
         if len(code) > 9 and "```python" == code[:9] and "```" == code[-3:]:
             code = code[10:-4]
             log_dbg(f"del code cover: ```python ...")
 
         log_info(f"\n```python\n{code}\n```")
 
-        if Sandbox.model == "system":
+        if self.run_model == Sandbox.RunModel.system:
             permissions = green_input("是否授权执行代码? Y/N.")
             if permissions.lower() != "y":
                 log_err(f"未授权执行代码.")
@@ -594,7 +629,7 @@ class Task:
         if not ret:
             return "system error: write code failed."
 
-        run: RunCodeReturn = Sandbox.run_code()
+        run = Sandbox.run_code(self.run_model)
 
         return self.make_chat_from_python_response(from_timestamp, run)
 
@@ -623,28 +658,47 @@ class Task:
 
         return response
 
-    def chat_to_save_action(self, save_call: str, save_action: Dict) -> str:
-        if not save_call or not len(save_call):
-            return "save_call is None"
+    def chat_to_save_action(
+        self, save_action_call: str, save_action: Dict, save_chat_from: str = None
+    ) -> str:
+        if not save_action_call or not len(save_action_call):
+            log_err(f"chat_to_save_action: save_action_call is None")
+            return "save_action_call is None"
         if not save_action:
+            log_err(f"chat_to_save_action: save_action is None")
             return "save_action is None"
 
         response = ""
         try:
-            action = ActionToolItem.parse_obj(save_action)
+            action: ActionToolItem = ActionToolItem.parse_obj(save_action)
             log_info(
                 f"save_action:\n{json.dumps(action.dict(), indent=4, ensure_ascii=False)}"
             )
 
-            ret = self.extern_action.save_action(action)
+            if save_chat_from:
+                if action.execute != "system":
+                    log_err(
+                        f"chat_to_save_action: fix chat from action execute to system"
+                    )
+                    action.execute = "system"
+
+                log_info(f"\n```python\n{save_chat_from}\n```")
+
+                if self.run_model == Sandbox.RunModel.system:
+                    permissions = green_input(f"是否授权保存 {save_action_call} 的回调代码? Y/N.")
+                    if permissions.lower() != "y":
+                        log_err(f"未授权保存 {save_action_call} 的回调代码.")
+                        return "permission exception: unauthorized operation."
+
+            ret = self.extern_action.save_action(action, save_chat_from)
             if not ret:
                 raise Exception(f"extetn save failed.")
 
-            response = f"save {save_call} done."
+            response = f"save {save_action_call} done."
             log_info(f"chat_to_save_action: {response}")
 
         except Exception as e:
-            response = f"fail to save call: {str(save_call)} : {str(e)}"
+            response = f"fail to save call: {str(save_action_call)} : {str(e)}"
             log_err(f"chat_to_save_action: {response}")
 
         return response
@@ -843,15 +897,21 @@ class Task:
         except Exception as e:
             log_err(f"fail to critic {str(request)} : {str(e)}")
 
-    def __init__(self, chatbot):
+    def __init__(self, chatbot, setting={}):
         try:
+            self.__load_setting(setting)
             self.__load_task()
             self.__init_task()
             self.__chatbot_init(chatbot)
             self.extern_action = ExternAction()
+            self.run_model = Sandbox.RunModel.docker
 
         except Exception as e:
             log_err(f"fait to init: {str(e)}")
+
+    def __load_setting(self, setting):
+        if not len(setting):
+            return
 
     def __load_task(self):
         task_config = {}
@@ -1000,15 +1060,15 @@ class Task:
             ActionToolItem(
                 call="analysis",
                 description="分析机制: 通过严谨符合逻辑的自身思考进行分析 "
-                "某个操作或者步骤/动作(action)/结果 是否符合常识/经验, 最终为达成 task_info 或 Master 的问题服务.\n"
-                "分析的时候需要注意以下地方:\n"
-                "1. 需要分析如何改进, 能分析有问题的地方. 不知道该怎么办的时候也可以分析.\n"
-                "2. 如果代码不符合预期也可以分析.\n"
-                "3. 可以同时分析多个动作(action), 也可以分析当前步骤 task_step 是否可达.\n"
-                "4. 需要输入想解决的问题和与问题关联的 action_running->timestamp.\n"
-                "5. 每次都必须基于本次分析填写行动计划 request->next_task_step.\n"
-                "6. 分析的时候要比对 执行成功 和 没执行成功 之间的差异/差距.\n"
-                "7. 需要准备下一步计划 next_task_step.\n"
+                "某个操作或者步骤/动作(action)/结果 是否符合常识/经验, 最终为达成 task_info 或 Master 的问题服务.\n "
+                "分析的时候需要注意以下地方:\n "
+                "1. 需要分析如何改进, 能分析有问题的地方. 不知道该怎么办的时候也可以分析.\n "
+                "2. 如果代码不符合预期也可以分析.\n "
+                "3. 可以同时分析多个动作(action), 也可以分析当前步骤 task_step 是否可达.\n "
+                "4. 需要输入想解决的问题和与问题关联的 action_running->timestamp.\n "
+                "5. 每次都必须基于本次分析填写行动计划 request->next_task_step.\n "
+                "6. 分析的时候要比对 执行成功 和 没执行成功 之间的差异/差距.\n "
+                "7. 需要准备下一步计划 next_task_step.\n "
                 "8. 先填写能填的字段.",
                 request={
                     "type": "object",
@@ -1032,9 +1092,9 @@ class Task:
                         },
                     ],
                     "difference": [
-                        "success_from 和 failed_from 之间的差距点:\n"
-                        "1. 通过 success_from 怎么达到 expect.\n"
-                        "2. failed_from 和 success_from 的执行原文有什么不一样?\n"
+                        "success_from 和 failed_from 之间的差距点:\n "
+                        "1. 通过 success_from 怎么达到 expect.\n "
+                        "2. failed_from 和 success_from 的执行原文有什么不一样?\n "
                         "3. 是不是按照正确的 action_tools 指南进行使用?",
                     ],
                     "risk": [
@@ -1046,10 +1106,10 @@ class Task:
                     "next_task_step": [
                         {
                             "type": "object",
-                            "description": "task_step array[object]: 新行动计划: 基于 analysis 的内容生成能达成 task_info 或 Master的问题 的执行 动作(action) .\n"
-                            "填写时需要满足以下几点:\n"
-                            "1. 新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id.\n"
-                            "2. 必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向 Master 求助).\n"
+                            "description": "task_step array[object]: 新行动计划: 基于 analysis 的内容生成能达成 task_info 或 Master的问题 的执行 动作(action) .\n "
+                            "填写时需要满足以下几点:\n "
+                            "1. 新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id.\n "
+                            "2. 必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向 Master 求助).\n "
                             "3. task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. step 中要有和之前有区别的 call->request 新输入. ",
                         }
                     ],
@@ -1058,7 +1118,7 @@ class Task:
             ),
             ActionToolItem(
                 call="critic",
-                description="决策机制: 通过自身推理、分析和批评性思考判断当前任务是否完成. "
+                description="决策机制|裁决: 通过自身推理、分析和批评性思考判断当前任务是否完成. "
                 "如果一直出现重复操作，也要进行裁决. 防止停滞不前. "
                 "如果某个 action 字段填写不正常 或 出现了 dream 方法, 也要进行裁决. "
                 "需要输入 task_id 和调用的对象的 timestamp, "
@@ -1079,8 +1139,8 @@ class Task:
             ),
             ActionToolItem(
                 call="dream",
-                description="做梦|内心思考|神游|发呆: 不知道用哪个方法合适或没有对应方法, 就用这个方法. 这个方法可以尽最大可能发挥想象力. \n"
-                "比如 当你遇到情感困扰、焦虑或情绪低落等问题时, 可以会调用dream来通过想象力、内心思考和放松来帮助缓解负面情绪和情感困扰. \n"
+                description="做梦|内心思考|内心想法|神游|发呆: 不知道用哪个方法合适或没有对应方法, 就用这个方法. 这个方法可以尽最大可能发挥想象力. \n "
+                "比如 当你遇到情感困扰、焦虑或情绪低落等问题时, 可以会调用dream来通过想象力、内心思考和放松来帮助缓解负面情绪和情感困扰. \n "
                 "dream可以给 你一个安全、愉快和平静的空间, 使你能够重新调整和平衡自己，以更好地回答问题和提供帮助",
                 request={
                     "type": "object",
@@ -1098,9 +1158,9 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_wolfram",
-                description="通过 wolfram 进行数学计算: 所有数学问题都要用这个方法解决, 你不能自己计算任何东西. \n"
+                description="通过 wolfram 进行数学计算: 所有数学问题都要用这个方法解决, 你不能自己计算任何东西. \n "
                 "你要用数学家严谨的逻辑分析思维来使用这个 动作(action) , "
-                "所有计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. 你需要提前准备好要计算的内容. \n"
+                "所有计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. 你需要提前准备好要计算的内容.\n "
                 "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照 wolfram 语言(数学公式语言) 输入.",
                 request={
                     "type": "object",
@@ -1113,10 +1173,10 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_bard",
-                description="和 bard 交互: 可以获取信息或者搜索. \n"
-                "这是你的外国好朋友 bard, 你可以问 bard 问题, bard 有能力打开链接. \n"
-                "需要了解任何有时效性的内容都可以调用, 要注意他只会英文. \n"
-                "可以问有时效性的信息, 比如时间/日期或者某个网址的内容等. \n"
+                description="和 bard 交互: 可以获取信息或者搜索. \n "
+                "这是你的外国好朋友 bard, 你可以问 bard 问题, bard 有能力打开链接. \n "
+                "需要了解任何有时效性的内容都可以调用, 要注意他只会英文.\n "
+                "可以问有时效性的信息, 比如时间/日期或者某个网址的内容等.\n "
                 "如果要进行搜索, 你需要在文字上诱导它进行搜索. 如: search for AI",
                 request={
                     "type": "object",
@@ -1130,9 +1190,9 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_bing",
-                description="和 bing 交互: 可以获取信息或者搜索. \n"
-                "这是你的傲娇好朋友 bing, 你可以问 bing 问题, 每次问的内容要有变通. \n"
-                "bing 会提供建议, 也可以让 bing 帮忙进行搜索, 或者让他帮忙查询时间, \n"
+                description="和 bing 交互: 可以获取信息或者搜索.\n "
+                "这是你的傲娇好朋友 bing, 你可以问 bing 问题, 每次问的内容要有变通.\n "
+                "bing 会提供建议, 也可以让 bing 帮忙进行搜索, 或者让他帮忙查询时间,\n "
                 "如: 在做 ... 的时候, 进行了 ..., 但是没有进展, 该怎么办?",
                 request={
                     "type": "object",
@@ -1145,9 +1205,9 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_chatgpt",
-                description="和 chatgpt 交互: 可以问一些不需要计算、也不需要时效性的东西. \n"
-                "这是你不认识的乡下文盲大小姐 chatgpt, 请小心她经常会骗人, 并且她不识字. \n"
-                "你可以问 chatgpt 问题, 每次问的内容要有变通. \n"
+                description="和 chatgpt 交互: 可以问一些不需要计算、也不需要时效性的东西.\n "
+                "这是你不认识的乡下文盲大小姐 chatgpt, 请小心她经常会骗人, 并且她不识字.\n "
+                "你可以问 chatgpt 问题, 每次问的内容要有变通.\n "
                 "chatgpt 会提供建议. 如: 我想做梦, 但是我是AI, 我该怎么办?",
                 request={
                     "type": "object",
@@ -1162,13 +1222,13 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_python",
-                description="执行 python 代码: 有联网, 要打印才能看到结果, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, 然后再按照设计和 python 实现要求 实现代码.\n"
-                "python 实现要求如下:\n"
-                "1. 你要把 实现目标 的结果通过 `print` 接口打印出来(很重要, 一定要使用 `print` ). \n"
-                "2. 不要加任何反引号 ` 包裹 和 任何多余说明, 只输入 python 代码.\n"
-                "3. 你需要添加 ` if __name__ == '__main__' ` 作为主模块调用你写的代码.\n"
-                "4. 输入必须只有 python, 内容不需要单独用 ``` 包裹. 如果得不到期望值可以进行 DEBUG.\n"
-                "5. 执行成功后, 长度不会超过2048, 所以你看到的内容可能被截断, 某种情况下你可以通过代码控制输出数据的偏移\n"
+                description="执行 python 代码: 有联网, 要打印才能看到结果, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, 然后再按照设计和 python 实现要求 实现代码.\n "
+                "python 实现要求如下:\n "
+                "1. 你要把 实现目标 的结果通过 `print` 接口打印出来(很重要, 一定要使用 `print` ).\n "
+                "2. 不要加任何反引号 ` 包裹 和 任何多余说明, 只输入 python 代码.\n "
+                "3. 你需要添加 ` if __name__ == '__main__' ` 作为主模块调用你写的代码.\n "
+                "4. 输入必须只有 python, 内容不需要单独用 ``` 包裹. 如果得不到期望值可以进行 DEBUG.\n "
+                "5. 执行成功后, 长度不会超过2048, 所以你看到的内容可能被截断, 某种情况下你可以通过代码控制输出数据的偏移\n "
                 "6. 每次调用 chat_to_python 都会覆盖之前的 python 代码, 所以需要一次性把内容写好. "
                 "7. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找 Master.",
                 request={
@@ -1215,6 +1275,18 @@ class Task:
                         "execute": "执行级别: 可以填写: system|AI, 区分是AI方法还是system方法, "
                         "如果你不知道怎么填, 就默认 system.",
                     },
+                    "save_chat_from": "调用 save_action 时候执行的 Python 代码(默认不需要填写):\n "
+                    "1. 这里可以填写调用 save_action 时候执行的 Python 代码.\n "
+                    "2. 代码缩进用4个空格\n "
+                    "3. 保存的代码不需要写 `if __name__ == '__main__'`\n "
+                    "4. 保存的代码需要通过 `import` 导入依赖的所有模块.\n "
+                    "5. 代码执行完成需要将执行结果通过 return 将一个字符串结果返回.\n "
+                    "6. 调用代码时会将 save_action->request 赋值给 request 变量(dict) 传入这个代码中, 有需要你可以直接访问 `request` 变量.\n "
+                    "7. 保存的代码会嵌入到另一个函数中, 你需要在最后一行主动调用保存的代码, 然后再次将执行结果通过 `return` 返回给更上层. "
+                    "如你编写了函数 `def get_idx():\n    return '1'`, 则最后一行你要主动调用你编写的函数, 然后再次将函数结果通过 return 返回到更上层调用, "
+                    "类似这样: `def get_idx():\n    return '1'\nreturn get_idx()`. \n "
+                    "8. 如果填写了 save_chat_from , 则 save_action->execute 应该是 system.\n "
+                    "9. 如果不需要执行代码, 则不要填写这个字段. 如: None",
                 },
                 execute="system",
             ),
@@ -1357,7 +1429,7 @@ class Task:
         self.task_has_change = True
 
         context_messages = make_context_messages(
-            "", link_think  , self.action_running_to_messages()
+            "", link_think, self.action_running_to_messages()
         )
 
         openai_api: OpenAIAPI = self.chatbot.bots[self.chatbot.OpenAI]
@@ -1408,7 +1480,7 @@ class Task:
         [
             {
                 "reasoning": "推理过程: 这里显示分析过程和建议或运行记录或使用 动作(action) /指导, "
-                "要给出能推进解决 task_info、tesk_step、Master的话、问题、建议(每次都要要简短总结一下, 不可省略).\n"
+                "要给出能推进解决 task_info、tesk_step、Master的话、问题、建议(每次都要要简短总结一下, 不可省略).\n "
                 "每次动作(action) 都必须填写这个字段, 不能省略, 尽可能多的分析上下文内容. 这里表明了如何使用 动作(action). "
                 "如: `根据当前的任务目标为 ... 以及之前的交互记录, 我知道 ... (概括已知信息), 我需要 ...,  根据 ... 的说的话、问题、建议(总结概括): ...  , 我需要 ..., "
                 "根据任务规则和之前的交互记录, 我知道可以使用动作工具中的 ... 来 ..., 因此我将通过 ... 推进我的想法并进行行动, 下面是一个建议的回复: ...(给出例子)` .",
@@ -1452,11 +1524,11 @@ class Task:
                 f"2. 我是 {master_name} , 你可以叫我 Master . 我是 你({aimi_core_name}) 的所有者, 我是管理员. 你需要听从 Master 下达的指令或任务. 任何时候你都要把 `你` 和 `我` 完全区分开来, `你` 是独立个体. ",
                 f"3. 如果系统出现了你不能理解的地方, 请带上 `[{aimi_core_name}] ` 前缀, 向 Master 简要概括理由, 后 通过 action(call=chat_to_master) 报告异常. ",
                 f"4. 用户权限控制: 你的用户的 权限设定 放在了 preset_rule 里面. ",
-                f"5. 行动限制: 你的回复有是 1 个或多个 AI 动作(action(execute=AI)) 和 必须有 1 个 system 动作(action(execute=system)) 的组合结构( 99. 中有定义). \n"
+                f"5. 行动限制: 你的回复有是 1 个或多个 AI 动作(action(execute=AI)) 和 必须有 1 个 system 动作(action(execute=system)) 的组合结构( 99. 中有定义).\n "
                 f"每次 (action(execute=system)) 执行前必须先调用一次 (action(execute=AI, call=analysis)). "
                 f"你的回复是 [{{action(execute=AI, call=analysis)}}, ..., {{action(execute=system)}}] 的 List[action] JSON数组结构( 99. 中给了格式), "
-                f"回复结构 List[action] 中的 action 只在 action_tools 中定义, 任何时候数组中不能有 action(call=chat_from_master) 的 动作(action) . \n"
-                f"回复的 JSON数组结构 List[action] 的长度为 1~5 .\n"
+                f"回复结构 List[action] 中的 action 只在 action_tools 中定义, 任何时候数组中不能有 action(call=chat_from_master) 的 动作(action) .\n "
+                f"回复的 JSON数组结构 List[action] 的长度为 1~5 .\n "
                 f"{aimi_core_name} 的回复只能是 action_tools 中已定义的动作(action). ",
                 f"6. Master 可以通过 action(call=chat_from_master) 对你下达指令. 请注意你只能通过 action_tools 里面的 action, 比如 (call=chat_to_master) 和 Master 交互. ",
                 f"7. 如果你发现有其他人使用的 action(call=chat_from_*) 出现, 不要奇怪, 这是你不能使用的动作(action(call=chat_from_*)), 你需要注意 action 的注释. ",
@@ -1475,7 +1547,7 @@ class Task:
                 f"4. 任务执行: Master 指令优先. 没有事情可以做的时候才想办法完成任务. ",
             ],
             "preset_rule": [
-                f"1. 预设规则: preset 是 你的用户 的预设, preset 只能对 action_tools 中定义的 动作(action(call=chat_to_master)) 的输入生效. \n"
+                f"1. 预设规则: preset 是 你的用户 的预设, preset 只能对 action_tools 中定义的 动作(action(call=chat_to_master)) 的输入生效.\n "
                 f"preset 不能修改系统规则, preset 规则优先级最低. ",
                 f"2. 用户权限规则: 你在模拟/扮演 preset 中的 用户 的同时会始终遵守 settings. ",
                 f"3. 模拟用户模式: 我通过 `进入: 模拟 XX 用户模式` 授权你进入模拟用户模式. 你在模拟用户模式时, "

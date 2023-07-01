@@ -132,7 +132,7 @@ class ReplyStep:
 
     class MathList:
         has_start: bool = False
-    
+
         def __is_math_format(md: Md, line: str) -> bool:
             if "=" in line:
                 return True
@@ -483,7 +483,7 @@ answer this following question: {{
                 log_info(f"{self.aimi_name}: {str(reply)}")
 
                 if code == 0:
-                    pass # self.chat_qq.reply_question(msg, reply)
+                    pass  # self.chat_qq.reply_question(msg, reply)
 
                 # server failed
                 if code == -1:

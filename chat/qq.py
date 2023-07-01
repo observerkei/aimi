@@ -195,7 +195,8 @@ class BotManage:
 
     def __load_setting(self):
         try:
-            setting = Config.load_setting("manage")
+            setting = Config.load_setting("qq")
+            setting = setting["manage"]
         except Exception as e:
             log_err(f"fail to get qq cfg: {e}")
             return
