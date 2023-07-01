@@ -79,7 +79,7 @@ class ExternAction:
                 cnt += 1
                 if cnt < self.action_offset:
                     continue
-    
+
                 if len(catalog) >= 10:
                     break
 
@@ -450,7 +450,7 @@ class Task:
                         show_call_info = None
                         if "show_call_info" in task.request:
                             show_call_info = task.request["show_call_info"]
-    
+
                         response = self.chat_to_load_action(offset, show_call_info)
                         task_response = self.make_chat_from(
                             from_timestamp=self.timestamp,
@@ -584,10 +584,11 @@ class Task:
 
         log_info(f"\n```python\n{code}\n```")
 
-        permissions = green_input("是否授权执行代码? Y/N.")
-        if permissions.lower() != "y":
-            log_err(f"未授权执行代码.")
-            return "permission exception: unauthorized operation."
+        if Sandbox.model == "system":
+            permissions = green_input("是否授权执行代码? Y/N.")
+            if permissions.lower() != "y":
+                log_err(f"未授权执行代码.")
+                return "permission exception: unauthorized operation."
 
         ret = Sandbox.write_code(code)
         if not ret:
@@ -597,25 +598,25 @@ class Task:
 
         return self.make_chat_from_python_response(from_timestamp, run)
 
-    def chat_to_load_action(self, offset: int = 0, show_call_info: str = "") -> List[ActionToolItem]:
+    def chat_to_load_action(
+        self, offset: int = 0, show_call_info: str = ""
+    ) -> List[ActionToolItem]:
         response = ""
         try:
             offset = int(offset)
             if self.extern_action.action_offset != offset:
                 self.extern_action.action_offset = offset
                 response = "change offset done"
-    
+
         except Exception as e:
             log_err(f"chat_to_load_action: offset not num.")
             response = str(e)
-        
+
         if show_call_info:
             if show_call_info in self.extern_action.actions:
                 action_info = self.extern_action.actions[show_call_info]
                 response = json.dumps(
-                    action_info.action.dict(),
-                    indent=4,
-                    ensure_ascii=False
+                    action_info.action.dict(), indent=4, ensure_ascii=False
                 )
             else:
                 response = f"not found action: {str(show_call_info)}"
@@ -647,7 +648,7 @@ class Task:
             log_err(f"chat_to_save_action: {response}")
 
         return response
-   
+
     def chat_to_bing(self, request: str) -> str:
         if not request or not len(request):
             return "request error"
@@ -1356,7 +1357,7 @@ class Task:
         self.task_has_change = True
 
         context_messages = make_context_messages(
-            "", link_think#, self.action_running_to_messages()
+            "", link_think  , self.action_running_to_messages()
         )
 
         openai_api: OpenAIAPI = self.chatbot.bots[self.chatbot.OpenAI]
@@ -1490,9 +1491,9 @@ class Task:
             "preset": preset,
             "action_tools": action_tools,
             "extern_action": self.extern_action.brief(),
-            "action_running": [item.dict() for item in self.running],
         }
         {
+            "action_running": [item.dict() for item in self.running],
             "sim_mode": [
                 f"2. 进入模拟用户模式: 需要在 Master 授权下 将 task_info 设置为 `模拟 XX 用户模式`, 表示已经进入 模拟用户模式. "
                 f"如我说: `进入: 模拟 {aimi_name} 用户模式`, 则 你要执行 action(call=set_task_info,request->task_info=`模拟 {aimi_name} 用户模式`) . ",

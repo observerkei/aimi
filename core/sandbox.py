@@ -1,5 +1,6 @@
 import sys
 from pydantic import BaseModel, constr
+from typing import List
 
 from tool.util import log_err, log_dbg
 
@@ -15,9 +16,9 @@ class Sandbox:
     # system:       不安全用法
     # proot-distro  termux
     # docker
-    model: str = "system"
+    model: str = "docker"
     sandbox_file: str = "sandbox.py"
-    sandbox_path: str = "./run/"
+    sandbox_path: str = "./run/sandbox/"
 
     def __init__(self):
         pass
@@ -35,24 +36,83 @@ class Sandbox:
             log_err(f"fail to write code: {str(e)}")
         return False
 
-    def run_code() -> RunCodeReturn:
+    def __run_cmd(cmd: List[str]):
         import subprocess
+        result = subprocess.run(
+            cmd,
+            cwd=Sandbox.sandbox_path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        return result
+
+    def __run_system_code():
+        run = RunCodeReturn(
+            returncode=-1,
+            stdout="",
+            stderr=""
+        )
+    
+        result = Sandbox.__run_cmd(
+            [sys.executable, Sandbox.sandbox_file]
+        )
+        run.returncode = int(result.returncode)
+        run.stdout = str(result.stdout.decode("utf-8"))
+        run.stderr = str(result.stderr.decode("utf-8"))
+    
+        return run
+
+    def __run_docker_code():
+        run = RunCodeReturn(
+            returncode=-1,
+            stdout="",
+            stderr=""
+        )
+
+        # create requirements.txt
+        # request: pipreqs
+        result = Sandbox.__run_cmd(
+            ["pipreqs", "--force"]
+        )
+        if result.returncode != 0:
+            raise Exception(f"fail to create requirements.txt : {str(result.stderr)}")
+
+        result = Sandbox.__run_cmd(
+            ["docker", "build", "-t", "sandbox", "."]
+        )
+        if result.returncode != 0:
+            raise Exception("build docker fail")
+
+        build_log = result.stdout.decode('utf-8')
+        if len(build_log):
+            log_dbg(f"docker build done {build_log}")
+
+        # run code.
+        result = Sandbox.__run_cmd(
+            ["docker", "run", "--rm", "sandbox"]
+        )
+
+        run.returncode = int(result.returncode)
+        run.stdout = str(result.stdout.decode("utf-8"))
+        run.stderr = str(result.stderr.decode("utf-8"))
+
+        return run
+
+    def run_code() -> RunCodeReturn:
 
         max_return_len = 2048
-        run: RunCodeReturn = RunCodeReturn(returncode=-1, stdout="", stderr="")
+        run = RunCodeReturn(
+            returncode=-1,
+            stdout="",
+            stderr=""
+        )
 
-        result = ""
         try:
-            result = subprocess.run(
-                [sys.executable, Sandbox.sandbox_file],
-                cwd=Sandbox.sandbox_path,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
+            if Sandbox.model == "system":
+                run = Sandbox.__run_system_code()
+            elif Sandbox.model == "docker":
+                run = Sandbox.__run_docker_code()
 
-            run.returncode = int(result.returncode)
-            run.stdout = str(result.stdout.decode("utf-8"))
-            run.stderr = str(result.stderr.decode("utf-8"))
             if not len(run.stdout):
                 run.returncode = -1
                 if not len(run.stderr):
@@ -66,5 +126,5 @@ class Sandbox:
             return run
         except Exception as e:
             log_err(f"fail to exec code: {str(e)}")
-            run["stderr"] = str(e)
+            run.stderr = str(e)
         return run
