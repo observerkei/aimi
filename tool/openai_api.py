@@ -60,11 +60,24 @@ class OpenAIAPI:
         context_messages: List[Dict] = [],
         conversation_id: str = "",
         timeout: int = 360,
+        temperature: float = 1,
+        top_p: float = 1,
+        presence_penalty: float = 0,
+        frequency_penalty: float = 0,
     ) -> Generator[dict, None, None]:
         if self.use_web_ask:
             yield from self.web_ask(question, conversation_id, timeout)
         else:
-            yield from self.api_ask(question, model, context_messages, timeout)
+            yield from self.api_ask(
+                question=question,
+                model=model,
+                messages=context_messages,
+                timeout=timeout,
+                temperature=temperature,
+                top_p=top_p,
+                presence_penalty=presence_penalty,
+                frequency_penalty=frequency_penalty
+            )
 
     def web_ask(
         self,
@@ -127,9 +140,13 @@ class OpenAIAPI:
     def api_ask(
         self,
         question: str,
-        bot_model: str = "",
+        model: str = "",
         messages: List[Dict] = [],
         timeout: int = 360,
+        temperature: float = 1,
+        top_p: float = 1,
+        presence_penalty: float = 0,
+        frequency_penalty: float = 0,
     ) -> Generator[dict, None, None]:
         answer = {"message": "", "code": 1}
 
@@ -140,12 +157,14 @@ class OpenAIAPI:
         # }
 
         req_cnt = 0
-        if not bot_model or not len(bot_model) or (
-            bot_model not in self.chat_completions_models
+        if (
+            not model
+            or not len(model)
+            or (model not in self.chat_completions_models)
         ):
-            bot_model = self.__get_bot_model(question)
-        log_dbg(f"use model: {bot_model}")
-        #log_dbg(f"msg: {str(messages)}")
+            model = self.__get_bot_model(question)
+        log_dbg(f"use model: {model}")
+        # log_dbg(f"msg: {str(messages)}")
 
         while req_cnt < self.max_repeat_times:
             req_cnt += 1
@@ -157,9 +176,13 @@ class OpenAIAPI:
 
                 completion = {"role": "", "content": ""}
                 for event in openai.ChatCompletion.create(
-                    model=bot_model,
+                    model=model,
                     messages=messages,
                     stream=True,
+                    temperature=temperature,
+                    top_p=top_p,
+                    presence_penalty=presence_penalty,
+                    frequency_penalty=frequency_penalty,
                 ):
                     if event["choices"][0]["finish_reason"] == "stop":
                         # log_dbg(f'recv complate: {completion}')

@@ -176,7 +176,9 @@ class ChatWeb:
                 model_infos = []
                 for owned_by, models in self.get_models_hook().items():
                     for model in models:
-                        model_info = self.__make_model_info(f"{owned_by}--{model}", owned_by)
+                        model_info = self.__make_model_info(
+                            f"{owned_by}--{model}", owned_by
+                        )
                         model_infos.append(model_info)
                         # log_dbg(f"mod: {str(model)} owned_by: {str(owned_by)}")
 
@@ -223,7 +225,7 @@ class ChatWeb:
                     message = answer["message"][len(prev_text) :]
                     yield self.__make_stream_reply(message)
                     if answer["code"] == -1:
-                        yield self.__make_stream_reply("\n")
+                        yield self.__make_stream_reply("\n\n")
                     prev_text = answer["message"]
 
                 yield self.__make_stream_stop()
@@ -249,11 +251,11 @@ class ChatWeb:
 
                 # get model
                 model = web_request["model"]
-                owned_by = ''
-                if 'owned_by' in web_request:
+                owned_by = ""
+                if "owned_by" in web_request:
                     owned_by = web_request["owned_by"]
 
-                model_info = model.split('--')
+                model_info = model.split("--")
                 if len(model_info) == 2:
                     owned_by = model_info[0]
                     model = model_info[1]

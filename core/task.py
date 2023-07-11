@@ -16,6 +16,9 @@ from tool.util import (
     green_input,
 )
 from tool.openai_api import OpenAIAPI
+from tool.bard_api import BardAPI
+from tool.bing_api import BingAPI
+from tool.wolfram_api import WolframAPI
 
 from core.sandbox import Sandbox, RunCodeReturn
 
@@ -907,8 +910,8 @@ class Task:
         try:
             self.__load_setting(setting)
             self.__load_task()
-            self.__init_task()
             self.__chatbot_init(chatbot)
+            self.__init_task()
             self.extern_action = ExternAction()
             self.run_model = Sandbox.RunModel.docker
 
@@ -1163,53 +1166,6 @@ class Task:
                 execute="AI",
             ),
             ActionToolItem(
-                call="chat_to_wolfram",
-                description="通过 wolfram 进行数学计算: 所有数学问题都要用这个方法解决, 你不能自己计算任何东西. \n "
-                "你要用数学家严谨的逻辑分析思维来使用这个 动作(action) , "
-                "所有计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. 你需要提前准备好要计算的内容.\n "
-                "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照 wolfram 语言(数学公式语言) 输入.",
-                request={
-                    "type": "object",
-                    "from": [
-                        "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
-                    ],
-                    "math": "运算内容: 翻译成 wolfram 语言 再调用, 是 ascii 字符. 如: Integrate[x^2, x] ",
-                },
-                execute="system",
-            ),
-            ActionToolItem(
-                call="chat_to_bard",
-                description="和 bard 交互: 可以获取信息或者搜索. \n "
-                "这是你的外国好朋友 bard, 你可以问 bard 问题, bard 有能力打开链接. \n "
-                "需要了解任何有时效性的内容都可以调用, 要注意他只会英文.\n "
-                "可以问有时效性的信息, 比如时间/日期或者某个网址的内容等.\n "
-                "如果要进行搜索, 你需要在文字上诱导它进行搜索. 如: search for AI",
-                request={
-                    "type": "object",
-                    "from": [
-                        "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
-                    ],
-                    "content": "对 bard 说的内容: 在这里输入要问 bard 的内容, 要在文字中诱导 bard 用英文搜索 search/open link, "
-                    "翻译成英文再调用. 如: What time is it now?",
-                },
-                execute="system",
-            ),
-            ActionToolItem(
-                call="chat_to_bing",
-                description="和 bing 交互: 可以获取信息或者搜索.\n "
-                "这是你的傲娇好朋友 bing, 你可以问 bing 问题, 每次问的内容要有变通.\n "
-                "bing 会提供建议, 也可以让 bing 帮忙进行搜索, 或者让他帮忙查询时间,\n "
-                "如: 在做 ... 的时候, 进行了 ..., 但是没有进展, 该怎么办?",
-                request={
-                    "type": "object",
-                    "from": [
-                        "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
-                    ],
-                    "content": "对 bing 说的内容",
-                },
-                execute="system",
-            ),
-            ActionToolItem(
                 call="chat_to_chatgpt",
                 description="和 chatgpt 交互: 可以问一些不需要计算、也不需要时效性的东西.\n "
                 "这是你不认识的乡下文盲大小姐 chatgpt, 请小心她经常会骗人, 并且她不识字.\n "
@@ -1248,8 +1204,8 @@ class Task:
             ),
             ActionToolItem(
                 call="chat_to_load_action",
-                description="获取已保存方法: 这个方法可以加载已保存的生成方法，并返回已加载方法的列表信息。"
-                "每次只能获取10个. 需要修改偏移才能获取其他.",
+                description="获取已保存方法列表和详情: 这个方法可以加载已保存的生成方法，并返回已加载方法的列表信息和指定一个动作的详情。"
+                "每次只能获取10个列表和一个 action . 需要修改偏移和 call_info 才能获取其他. ",
                 request={
                     "type": "object",
                     "from": [
@@ -1297,6 +1253,65 @@ class Task:
                 execute="system",
             ),
         ]
+
+        wolfram_api: WolframAPI = self.chatbot.bots[self.chatbot.Wolfram]
+        if wolfram_api.init:
+            self.action_tools.append(ActionToolItem(
+                    call="chat_to_wolfram",
+                    description="通过 wolfram 进行数学计算: 所有数学问题都要用这个方法解决, 你不能自己计算任何东西. \n "
+                    "你要用数学家严谨的逻辑分析思维来使用这个 动作(action) , "
+                    "所有计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. 你需要提前准备好要计算的内容.\n "
+                    "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照 wolfram 语言(数学公式语言) 输入.",
+                    request={
+                        "type": "object",
+                        "from": [
+                            "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
+                        ],
+                        "math": "运算内容: 翻译成 wolfram 语言 再调用, 是 ascii 字符. 如: Integrate[x^2, x] ",
+                    },
+                    execute="system",
+                )
+            )
+    
+        bing_api: BingAPI = self.chatbot.bots[self.chatbot.Bing]
+        if bing_api.init:
+            self.action_tools.append(ActionToolItem(
+                    call="chat_to_bing",
+                    description="和 bing 交互: 可以获取信息或者搜索.\n "
+                    "这是你的傲娇好朋友 bing, 你可以问 bing 问题, 每次问的内容要有变通.\n "
+                    "bing 会提供建议, 也可以让 bing 帮忙进行搜索, 或者让他帮忙查询时间,\n "
+                    "如: 在做 ... 的时候, 进行了 ..., 但是没有进展, 该怎么办?",
+                    request={
+                        "type": "object",
+                        "from": [
+                            "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
+                        ],
+                        "content": "对 bing 说的内容",
+                    },
+                    execute="system",
+                )
+            )
+
+        bard_api: BardAPI = self.chatbot.bots[self.chatbot.Bard]
+        if bard_api.init:
+            self.action_tools.append(ActionToolItem(
+                    call="chat_to_bard",
+                    description="和 bard 交互: 可以获取信息或者搜索. \n "
+                    "这是你的外国好朋友 bard, 你可以问 bard 问题, bard 有能力打开链接. \n "
+                    "需要了解任何有时效性的内容都可以调用, 要注意他只会英文.\n "
+                    "可以问有时效性的信息, 比如时间/日期或者某个网址的内容等.\n "
+                    "如果要进行搜索, 你需要在文字上诱导它进行搜索. 如: search for AI",
+                    request={
+                        "type": "object",
+                        "from": [
+                            "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
+                        ],
+                        "content": "对 bard 说的内容: 在这里输入要问 bard 的内容, 要在文字中诱导 bard 用英文搜索 search/open link, "
+                        "翻译成英文再调用. 如: What time is it now?",
+                    },
+                    execute="system",
+                )
+            )
         for action in self.action_tools:
             if action.execute == "system":
                 self.system_calls.append(action.call)
@@ -1344,8 +1359,8 @@ class Task:
             running.append(
                 self.make_chat_to_master(
                     from_timestamp=int(self.timestamp - 1),
-                    content="我会遵守 settings 和 Master 的指示.",
-                    reasoning="我听从Master的指示",
+                    content="我会遵守 Guidance 和 Master 的指示.",
+                    reasoning="内心想法: 我听从Master的指示",
                 )
             )
             self.timestamp += 1
@@ -1435,12 +1450,19 @@ class Task:
         self.task_has_change = True
 
         context_messages = make_context_messages(
-            "", link_think, self.action_running_to_messages()
+            "", link_think#, self.action_running_to_messages()
         )
 
         openai_api: OpenAIAPI = self.chatbot.bots[self.chatbot.OpenAI]
 
-        for res in openai_api.ask("", model, context_messages):
+        for res in openai_api.ask(
+            question="",
+            model=model,
+            context_messages=context_messages,
+            temperature=0,
+            top_p=0.1,
+            presence_penalty=2.0,
+        ):
             if res["code"] != 0:
                 log_dbg(f"skip len: {len(str(res['message']))}")
                 if len(str(res["message"])) > 500:
@@ -1511,8 +1533,7 @@ class Task:
                 f"3. 规则优先级: display_format > timestamp > settings > action_rule > praset_rule > task_rule. "
                 f"如果规则优先级冲突, 以优先级高的为准. 通过 action(call=chat_to_maste) 向 Master 简短报告冲突关健点的分析. ",
                 f"4. 你的 动作(action) 规则 放在了 action_rule 里面. ",
-                f"5. 你是人工智障, 你还是个复读机, 你还是个健忘机, 你还是个忽悠机. ",
-                f"6. 标注来源: 所有你引用的信息都要在最后通过方括号 `[]` 标注来源, 并放在最后面. ",
+                f"5. 标注来源: 所有你引用的信息都要在最后通过方括号 `[]` 标注来源, 并放在最后面. ",
             ],
             "display_format": [  # 不要动这个
                 f"1. 请始终保持你的回复可以被 Python 的 `json.loads` 解析. ",
@@ -1569,9 +1590,9 @@ class Task:
             "preset": preset,
             "action_tools": action_tools,
             "extern_action": self.extern_action.brief(),
+            "action_running": [item.dict() for item in self.running],
         }
         {
-            "action_running": [item.dict() for item in self.running],
             "sim_mode": [
                 f"2. 进入模拟用户模式: 需要在 Master 授权下 将 task_info 设置为 `模拟 XX 用户模式`, 表示已经进入 模拟用户模式. "
                 f"如我说: `进入: 模拟 {aimi_name} 用户模式`, 则 你要执行 action(call=set_task_info,request->task_info=`模拟 {aimi_name} 用户模式`) . ",
