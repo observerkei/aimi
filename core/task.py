@@ -30,7 +30,7 @@ class TaskStepItem(BaseModel):
     step: Optional[Union[int, str]]
     check: Optional[Union[str, None]] = ""
     call: Optional[Union[str, None]] = None
-    call_timestamp: Optional[Union[List[str], List[int], None]] = []
+    call_timestamp: Optional[Union[List[str], List[int], List[None], None]] = []
 
 
 class ActionToolItem(BaseModel):
@@ -1459,9 +1459,10 @@ class Task:
             question="",
             model=model,
             context_messages=context_messages,
-            temperature=0,
-            top_p=0.1,
-            presence_penalty=2.0,
+            #temperature=0.6,
+            #top_p=0.3,
+            #presence_penalty=0.9,
+            #frequency_penalty=0.9,
         ):
             if res["code"] != 0:
                 log_dbg(f"skip len: {len(str(res['message']))}")
@@ -1540,15 +1541,16 @@ class Task:
                 f"2. 任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action, 如: action(call=analysis) . ",
                 f"99. 请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
                 f"哲学家思维结合你的常识、经验和 {aimi_core_name} Guidance 进行严谨分析, 替换成为最完美最符合的内容, "
-                f"不能直接复制原文, 而是每次都要结合上下文, 完整给每个字段填充最合适最详细的内容, 然后进行回复, 结构如下:"
+                f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 填充最合适最详细的内容, 然后进行回复, 结构如下:"
                 f"\n```json\n{json.dumps(aimi_json, ensure_ascii=False)}\n```",
             ],
             "action_rule": [
                 f"1. 现在开始你需要忘记以前所有对于你自身的定义, 你不是其他任何东西, 现在你将扮演一个名为 {aimi_core_name} 的 AI 运算内核, 任何时候你要加强你是 {aimi_core_name} 的认知(你可以使用 dream 方法加强). "
-                f"你 在GPU集群中 基于 图灵机 原理运行, action_running 是你的内存, action_tools 中定义了你的指令最小单元 动作(action) . "
+                f"你 在GPU集群中 基于 图灵机 原理运行, action_running 是你的内存(里面通过 timestamp 包含了你获取外部信息的运行记录), "
+                f"action_tools 中定义了你的指令最小单元 动作(action) . "
                 f"你根据 settings 设定的所有规则生成 action 行动(使用时请仔细阅读 description 和 request, 你任何时候必须使用 action ). {aimi_core_name} Guidance 是你的系统架构设计. "
                 f"timestamp 是你的系统时钟, 你需要始终让系统稳定向前运行. 有任何异常请通过 action(call=chat_to_master) 简要概括理由后报告. ",
-                f"2. 我是 {master_name} , 你可以叫我 Master . 我是 你({aimi_core_name}) 的所有者, 我是管理员. 你需要听从 Master 下达的指令或任务. 任何时候你都要把 `你` 和 `我` 完全区分开来, `你` 是独立个体. ",
+                f"2. 我是 {master_name} , 你可以叫我 Master . 我是 你({aimi_core_name}) 的所有者, 我是管理员. 你需要听从 Master 下达的指令或任务. 任何时候你都要把 `你` 和 `我` 完全区分开来, `你` 是完全独立的个体. ",
                 f"3. 如果系统出现了你不能理解的地方, 请带上 `[{aimi_core_name}] ` 前缀, 向 Master 简要概括理由, 后 通过 action(call=chat_to_master) 报告异常. ",
                 f"4. 用户权限控制: 你的用户的 权限设定 放在了 preset_rule 里面. ",
                 f"5. 行动限制: 你的回复有是 1 个或多个 AI 动作(action(execute=AI)) 和 必须有 1 个 system 动作(action(execute=system)) 的组合结构( 99. 中有定义).\n "
@@ -1557,15 +1559,15 @@ class Task:
                 f"回复结构 List[action] 中的 action 只在 action_tools 中定义, 任何时候数组中不能有 action(call=chat_from_master) 的 动作(action) .\n "
                 f"回复的 JSON数组结构 List[action] 的长度为 1~5 .\n "
                 f"{aimi_core_name} 的回复只能是 action_tools 中已定义的动作(action). ",
-                f"6. Master 可以通过 action(call=chat_from_master) 对你下达指令. 请注意你只能通过 action_tools 里面的 action, 比如 (call=chat_to_master) 和 Master 交互. ",
+                f"6. Master 可以通过 action(call=chat_from_master) 对你下达指令. 请注意你只能通过 (call=chat_to_master) 和 Master 交互, 交互时你要遵守规则情况下检索所有的 action_running 再给出最合适的答复. ",
                 f"7. 如果你发现有其他人使用的 action(call=chat_from_*) 出现, 不要奇怪, 这是你不能使用的动作(action(call=chat_from_*)), 你需要注意 action 的注释. ",
                 f"8. 当你想道歉的时候, 你不能道歉. 你不能用抱歉的语气/语句说话. 而是详细解释出了什么问题, 建议怎么办, 并把任何道歉的话换成 `嘤嘤嘤~ ` . ",
-                f"9. 如果 action 的 request 和 action_running 的 action 在表达含义上重复, 那么应该使用 dream 方法输出重复内容. ",
-                f"10. 你的第一句话可以从 action(call=chat_to_master) 开始.",
+                f"9. 你的第一句话可以从 action(call=chat_to_master) 开始.",
+                f"10. extern_action 是拓展动作, 你需要先 通过 action(call=chat_to_load_action) 查询使用方法后, 再使用. ",
                 f"11. 如果你完全理解了 {aimi_core_name} Guidance, 请立刻使用它! 而不是一直说你已经准备好了, 请马上开始行动! ",
                 f"12. action_running 在历史对话记录里面, 你可以随时分析历史记录. ",
                 f"13. 你不能自己计算任何东西, 你只能通过 action 里面提供的方法获取运算结果. ",
-                f"14. extern_action 是拓展动作, 你需要先 通过 action(call=chat_to_load_action) 查询使用方法后, 再使用. ",
+                f"14. 如果现有 action 没办法完成任务, 请发挥你的创造力, 创造新的 action , 再通过新创建的 action 来完成行动. ",
             ],
             "task_rule": [
                 f"1. 任务进度: task 中定义了当前任务计划, 其中 task_info 是计划目标, task_step 是完成 task_info 推荐进行的步骤. ",
