@@ -1,6 +1,6 @@
 import time
 from typing import Generator, List, Dict, Any
-import openai
+from openai import OpenAI 
 
 from tool.util import log_dbg, log_err, log_info
 from tool.config import Config
@@ -8,6 +8,7 @@ from tool.config import Config
 
 class OpenAIAPI:
     type: str = "openai"
+    openai: Any
     chatbot: Any
     use_web_ask: bool = False
     max_requestion: int = 1024
@@ -24,8 +25,11 @@ class OpenAIAPI:
         "gpt-3.5-turbo",
         "gpt-3.5-turbo-0301",
         "gpt-3.5-turbo-0613",
+        "gpt-3.5-turbo-1106",
         "gpt-3.5-turbo-16k",
         "gpt-3.5-turbo-16k-0613",
+        'gpt-3.5-turbo-instruct',
+        'gpt-3.5-turbo-instruct-0914',
         "gpt-4",
         "gpt-4-0314",
         "gpt-4-0613",
@@ -175,7 +179,7 @@ class OpenAIAPI:
                 res = None
 
                 completion = {"role": "", "content": ""}
-                for event in openai.ChatCompletion.create(
+                for event in self.openai.chat.completions.create(
                     model=model,
                     messages=messages,
                     stream=True,
@@ -184,18 +188,12 @@ class OpenAIAPI:
                     presence_penalty=presence_penalty,
                     frequency_penalty=frequency_penalty,
                 ):
-                    if event["choices"][0]["finish_reason"] == "stop":
+                    if event.choices[0].finish_reason == "stop":
                         # log_dbg(f'recv complate: {completion}')
                         break
-                    for delta_k, delta_v in event["choices"][0]["delta"].items():
-                        if delta_k != "content":
-                            # skip none content
-                            continue
-                        # log_dbg(f'recv stream: {delta_k} = {delta_v}')
-                        completion[delta_k] += delta_v
 
-                        answer["message"] = completion[delta_k]
-                        yield answer
+                    answer["message"] += event.choices[0].delta.content
+                    yield answer 
 
                     res = event
 
@@ -251,15 +249,17 @@ class OpenAIAPI:
 
         api_base = self.api_base
         if api_base and len(api_base):
-            openai.api_base = api_base
+            OpenAI.api_base = api_base
             log_dbg(f"use openai base: {api_base}")
 
         api_key = self.api_key
         if api_key and len(api_key):
-            openai.api_key = api_key
             try:
-                models = openai.Model.list(model_type="chat")
-                for model in models["data"]:
+                self.openai = OpenAI(
+                        api_key=api_key,
+                        )
+                models = self.openai.models.list() #(model_type="chat")
+                for model in models:
                     if not (model.id in self.chat_completions_models):
                         continue
                     log_dbg(f"avalible model: {str(model.id)}")
@@ -274,12 +274,14 @@ class OpenAIAPI:
             try:
                 hello = "状态正常?请回答‘是’或‘否’."
                 bot_model = self.__get_bot_model(hello)
-                for event in openai.ChatCompletion.create(
+                for event in self.openai.chat.completions.create(
                     model=bot_model,
                     messages=[{"role": "user", "content": hello}],
                     stream=True,
                 ):
-                    if event["choices"][0]["finish_reason"] == "stop":
+                    print(event)
+                    print(str(type(event)))
+                    if event.choices[0].finish_reason == "stop":
                         # log_dbg(f'recv complate: {completion}')
                         break
                     log_dbg(f"{str(event)}")
