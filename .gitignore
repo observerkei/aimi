@@ -144,8 +144,10 @@ qq_server_data/
 /run/setting.yml.*
 /run/wolfram*.txt
 /run/task.yml.*
+/run/task.yml
 /run/sandbox/sandbox.py
 /run/sandbox/requirements.txt
+/run/sandbox/temp*
 /run/clash
 
 # plugin

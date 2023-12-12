@@ -1,6 +1,6 @@
 import asyncio
-from EdgeGPT import Chatbot
-from EdgeGPT import ConversationStyle as EdgeConversationStyle
+from EdgeGPT.EdgeGPT import Chatbot
+from EdgeGPT.EdgeGPT import ConversationStyle as EdgeConversationStyle
 from contextlib import suppress
 from typing import Generator, List, Any, Dict
 import time
@@ -259,6 +259,7 @@ class BingAPI:
 
                 self.cur_messages = 0
                 self.max_messages = 0
+                self.init = False
 
                 await self.__bot_reload()
 
@@ -309,9 +310,7 @@ class BingAPI:
             cookies = []
             with open(self.cookie_path, "r") as f:
                 cookies = json.load(f)
-            cookies_list = (
-                cookies  # [{"name": name, "value": cookies[name]} for name in cookies]
-            )
+            cookies_list = cookies
             self.chatbot = await Chatbot().create(None, cookies_list)
             self.init = True
             log_info(f"{self.type}: init done")
@@ -361,10 +360,10 @@ class BingAPI:
         try:
             self.wss_link = setting["wss_link"]
             if not self.wss_link:
-                self.wss_link = ""
+                self.wss_link = None
         except Exception as e:
             log_err("fail to load bing config: " + str(e))
-            self.wss_link = ""
+            self.wss_link = None
 
         try:
             self.trigger["default"] = setting["trigger"]["default"]

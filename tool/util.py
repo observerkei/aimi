@@ -168,7 +168,9 @@ def load_module(
 
             module = None
             try:
-                spec = importlib.util.spec_from_file_location(module_name, load_module_path)
+                spec = importlib.util.spec_from_file_location(
+                    module_name, load_module_path
+                )
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
             except Exception as e:
@@ -189,6 +191,12 @@ def green_input(prompt: str):
     BOLD = "\033[1m"
     RESET = "\033[0m"
     return input(f"{GREEN}{BOLD}{prompt}{RESET}")
+
+
+def move_key_to_first_position(dictionary: dict, key: str):
+    value = dictionary.pop(key)
+    dictionary = {key: value, **dictionary}
+    return dictionary
 
 
 __log_disable: bool = False
