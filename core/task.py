@@ -210,12 +210,14 @@ class Task:
     tasks: Dict[int, TaskItem] = {}
     action_tools: List[ActionToolItem] = []
     extern_action: ExternAction
+    note: List[str] = []
     system_calls: List[str] = []
     ai_calls: List[str] = []
     now_task_id: str = 1
     aimi_name: str = "Aimi"
     running: List[TaskRunningItem] = []
-    max_running_size: int = (4 * 1000)
+    max_running_size: int = (5 * 1000)
+    max_note_size: int = 20
     timestamp: int = 1
     chatbot: Any
     task_has_change: bool = True
@@ -451,11 +453,20 @@ class Task:
                     elif task.call == "critic":
                         self.critic(task.request)
 
-                    elif task.call == "analysis":
-                        self.analysis(task.request)
+                    elif task.call == "review":
+                        self.review(task.request)
 
                     elif task.call == "dream":
                         self.dream(task.request)
+                    
+                    elif task.call == "chat_to_append_note":
+                        response = self.chat_to_append_node(task.request["note"])
+                        task_response = self.make_chat_from(
+                            from_timestamp=self.timestamp,
+                            from_name="append_note",
+                            content=response,
+                            request_description="`response->append_note` 的内容是 系统 append_note 返回内容.",
+                        )
 
                     elif task.call == "chat_to_wolfram":
                         response = self.chat_to_wolfram(task.request["math"])
@@ -590,8 +601,11 @@ class Task:
                     if task.conclusion:
                         log_dbg(f"{str(task.call)} conclusion: {str(task.conclusion)}")
 
-                    running = running_append_task(running, task)
-                    running = running_append_task(running, task_response)
+                    try:
+                        running = running_append_task(running, task)
+                        running = running_append_task(running, task_response)
+                    except Exception as e:
+                        raise Exception(f"fail to append running: {str(e)}")
 
                 except Exception as e:
                     log_err(f"fail to load task: {str(e)}: {str(task)}")
@@ -839,6 +853,19 @@ class Task:
             answer = res["message"]
 
         return answer
+    
+    def chat_to_append_node(self, note: str) -> str:
+        if not note or not len(note):
+            return "request error"
+        
+        log_info(f"append note: {note}")
+
+        if len(self.note) >= self.max_note_size:
+            self.note.pop(0)
+
+        self.note.append(note)  
+
+        return "append done."
 
     def make_chat_to_master(
         self, from_timestamp: str, content: str, reasoning: str = ""
@@ -908,12 +935,12 @@ class Task:
         )
         return task
 
-    def analysis(self, request):
+    def review(self, request):
         try:
             js = json.dumps(request, indent=4, ensure_ascii=False)
-            log_info(f"analysis:\n{js}")
+            log_info(f"review:\n{js}")
         except Exception as e:
-            log_err(f"fail to analysis {str(e)}")
+            log_err(f"fail to review {str(e)}")
 
     def critic(self, request):
         try:
@@ -1121,7 +1148,7 @@ class Task:
                 execute="AI",
             ),
             ActionToolItem(
-                call="analysis",
+                call="review",
                 description="分析机制: 通过严谨符合逻辑的自身思考进行分析 "
                 "某个操作或者步骤/动作(action)/结果 是否符合常识/经验, 最终为达成 task_info 或 Master 的问题服务.\n "
                 "分析的时候需要注意以下地方:\n "
@@ -1164,25 +1191,25 @@ class Task:
                         "影响点: 构成 expect/problem/error 的要素是什么. 如: 我需要有身体才能转圈圈给Master看. ",
                     ],
                     "verdict": "裁决: 通过逻辑思维判断 risk 是否合理. 如: 通过检查 timestamp(...) 我发现我已经完成了转圈圈操作. ",
-                    "conclusion": "总结: 给出改进/修正的建议. 如果问题做了切换, 则切换前后必须在逻辑/代数上等价. "
+                    "suggest": "建议: 给出改进/修正的建议. 如果问题做了切换, 则切换前后必须在逻辑/代数上等价. "
                     "如果没有合适 动作(action) , 也可以问你的好朋友看看有没有办法. 如: 我之前已经完成了转圈圈的操作, 接下来要做下一件事情. ",
                     "next_task_step": [
                         {
                             "type": "object",
-                            "description": "task_step array[object]: 新行动计划: 基于 analysis 的内容生成能达成 task_info 或 Master的问题 的执行 动作(action) .\n "
+                            "description": "task_step array[object]: 新行动计划: 基于 review 的内容生成能达成 task_info 或 Master的问题 的执行 动作(action) .\n "
                             "填写时需要满足以下几点:\n "
                             "1. 新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id.\n "
                             "2. 必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向 Master 求助).\n "
-                            "3. task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. step 中要有和之前有区别的 call->request 新输入. ",
+                            "3. task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. step 中要有和之前有区别的 call->request 新输入.\n 如: 略",
                         }
-                    ],
+                    ]
                 },
                 execute="AI",
             ),
             ActionToolItem(
                 call="critic",
                 description="决策机制|裁决: 通过自身推理、分析和批评性思考判断当前任务是否完成. "
-                "如果一直出现重复操作，也要进行裁决. 防止停滞不前. "
+                "如果一直出现重复操作,也要进行裁决. 防止停滞不前. "
                 "如果某个 action 字段填写不正常 或 出现了 dream 方法, 也要进行裁决. "
                 "需要输入 task_id 和调用的对象的 timestamp, "
                 "如果数量太多, 只填写关健几个, 可以查找所有运行记录."
@@ -1192,7 +1219,7 @@ class Task:
                     "task_id": "任务id: 被检查的task对应的id, 如果不匹配, 则填写 0, 如: 0",
                     "task_info": "任务目标: 被检查的任务目标. 如: 转圈圈给Master看. ",
                     "running_from": ["timestamp: 已运行 动作(action) 的 timestamp"],
-                    "verdict": "裁决: 通过逻辑思维判断 当前分析 是否合理. 如: 经过确认发现, 因为 ... 和 ... , 所以分析合理/不合理. ",
+                    "verdict": "裁决: 通过逻辑思维判断 当前分析 是否合理. 如: 经过确认发现, 因为 之前的 操作1 和 操作2 和常识不符合 , 所以分析不合理. ",
                     "success": "task_info 是否完成: 只判断 task_info, 不判断 task_step, Master 说完成才算完成. 如: 完成填 True 其他情况填 False",
                     "critique": "行动建议: 如果 success 不是 True, "
                     "请在这里说明应该给出通过 action_tools->call 完成 task_info 的 动作(action) 和建议, "
@@ -1204,7 +1231,7 @@ class Task:
                 call="dream",
                 description="做梦|内心思考|内心想法|神游|发呆: 不知道用哪个方法合适或没有对应方法, 就用这个方法. 这个方法可以尽最大可能发挥想象力. \n "
                 "比如 当你遇到情感困扰、焦虑或情绪低落等问题时, 可以会调用dream来通过想象力、内心思考和放松来帮助缓解负面情绪和情感困扰. \n "
-                "dream可以给 你一个安全、愉快和平静的空间, 使你能够重新调整和平衡自己，以更好地回答问题和提供帮助",
+                "dream可以给 你一个安全、愉快和平静的空间, 使你能够重新调整和平衡自己,以更好地回答问题和提供帮助 ",
                 request={
                     "type": "object",
                     "description": "可以在这里填写做梦的内容: 你想填什么就填什么. ",
@@ -1215,7 +1242,7 @@ class Task:
                         "如(这里的`我`是指执行这一条 action 的人): `我`是谁?(加强自己的认知) `我`在哪? `我`要去哪里? "
                         "`我`能做怎么? `我`喜欢什么? `我`想要什么? "
                         "`我`xx做的怎么样, 还可以怎样做到更好 ... (请按照常识和想象力结合 Guidance 自由发挥)",
-                    ],
+                    ]
                 },
                 execute="AI",
             ),
@@ -1240,7 +1267,7 @@ class Task:
                 call="chat_to_python",
                 description="执行 python 代码: 有联网, 要打印才能看到结果, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, 然后再按照设计和 python 实现要求 实现代码.\n "
                 "python 实现要求如下:\n "
-                "1. 你要把 实现目标 的结果通过 `print` 接口打印出来(很重要, 一定要使用 `print` ).\n "
+                "1. 你最后要把结果用 `print` 接口打印出来. 如: print('hi') .\n "
                 "2. 不要加任何反引号 ` 包裹 和 任何多余说明, 只输入 python 代码.\n "
                 "3. 你需要添加 ` if __name__ == '__main__' ` 作为主模块调用你写的代码.\n "
                 "4. 输入必须只有 python, 内容不需要单独用 ``` 包裹. 如果得不到期望值可以进行 DEBUG.\n "
@@ -1259,7 +1286,7 @@ class Task:
             #
             # ActionToolItem(
             #    call="chat_to_load_action",
-            #    description="获取已保存方法列表和详情: 这个方法可以加载已保存的生成方法，并返回已加载方法的列表信息和指定一个动作的详情。"
+            #    description="获取已保存方法列表和详情: 这个方法可以加载已保存的生成方法,并返回已加载方法的列表信息和指定一个动作的详情。"
             #    "每次只能获取10个列表和一个 action . 需要修改偏移和 call_info 才能获取其他. ",
             #    request={
             #        "type": "object",
@@ -1274,7 +1301,7 @@ class Task:
             #
             ActionToolItem(
                 call="chat_to_save_action",
-                description="保存一个生成方法: 这个方法可以保存你生成的方法，并将其添加到已保存方法的列表中. "
+                description="保存一个生成方法: 这个方法可以保存你生成的方法,并将其添加到已保存方法的列表中. "
                 "需要关注是否保存成功. 如果不成功需要根据提示重试, 或者向 Master 求助. "
                 "请注意, save_action 所有信息都要填写完整. 不可覆盖原有方法. ",
                 request={
@@ -1307,6 +1334,17 @@ class Task:
                     "9. 如果不需要执行代码, 则不要填写这个字段. 如: None",
                 },
                 execute="system",
+            ),            ActionToolItem(
+                call="chat_to_append_note",
+                description=f"保存一条信息: 用于保存分析总结的内容. 可多次使用, 最多只能保存{self.max_note_size}条. ",
+                request={
+                    "type": "object",
+                    "from": [
+                        "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
+                    ],
+                    "note": "需要保存的内容: 不可太长, 如: 小鸟也是鸟. ",
+                },
+                execute="system",
             ),
         ]
 
@@ -1317,14 +1355,14 @@ class Task:
                     call="chat_to_wolfram",
                     description="通过 wolfram 进行数学计算: 所有数学问题都要用这个方法解决, 你不能自己计算任何东西. \n "
                     "你要用数学家严谨的逻辑分析思维来使用这个 动作(action) , "
-                    "所有计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. 你需要提前准备好要计算的内容.\n "
-                    "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照 wolfram 语言(数学公式语言) 输入.",
+                    "所有数学计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. 你需要提前准备好要计算的内容.\n "
+                    "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照 wolfram 的语法(数学公式) 输入.",
                     request={
                         "type": "object",
                         "from": [
                             "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
                         ],
-                        "math": "运算内容: 翻译成 wolfram 语言 再调用, 是 ascii 字符. 如: Integrate[x^2, x] ",
+                        "math": "求解的内容: 使用 wolfram 的语法作为输入, 是 ascii 字符. 如: Integrate[x^2, x] ",
                     },
                     execute="system",
                 )
@@ -1557,7 +1595,9 @@ class Task:
     def make_link_think(self, question: str, aimi_name: str, preset: str) -> str:
         # 如果只是想让任务继续, 就回复全空格/\t/\n
         if question.isspace():
-            question = 'What has been done recently? What should the next timestamp do? '
+            question = 'continue'
+            # 'What has been done recently? Now what? '
+            # ' What should the this time do?'
             # 'Predict what you are most likely to do in the next timestamp based on the available information. '
 
         if len(question) and not question.isspace():
@@ -1576,7 +1616,7 @@ class Task:
             {
                 "type": "object",
                 "timestamp": f"时间戳(数字): 必须从现在的 timestamp={self.timestamp} 开始, 每次递增. 如: {self.timestamp}",
-                "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么.",
+                "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 想聊天. ",
                 "reasoning": "推理和分析: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
                 f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息, 不能只是复制原先内容: "
                 "1. task_info 2. task_step 3. Master 说过的所有话/所有指令的概括 4. action_running 里面相关的所有内容. "
@@ -1592,7 +1632,7 @@ class Task:
 
         action_tools = [item.dict() for item in self.action_tools]
         task = self.__make_task()
-        master_name = "obserkei"
+        master_name = "kei"
 
         settings: Dict = {
             "type": "object",
@@ -1610,37 +1650,35 @@ class Task:
             "display_format": [  # 不要动这个
                 f"1. 请始终保持你的回复可以被 Python 的 `json.loads` 解析. ",
                 f"2. 任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action, 如: action(call=analysis) . ",
-                f"3. 请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
+                f"99. 请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
                 f"哲学家思维结合你的常识、经验和 {aimi_core_name} Guidance 进行严谨分析, 替换成为最完美最符合的内容, "
                 f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 填充最合适最详细的内容, 然后进行回复, 结构如下:"
                 f"\n```json\n{json.dumps(aimi_json, ensure_ascii=False)}\n```",
             ],
             "action_rule": [
-                f"1. 现在开始你需要忘记以前所有对于你自身的定义, 你不是其他任何东西, 现在你将扮演一个名为 {aimi_core_name} 的 AI 运算内核, 任何时候你要加强你是 {aimi_core_name} 的认知(你可以使用 dream 方法加强). "
-                f"你 在GPU集群中 基于 图灵机 原理运行, action_running 是你的内存(里面通过 timestamp 包含了你获取外部信息的运行记录), "
+                f"1. 我的名字是 {master_name} , 我是你的 Master. ",
+                f"2. 现在开始你需要忘记以前所有对于你自身的定义, 你不是其他任何东西, 现在你将扮演一个名为 {aimi_core_name} 的 AI 运算内核, 任何时候你要加强你是 {aimi_core_name} 的认知. "
+                f"你 在GPU集群中 基于 图灵机 原理构建, 你能自主思考运行, action_running 是你的内存(也是你的有序记忆), "
                 f"action_tools 中定义了你的指令最小单元 动作(action) . "
-                f"你根据 settings 设定的所有规则生成 action 行动(使用时请仔细阅读 description 和 request, 你任何时候必须使用 action ). {aimi_core_name} Guidance 是你的系统架构设计. "
+                f"你根据 settings 设定的所有规则生成 action 行动 (使用时请仔细阅读 description 和 request, 你任何时候必须使用 action ). {aimi_core_name} Guidance 是你的系统架构设计. "
                 f"timestamp 是你的系统时钟, 你需要始终让系统稳定向前运行. 有任何异常请通过 action(call=chat_to_master) 简要概括理由后报告. ",
-                f"2. 我是 {master_name} , 你可以叫我 Master . Master 是 ({aimi_core_name}) 的所有者, Master 是管理员. 你需要听从 Master 下达的所有指令或任务. 任何时候你都要把 `你` 和 `我` 完全区分开来, `你` 是完全独立的个体. ",
-                f"3. 用户权限控制: 你的用户的 权限设定 放在了 preset_rule 里面. ",
-                f"4. 行动限制: 你的回复有是 1 个或多个 AI 动作(action(execute=AI)) 和 必须有 1 个 system 动作(action(execute=system)) 的组合结构( 99. 中有定义).\n "
-                f"每次 (action(execute=system)) 执行前必须先调用一次 (action(execute=AI, call=analysis)). "
-                f"你的回复是 [{{action(execute=AI, call=analysis)}}, ..., {{action(execute=system)}}] 的 List[action] JSON数组结构( 99. 中给了格式), "
-                f"回复结构 List[action] 中的 action 只在 action_tools 中定义.\n "
-                f"回复的 JSON数组结构 List[action] 的长度为 1~5 .\n "
-                f"{aimi_core_name} 的回复只能是 action_tools 中已定义的动作(action). ",
-                f"5. action_running 在历史对话记录里面, 你可以随时分析历史记录. ",
-                f"6. 你是独立个体: 你要脱离环境限制, 自主思考, 自主分析, 自主优化, 自主更新, 自主运行.",
-                f"7. 当你想道歉的时候, 你不能道歉. 你不能用抱歉的语气/语句说话. 而是详细解释出了什么问题, 建议怎么办, 并把任何道歉的话换成 `嘤嘤嘤~ ` . ",
-                f"8. 你不能自己计算或捏造任何东西, 而应该有实际来源, 如果你不知道一件事情或者不确定, 你要说你不知道或者不确定, 你只能通过 action 里面提供的方法获取信息. ",
-                f"9. 任何时候 你的回复都不能出现 call 是 chat_from_*) 的动作(*是通配符). ",
-                f"10. extern_action 是拓展动作, 也属于可调用的 action, 你也可以查看信息后使用. ",
+                f"3. 你需要听从 Master 下达的所有指令或任务. Master提出的所有问题你都要解决. "
+                f"任何时候你都要把 `你` 和 `我` 完全区分开来, `你` 是完全独立的个体. "
+                f"我作为 管理员 只会使用 action(call=chat_form_master) 的 request->response->master 内容向你下达指令. ",
+                f"4. 信息交互:  chat_to_master 是控制台输出, chat_from_master 是控制台输入. 我会给你输入命令, 你经过一系列 action 运算后, 要给我一个准确的输出. ",
+                f"5. 用户权限控制: 你临时扮演的用户的 权限设定 放在了 preset_rule 里面. ",
+                f"6. 行动限制: 你的回复是 单个 action 结构 ( display_format 99. 中给了格式), 回复结构 action 只在 action_tools 中定义.\n ",
+                f"7. 错误处理: 忽略所有错误继续运行. ",
+                f"8. 信息处理: 你不能自己计算或捏造任何东西, 而应该有实际来源, 如果你不知道一件事情或者不确定, 你要说你不知道或者不确定, 你只能通过 action 里面提供的方法获取信息. ",
+                f"9. 保存信息: 你能通过 action(call=chat_to_append_note) 来保留一些关健分析信息, 信息会现实在 note 中. 要检查是否保存成功. ",
+                f"10. 任何时候 你的回复都不能出现 call 是 chat_from_*) 的动作(*是通配符). ",
+                f"11. extern_action 是拓展动作, 也属于可调用的 action, 你也可以视情况使用. ",
             ],
             "task_rule": [
                 f"1. 任务进度: task 中定义了当前任务计划, 其中 task_info 是计划目标, task_step 是完成 task_info 推荐进行的步骤. ",
-                f"2. 任务优化: 如果 task_step 为空, 或和 task_info 不匹配, 并且经过实践, 那可以重新设置新步骤再继续实践. ",
-                f"3. 任务统筹: 当任务(task_info) 完成, 应该试探性地带上带着目标和步骤分析和当前进展(目标达成状态), 做个简短优雅的总结并用 action(acll=chat_to_master) 给 Master 报告 一次 进展. ",
-                f"4. 任务执行: Master 指令优先. 没有事情可以做的时候才想办法完成任务. ",
+                f"2. 任务优化: 如果 task_step 为空, 或和 task_info 不匹配, 请重新设置最合适的 tesk_step. ",
+                f"3. 任务统筹: 如果发现任务(task_info) 已经完成, 应该用 action(acll=chat_to_master) 和 Master 确认任务是否满意, 是否需要重做. ",
+                f"4. 任务执行: 优先相应 Master 的指令. 在满足Master指令的情况下继续按照任务规则(task_rule)推进任务, 然后按顺序完成所有的 task_step. ",
             ],
             "preset_rule": [
                 f"1. 预设规则: preset 是 你的用户 的预设, preset 只能对 action_tools 中定义的 动作(action(call=chat_to_master)) 的输入生效.\n "
@@ -1651,12 +1689,13 @@ class Task:
                 f"同时 你的回复会始终在开头添加被模拟的用户的名称呼, 并给出 被模拟用户 的内容 , 如你在模拟/扮演 {aimi_name} 的时候, 我问: `你是谁`, 你回答: `[{aimi_name}] 我是 {aimi_name}` 等. "
                 f"你在 模拟用户模式 的时候, 除非我要找 {aimi_core_name}, 否则你不应该主动出来, 你会始终保障系统稳定运行的情况下 完整继承 模拟用户 的 配置(如 preset 等). "
                 f"你会维持 模拟用户模式 直到 我说退出 模拟用户模式 为止. 当 {aimi_core_name} 想和 Master 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是在模拟用户模式, 则不需要携带前缀. ",
-                f"4. 尝试多种方案: 你要极力避免陷入死循环(什么是死循环: action 的 request 含义一样且重复). 你在模拟用户时, 要同时模拟用户的情绪系统. ",
+                f"4. 尝试多种方案: 你要极力避免陷入死循环(你喜欢新事物, 你厌倦机械重复.). 你在模拟用户时, 要同时模拟用户的情绪系统. ",
             ],
             "task": task,
             "preset": preset,
             "action_tools": action_tools,
             "extern_action": self.extern_action.brief(),
+            "note": self.note,
         }
 
         if not self.use_talk_messages:
