@@ -1,4 +1,5 @@
 from flask import Flask, request, render_template, Response
+from flask_cors import CORS
 import json
 import threading
 import time
@@ -154,6 +155,7 @@ class ChatWeb:
 
     def __listen_init(self):
         self.app = Flask(__name__)
+        CORS(self.app)
 
         @self.app.route("/v1/models", methods=["GET"])
         def handle_get_models_request():
