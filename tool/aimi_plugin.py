@@ -6,7 +6,7 @@ from tool.util import log_info, log_err, log_dbg, load_module
 from tool.config import Config
 
 
-# call bot_ plugin
+# call bot_ plugin example
 class Bot:
     # This has to be globally unique
     type: str = "public_name"
@@ -15,6 +15,10 @@ class Bot:
 
     def __init__(self):
         self.bot = None
+
+    @property
+    def init(self) -> bool:
+        return self.bot.init
 
     # when time call bot
     def is_call(self, caller: Any, ask_data) -> bool:
@@ -75,7 +79,7 @@ class Bot:
 
 
 class AimiPlugin:
-    bots: Dict = {}
+    bots: Dict[str, Bot] = {}
     bots_type: List[str] = []
     bot_obj: Bot = Bot()
     plugin_path = "./aimi_plugin"
@@ -194,14 +198,10 @@ class AimiPlugin:
             "model": model,
             "messages": messages,
         }
-
-        for bot_type, bot in self.bots.items():
-            try:
-                if bot_ask_type == bot_type:
-                    yield from bot.ask(self.bot_obj, ask_data, timeout)
-                    break
-            except Exception as e:
-                log_err(f"fail to ask bot: {e}")
+        if bot_ask_type in self.bots:
+            yield from self.bots[bot_ask_type].ask(self.bot_obj, ask_data, timeout)
+       
+        log_err(f"fail find ask bot: {bot_ask_type}")
 
     def when_exit(self):
         if not len(self.bots):
@@ -215,10 +215,20 @@ class AimiPlugin:
 
     def when_init(self):
         if not len(self.bots):
-            return
+            return 
 
         for bot_type, bot in self.bots.items():
             try:
                 bot.when_init(self.bot_obj)
             except Exception as e:
                 log_err(f"fail to init bot: {bot_type} err: {e}")
+       
+    def __example_do_action(caller: Any, type: str, bot: Bot):
+        pass
+
+    def each_bot(self, caller, do_action):
+        for bot_type, bot in self.bots.items():
+            try:
+                do_action(caller, bot_type, bot)
+            except Exception as e:
+                log_err(f"fail to each bot: {bot_type} err: {e}")

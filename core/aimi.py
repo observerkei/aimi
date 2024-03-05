@@ -9,10 +9,7 @@ from contextlib import suppress
 from tool.config import Config
 from tool.util import log_dbg, log_err, log_info, make_context_messages
 from tool.openai_api import OpenAIAPI
-from tool.bing_api import BingAPI
-from tool.bard_api import BardAPI
-from tool.aimi_plugin import AimiPlugin
-from tool.wolfram_api import WolframAPI
+from tool.aimi_plugin import AimiPlugin, Bot
 from chat.qq import ChatQQ
 from chat.web import ChatWeb
 
@@ -22,37 +19,32 @@ from core.task import Task
 
 
 class ChatBot:
-    bots: Dict[str, Any] = {}
+    bots: Dict[str, Bot] = {}
 
     @property
     def OpenAI(self) -> str:
         return OpenAIAPI.type
 
-    @property
-    def Bing(self) -> str:
-        return BingAPI.type
-
-    @property
-    def Bard(self) -> str:
-        return BardAPI.type
-
-    @property
-    def Wolfram(self) -> str:
-        return WolframAPI.type
-
     def __init__(self):
         self.bots = {
             OpenAIAPI.type: OpenAIAPI(),
-            BingAPI.type: BingAPI(),
-            BardAPI.type: BardAPI(),
-            WolframAPI.type: WolframAPI(),
         }
+
+    def append(self, type: str, bot: Bot):
+        if type:
+            self.bots[type] = bot
 
     def ask(
         self, type: str, question: str, context: Any = None
     ) -> Generator[dict, None, None]:
-        yield from self.bots[type].ask(question)
-
+        if type in self.bots:
+            yield from self.bots[type].ask(question)
+        log_err(f"no model to ask of type: {Bot}")
+    
+    def get_bot(self, type: str) -> Bot:
+        if type in self.bots:
+            return self.bots[type]
+        return None
 
 class ReplyStep:
     class TalkList:
@@ -174,9 +166,9 @@ class Aimi:
     task: Task
     aimi_plugin: AimiPlugin
     openai_api: OpenAIAPI
-    bing_api: BardAPI
-    bard_api: BardAPI
-    wolfram_api: WolframAPI
+    bing_api: Bot
+    bard_api: Bot
+    wolfram_api: Bot
     chat_web: ChatWeb
     chat_qq: ChatQQ
     chatbot: ChatBot
@@ -186,14 +178,22 @@ class Aimi:
         self.config = Config()
         self.md = Md()
         self.memory = Memory()
-        self.aimi_plugin = AimiPlugin()
 
         self.chatbot = ChatBot()
+
+        self.aimi_plugin = AimiPlugin()
+        # setup aimi_plugin to chatbot list
+        def fill_chatbot(chatbot, type, bot):
+            chatbot.append(type, bot)
+        self.aimi_plugin.each_bot(self.chatbot, fill_chatbot)
+
         self.openai_api: OpenAIAPI = self.chatbot.bots[self.chatbot.OpenAI]
         self.max_link_think = self.openai_api.max_requestion
-        self.bing_api = self.chatbot.bots[self.chatbot.Bing]
-        self.bard_api = self.chatbot.bots[self.chatbot.Bard]
-        self.wolfram_api = self.chatbot.bots[self.chatbot.Wolfram]
+
+        # Adapt the history code
+        self.bing_api = self.chatbot.get_bot('bing')
+        self.bard_api = self.chatbot.get_bot('bard')
+        self.wolfram_api = self.chatbot.get_bot('wolfram')
 
         self.task = Task(self.chatbot)
 
@@ -666,22 +666,13 @@ answer this following question: {{
         if len(models):
             bot_models[self.openai_api.type] = models
 
-        models = self.bing_api.get_models()
-        if len(models):
-            bot_models[self.bing_api.type] = models
-
-        models = self.wolfram_api.get_models()
-        if len(models):
-            bot_models[self.wolfram_api.type] = models
-
-        models = self.bard_api.get_models()
-        if len(models):
-            bot_models[self.bard_api.type] = models
-
-        plugin_models = self.aimi_plugin.bot_get_models()
-        for bot_type, models in plugin_models.items():
-            if len(models):
-                bot_models[bot_type] = models
+        try:
+            plugin_models = self.aimi_plugin.bot_get_models()
+            for bot_type, models in plugin_models.items():
+                if len(models):
+                    bot_models[bot_type] = models
+        except Exception as e:
+            log_err(f"fail to get plugin bots models: {e}")
 
         # log_dbg(f"models: {str(bot_models)}")
 

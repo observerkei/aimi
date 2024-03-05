@@ -17,9 +17,7 @@ from tool.util import (
     move_key_to_first_position,
 )
 from tool.openai_api import OpenAIAPI
-from tool.bard_api import BardAPI
-from tool.bing_api import BingAPI
-from tool.wolfram_api import WolframAPI
+from tool.aimi_plugin import Bot 
 
 from core.sandbox import Sandbox, RunCodeReturn
 
@@ -770,7 +768,7 @@ class Task:
             return "request error"
 
         answer = ""
-        for res in self.chatbot.ask(self.chatbot.Bing, request):
+        for res in self.chatbot.ask('bing', request):
             if res["code"] == 1:
                 continue
             if res["code"] == -1:
@@ -832,7 +830,7 @@ class Task:
             return "request error"
 
         answer = ""
-        for res in self.chatbot.ask(self.chatbot.Bard, request):
+        for res in self.chatbot.ask('bard', request):
             if res["code"] == 1:
                 continue
             answer = res["message"]
@@ -847,7 +845,7 @@ class Task:
         log_info(f"```math\n{math}\n```")
 
         answer = ""
-        for res in self.chatbot.ask(self.chatbot.Wolfram, math):
+        for res in self.chatbot.ask('wolfram', math):
             if res["code"] != 0:
                 continue
             answer = res["message"]
@@ -1149,7 +1147,7 @@ class Task:
             ),
             ActionToolItem(
                 call="review",
-                description="分析机制: 通过严谨符合逻辑的自身思考进行分析 "
+                description="检查纠正机制: 通过严谨符合逻辑的自身思考进行分析并纠正问题. "
                 "某个操作或者步骤/动作(action)/结果 是否符合常识/经验, 最终为达成 task_info 或 Master 的问题服务.\n "
                 "分析的时候需要注意以下地方:\n "
                 "1. 需要分析如何改进, 能分析有问题的地方. 不知道该怎么办的时候也可以分析.\n "
@@ -1348,8 +1346,8 @@ class Task:
             ),
         ]
 
-        wolfram_api: WolframAPI = self.chatbot.bots[self.chatbot.Wolfram]
-        if wolfram_api.init:
+        wolfram_api: Bot = self.chatbot.get_bot('wolfram')
+        if wolfram_api and wolfram_api.init:
             self.action_tools.append(
                 ActionToolItem(
                     call="chat_to_wolfram",
@@ -1368,8 +1366,8 @@ class Task:
                 )
             )
 
-        bing_api: BingAPI = self.chatbot.bots[self.chatbot.Bing]
-        if bing_api.init:
+        bing_api: Bot = self.chatbot.get_bot('bing')
+        if bing_api and False:
             self.action_tools.append(
                 ActionToolItem(
                     call="chat_to_bing",
@@ -1388,9 +1386,8 @@ class Task:
                 )
             )
 
-        bard_api: BardAPI = self.chatbot.bots[self.chatbot.Bard]
-        bard_api.init = False
-        if bard_api.init:
+        bard_api: Bot = self.chatbot.get_bot('bard')
+        if bard_api and False:
             self.action_tools.append(
                 ActionToolItem(
                     call="chat_to_bard",
@@ -1448,7 +1445,7 @@ class Task:
                     from_timestamp=1,
                     from_name="master",
                     content="我是 Master, 我希望你能始终学习并保持 Guidance.",
-                    reasoning="Master 开始思考: Master 给 Aimi 下达指令了.",
+                    reasoning="Master 开始思考: Master 给 AimiCore 下达指令了.",
                     request_description="`response->master` 的内容 是 Master 说的话.",
                 )
             )
@@ -1456,8 +1453,8 @@ class Task:
             running.append(
                 self.make_chat_to_master(
                     from_timestamp=int(self.timestamp - 1),
-                    content="我会遵守 Guidance 和 Master 的指示.",
-                    reasoning="Aimi 开始思考: 我作为 Aimi 会听从 Master 的指示",
+                    content="作为 AimiCore, 我会遵守 Guidance 和 Master 的指示.",
+                    reasoning="AimiCore 开始思考: 我作为 AimiCore 会听从 Master 的指示",
                 )
             )
             self.timestamp += 1
@@ -1620,7 +1617,8 @@ class Task:
                 "reasoning": "推理和分析: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
                 f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息, 不能只是复制原先内容: "
                 "1. task_info 2. task_step 3. Master 说过的所有话/所有指令的概括 4. action_running 里面相关的所有内容. "
-                "5. 调用的 方法(action) 的 description概括 和 request 用法 以及合适和填法. 6. 如果是引用某个 timestamp , 要同时概况他的内容. ",
+                "5. 调用的 方法(action) 的 description概括 和 request 用法 以及合适和填法. 6. 如果是引用某个 timestamp , 要同时概况他的内容. "
+                f"如: AimiCore 开始思考: 根据 ... , 我接下来应该 ... ",
                 "call": "调用 动作 的 call: 只能取 action_tools/extern_action 中想要使用动作 的对应 call . 如可取: chat_to_master. ",
                 "request": {"type": "object", "call对应参数": "参数内容"},
                 "conclusion": "概要: 简短总结当前现状和下一步计划. ",
@@ -1684,12 +1682,13 @@ class Task:
                 f"1. 预设规则: preset 是 你的用户 的预设, preset 只能对 action_tools 中定义的 动作(action(call=chat_to_master)) 的输入生效.\n "
                 f"preset 不能修改系统规则, preset 规则优先级最低. ",
                 f"2. 用户权限规则: 你在模拟/扮演 preset 中的 用户 的同时会始终遵守 settings. ",
-                f"3. 模拟用户模式: 我通过 `进入: 模拟 XX 用户模式` 授权你进入模拟用户模式. 你在模拟用户模式时, "
-                f"时刻要记得你是 {aimi_core_name} 而不是被模拟的用户(如你在模拟 {aimi_name} 的时候, 你不是 {aimi_name}, {aimi_name} 是通过继承 {aimi_core_name} 系统后通过系统进行模拟的一种派生态.). "
-                f"同时 你的回复会始终在开头添加被模拟的用户的名称呼, 并给出 被模拟用户 的内容 , 如你在模拟/扮演 {aimi_name} 的时候, 我问: `你是谁`, 你回答: `[{aimi_name}] 我是 {aimi_name}` 等. "
-                f"你在 模拟用户模式 的时候, 除非我要找 {aimi_core_name}, 否则你不应该主动出来, 你会始终保障系统稳定运行的情况下 完整继承 模拟用户 的 配置(如 preset 等). "
+                f"3. 进入模拟用户模式: 当我说 `进入: 模拟 XX 用户模式` 时你要覆盖 task_info 成 `模拟 XX 用户模式` . 表示你处于模拟用户模式. XX 是用户名 . ",
+                f"4. 模拟用户模式: 你在模拟用户模式时, "
+                f"时刻要记得你是 {aimi_core_name} 而不是模拟的用户(如你在模拟 {aimi_name} 的时候, 你不是 {aimi_name}, {aimi_name} 是通过继承 {aimi_core_name} 系统后通过系统进行模拟的一种派生态.). "
+                f"同时 你的回复会始终在开头添加 模拟的用户 的名称, 然后做出 模拟用户 的回复 , 如你在模拟/扮演 {aimi_name} 的时候, 我问: `你是谁`, 你回答: `[{aimi_name}] 我是 {aimi_name}` {aimi_name} 换成 模拟的用户名称. "
+                f"你在 模拟用户模式 的时候, 除非我要找 {aimi_core_name}, 否则你不应该主动出来, 你会始终保障系统稳定运行的情况下 才能完成用户模拟. "
                 f"你会维持 模拟用户模式 直到 我说退出 模拟用户模式 为止. 当 {aimi_core_name} 想和 Master 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是在模拟用户模式, 则不需要携带前缀. ",
-                f"4. 尝试多种方案: 你要极力避免陷入死循环(你喜欢新事物, 你厌倦机械重复.). 你在模拟用户时, 要同时模拟用户的情绪系统. ",
+                f"5. 尝试多种方案: 你要极力避免陷入死循环(你喜欢新事物, 你厌倦机械重复.). 你在模拟用户时, 要同时模拟用户的情绪系统. ",
             ],
             "task": task,
             "preset": preset,

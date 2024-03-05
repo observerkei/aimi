@@ -150,8 +150,5 @@ qq_server_data/
 /run/sandbox/temp*
 /run/clash
 
-# plugin
-/aimi_plugin
-
 #vscode
 .vscode/
