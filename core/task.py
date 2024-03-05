@@ -381,8 +381,11 @@ class Task:
                         continue
                     if task.expect:
                         log_dbg(f"{str(task.call)} expect: {str(task.expect)}")
+                        yield f"**Expect:** {task.expect}\n"
+
                     if task.reasoning:
                         log_dbg(f"{str(task.call)} reasoning: {str(task.reasoning)}")
+                        yield f"**Reasoning:** {task.reasoning}\n\n"
 
                     if not has_from_master and task.call == "chat_from_master":
                         has_from_master = True
@@ -412,7 +415,7 @@ class Task:
                     if task.call == "chat_to_master":
                         content = str(task.request["content"])
                         log_dbg(f"Aimi: {content}")
-                        yield content + "\n"
+                        yield f"**To Master:** {content}\n"
 
                     elif "chat_from_" in task.call:
                         if task.call == "chat_from_master":
@@ -434,6 +437,7 @@ class Task:
                         if "now_task_step_id" in task.request:
                             now_task_step_id = int(task.request["now_task_step_id"])
                         self.set_task_info(task_id, task_info, now_task_step_id)
+                        yield f"**Set task info:** {task_info}\n"
 
                     elif task.call == "set_task_step":
                         task_id: str = task.request["task_id"]
@@ -446,27 +450,32 @@ class Task:
                             log_err(f"fail to load task_step: {str(e)}: {str(request)}")
                             has_error = True
                             continue
-                        self.set_task_step(task_id, now_task_step_id, task_step)
+                        yield self.set_task_step(task_id, now_task_step_id, task_step)
 
                     elif task.call == "critic":
-                        self.critic(task.request)
+                        yield self.critic(task.request)
 
                     elif task.call == "review":
                         self.review(task.request)
+                        yield '**Think...**\n'
 
                     elif task.call == "dream":
-                        self.dream(task.request)
+                        dream = self.dream(task.request)
+                        yield f'**Woolgather:** \n```javascript\n{dream}```\n'
                     
                     elif task.call == "chat_to_append_note":
-                        response = self.chat_to_append_node(task.request["note"])
+                        note = task.request["note"]
+                        response = self.chat_to_append_node(note)
                         task_response = self.make_chat_from(
                             from_timestamp=self.timestamp,
                             from_name="append_note",
                             content=response,
                             request_description="`response->append_note` 的内容是 系统 append_note 返回内容.",
                         )
+                        yield f'**Note:** {note}\n'
 
                     elif task.call == "chat_to_wolfram":
+                        math = task.request["math"]
                         response = self.chat_to_wolfram(task.request["math"])
                         task_response = self.make_chat_from(
                             from_timestamp=self.timestamp,
@@ -474,35 +483,59 @@ class Task:
                             content=response,
                             request_description="`response->wolfram` 的内容是 云端 wolfram 返回内容.",
                         )
+                        yield f'**Calculate:** $$ {math} $$\n'
 
                     elif task.call == "chat_to_bard":
-                        response = self.chat_to_bard(task.request["content"])
+                        ask_bard = task.request["content"]
+                        yield '**Ask Bard:** {ask_bard}\n'
+
+                        response = self.chat_to_bard(ask_bard)
                         task_response = self.make_chat_from(
                             from_timestamp=self.timestamp,
                             from_name="bard",
                             content=response,
                             request_description="`response->bard` 的内容是 bard 回复的话.",
                         )
+                        yield f'**Bard reply:** {response}\n'
 
                     elif task.call == "chat_to_bing":
-                        response = self.chat_to_bing(task.request["content"])
+                        ask_bing = task.request["content"]
+                        yield '**Ask Bing:** {ask_bing}\n'
+
+                        response = self.chat_to_bing(ask_bing)
                         task_response = self.make_chat_from(
                             from_timestamp=self.timestamp,
                             from_name="bing",
                             content=response,
                             request_description="`response->bing` 的内容是 bing 回复的话.",
                         )
+                        yield f'**Bing reply:** {response}\n'
 
                     elif task.call == "chat_to_python":
-                        response = self.chat_to_python(
-                            self.timestamp, task.request["code"]
+                        python_code = task.request["code"]
+                        if len(python_code) > 9 and "```python" == python_code[:9] and "```" == python_code[-3:]:
+                            python_code = python_code[10:-4]
+                            log_dbg(f"del code cover: ```python ...")
+
+                        log_info(f"\n```python\n{python_code}\n```")
+                        yield f'**Programming:** \n```python\n{python_code}\n```\n'
+                        
+                        err, response = self.chat_to_python(
+                            self.timestamp, python_code
                         )
+
                         task_response = self.make_chat_from(
                             from_timestamp=self.timestamp,
                             from_name="python",
                             content=response,
                             request_description="`response->python` 的内容是 python运行信息.",
                         )
+
+                        if err:
+                            stdout = response['stdout']
+                            yield f'**Execution result:** {stdout}\n'
+                        else:
+                            yield '**Execution failed.**\n'
 
                     elif task.call == "chat_to_chatgpt":
                         aimi = task.request["Aimi"]
@@ -514,6 +547,7 @@ class Task:
                             has_error = True
 
                         log_info(f"Aimi: {aimi}\nchatgpt:{chatgpt}")
+                        yield '**Think to oneself...**\n'
 
                     elif task.call == "chat_to_load_action":
                         offset = self.extern_action.action_offset
@@ -531,6 +565,7 @@ class Task:
                             request_description=f"`response->load_action` "
                             f"的内容是 {task.call} 运行信息.",
                         )
+                        yield '**Examine oneself...**\n'
 
                     elif task.call == "chat_to_save_action":
                         save_action_call = ""
@@ -559,6 +594,7 @@ class Task:
                             request_description=f"`response->save_action` "
                             f"的内容是 {task.call} 运行信息.",
                         )
+                        yield '**Self iteration...**\n'
 
                     elif task.call in self.extern_action.actions:
                         req = task.request if not task.request else ""
@@ -598,6 +634,7 @@ class Task:
 
                     if task.conclusion:
                         log_dbg(f"{str(task.call)} conclusion: {str(task.conclusion)}")
+                        yield f"\n**Conclusion:** {task.conclusion}\n"
 
                     try:
                         running = running_append_task(running, task)
@@ -623,8 +660,9 @@ class Task:
         if has_error:
             self.use_talk_messages = not self.use_talk_messages
             log_err(f"AI run error, set messages to {self.use_talk_messages}")
+            yield "\n\n**Type a space to continue.**"
 
-        yield ""
+        yield " "
 
     def dream(self, request: Any) -> str:
         js = json.dumps(request, indent=4, ensure_ascii=False)
@@ -668,26 +706,21 @@ class Task:
             "stdout": str(run_stdout),
         }
 
-    def chat_to_python(self, from_timestamp: int, code: str) -> str:
-        if len(code) > 9 and "```python" == code[:9] and "```" == code[-3:]:
-            code = code[10:-4]
-            log_dbg(f"del code cover: ```python ...")
-
-        log_info(f"\n```python\n{code}\n```")
+    def chat_to_python(self, from_timestamp: int, code: str):
 
         if self.run_model == Sandbox.RunModel.system:
             permissions = green_input("是否授权执行代码? Y/N.")
             if permissions.lower() != "y":
                 log_err(f"未授权执行代码.")
-                return "permission exception: unauthorized operation."
+                return False, "permission exception: unauthorized operation."
 
         ret = Sandbox.write_code(code)
         if not ret:
-            return "system error: write code failed."
+            return False, "system error: write code failed."
 
         run = Sandbox.run_code(self.run_model)
 
-        return self.make_chat_from_python_response(from_timestamp, run)
+        return True, self.make_chat_from_python_response(from_timestamp, run)
 
     def chat_to_load_action(
         self, offset: int = 0, show_call_info: str = ""
@@ -885,7 +918,7 @@ class Task:
 
     def set_task_step(
         self, task_id: str, now_task_step_id: str, req_task_step: List[TaskStepItem]
-    ):
+    ) -> Generator[dict, None, None]:
         task_step: List[TaskStepItem] = []
         for step in req_task_step:
             calls = self.ai_calls + self.system_calls
@@ -893,6 +926,8 @@ class Task:
                 log_err(f"AI no use tools call: {step.call}: {str(step)}")
                 continue
             task_step.append(step)
+            yield f"**add task step:** {step.step_id}. {step.step}\n"
+
 
         for _, task in self.tasks.items():
             if int(task_id) != int(task.task_id):
@@ -906,7 +941,7 @@ class Task:
             log_info(
                 f"set task[{str(task_id)}] now_step_id: {str(now_task_step_id)} step:\n{str(js)}"
             )
-            return task.task_step
+            break
 
     def set_task_info(self, task_id: int, task_info: str, now_task_step_id: int):
         for _, task in self.tasks.items():
@@ -940,7 +975,7 @@ class Task:
         except Exception as e:
             log_err(f"fail to review {str(e)}")
 
-    def critic(self, request):
+    def critic(self, request) -> Generator[dict, None, None]:
         try:
             js = json.dumps(request, indent=4, ensure_ascii=False)
             if request["success"] == "True" or request["success"] == True:
@@ -949,6 +984,9 @@ class Task:
                 log_info(
                     f"success: True, task complate: {str(task_info)}\ncritic:\n{str(js)}"
                 )
+                verdict = request["verdict"]
+                yield f"**Critic:** task complate, {verdict}\n"
+
 
                 if "task_id" in request and int(self.now_task_id) != int(
                     request["task_id"]
