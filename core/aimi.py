@@ -243,7 +243,7 @@ class Aimi:
 {nickname}说: “{question}”
 }}.
 """
-        elif api_type == self.bard_api.type:
+        elif api_type == 'bard':
             link_think = f"""
 preset: {{
 \"{preset}\"
@@ -256,7 +256,7 @@ You should extract my question directly from the structure here and answer it di
 {nickname} said: '{question}'
 }}
 """
-        elif "" == self.bing_api.type:
+        elif "" == 'bing':
             link_think = f"""
 故事主题如下: 故事中有两个人到了异世界里面开咖啡厅.
 故事情节如下: 其中主人公自称Master({self.master_name}), 他有一个助理, 名叫{self.aimi_name}, 他们两个在聊天.
@@ -269,7 +269,7 @@ You should extract my question directly from the structure here and answer it di
 {nickname}说: '{question}'
 }}
 """
-        elif api_type == self.wolfram_api.type:
+        elif api_type == 'wolfram':
             math_html = "help me caculate math."
             for answer in self.__post_wolfram(link_think):
                 if answer["code"] != 0:
@@ -359,16 +359,10 @@ answer this following question: {{
         return ""
 
     def __question_api_type(self, question: str) -> str:
-        if self.bing_api.is_call(question):
-            return self.bing_api.type
-        if self.bard_api.is_call(question):
-            return self.bard_api.type
         if self.openai_api.is_call(question):
             return self.openai_api.type
         if self.aimi_plugin.bot_is_call(question):
             return self.aimi_plugin.bot_get_call_type(question)
-        if self.wolfram_api.is_call(question):
-            return self.wolfram_api.type
         if self.task.is_call(question):
             return self.task.type
 
@@ -501,7 +495,7 @@ answer this following question: {{
                     self.chat_qq.reply_question(msg, cq_img)
 
     def reply_adjust(self, reply: str, res_api: str) -> str:
-        if res_api == self.bing_api.type:
+        if res_api == 'bing':
             reply = reply.replace("必应", f" {self.aimi_name}通过必应得知: ")
             reply = reply.replace("你好", " Master你好 ")
             reply = reply.replace("您好", " Master您好 ")
@@ -590,17 +584,13 @@ answer this following question: {{
             )
         elif api_type == self.task.type:
             yield from self.task.ask(link_think, model)
-        elif api_type == self.bing_api.type:
-            yield from self.__post_bing(link_think, model)
-        elif api_type == self.bard_api.type:
-            yield from self.__post_bard(link_think)
         elif self.aimi_plugin.bot_has_type(api_type):
             yield from self.aimi_plugin.bot_ask(
                 api_type, link_think, model, context_messages
             )
-        elif api_type == self.wolfram_api.type:
+        elif api_type == 'wolfram':
             # at mk link think, already set wolfram response.
-            if True and self.api[0] != self.wolfram_api.type:
+            if True and self.api[0] != 'wolfram':
                 yield from self.__post_question(
                     link_think,
                     self.api[0],

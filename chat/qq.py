@@ -28,8 +28,8 @@ class GoCQHttp:
         except:
             go_cqhttp_config = "./run/config.yml"
 
-        obj = read_yaml(go_cqhttp_config)
         try:
+            obj = read_yaml(go_cqhttp_config)
             self.account_uin = obj["account"]["uin"]
 
             http_config = obj["servers"][0]["http"]
@@ -47,6 +47,7 @@ class GoCQHttp:
 
         except Exception as e:
             log_err("fail to get go-cqhttp config: " + str(e))
+  
 
     def is_message(self, msg) -> bool:
         try:
@@ -180,10 +181,10 @@ class GoCQHttp:
 
 class BotManage:
     reply_time: Dict[int, int] = {}
-    protect_bot_ids: List[int]
-    reply_time_limit_s: int
-    day_reply_time_start: Any
-    day_reply_time_end: Any
+    protect_bot_ids: List[int] = []
+    reply_time_limit_s: int = 1
+    day_reply_time_start: Any = 1
+    day_reply_time_end: Any = 10
     reply_max_cnt: int = 10  # max reply limit
     reply_cur_cnt: int = 0  # cur reply limit
 
