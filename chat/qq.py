@@ -14,7 +14,7 @@ class GoCQHttp:
     name: str = "go-cqhttp"
     post_host: str = "127.0.0.1"
     post_port: int = 5700
-    notofy_host: str = "127.0.0.1"
+    notify_host: str = "127.0.0.1"
     notify_port: int = 5701
     account_uin: int = 0
 
