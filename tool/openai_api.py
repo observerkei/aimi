@@ -1,6 +1,6 @@
 import time
 from typing import Generator, List, Dict, Any
-from openai import OpenAI 
+from openai import OpenAI
 
 from tool.util import log_dbg, log_err, log_info
 from tool.config import Config
@@ -28,8 +28,8 @@ class OpenAIAPI:
         "gpt-3.5-turbo-1106",
         "gpt-3.5-turbo-16k",
         "gpt-3.5-turbo-16k-0613",
-        'gpt-3.5-turbo-instruct',
-        'gpt-3.5-turbo-instruct-0914',
+        "gpt-3.5-turbo-instruct",
+        "gpt-3.5-turbo-instruct-0914",
         "gpt-4",
         "gpt-4-0314",
         "gpt-4-0613",
@@ -80,7 +80,7 @@ class OpenAIAPI:
                 temperature=temperature,
                 top_p=top_p,
                 presence_penalty=presence_penalty,
-                frequency_penalty=frequency_penalty
+                frequency_penalty=frequency_penalty,
             )
 
     def web_ask(
@@ -127,12 +127,15 @@ class OpenAIAPI:
 
             except Exception as e:
                 log_err("fail to ask: " + str(e))
-                log_info("server fail, sleep 30")
-                time.sleep(30)
+                log_info("server fail")
 
                 answer["message"] = str(e)
                 answer["code"] = -1
                 yield answer
+                if req_cnt < self.max_repeat_times:
+                    log_dbg("wait 30s...")
+                    time.sleep(30)
+
 
             # request complate.
             if answer["code"] == 0:
@@ -161,11 +164,7 @@ class OpenAIAPI:
         # }
 
         req_cnt = 0
-        if (
-            not model
-            or not len(model)
-            or (model not in self.chat_completions_models)
-        ):
+        if not model or not len(model) or (model not in self.chat_completions_models):
             model = self.__get_bot_model(question)
         log_dbg(f"use model: {model}")
         # log_dbg(f"msg: {str(messages)}")
@@ -193,7 +192,7 @@ class OpenAIAPI:
                         break
 
                     answer["message"] += event.choices[0].delta.content
-                    yield answer 
+                    yield answer
 
                     res = event
 
@@ -204,14 +203,15 @@ class OpenAIAPI:
 
             except Exception as e:
                 log_err("fail to ask: " + str(e))
-                log_info("server fail, sleep 15")
-                time.sleep(15)
-                # log_info(f"try recreate {self.type} bot")
-                # self.__create_bot()
+                log_info("server fail")
 
                 answer["message"] = str(e)
                 answer["code"] = -1
                 yield answer
+
+                if req_cnt < self.max_repeat_times:
+                    log_dbg("wait 15s...")
+                    time.sleep(15)
 
             # request complate.
             if answer["code"] == 0:
@@ -256,9 +256,9 @@ class OpenAIAPI:
         if api_key and len(api_key):
             try:
                 self.openai = OpenAI(
-                        api_key=api_key,
-                        )
-                models = self.openai.models.list() #(model_type="chat")
+                    api_key=api_key,
+                )
+                models = self.openai.models.list()  # (model_type="chat")
                 for model in models:
                     if not (model.id in self.chat_completions_models):
                         continue

@@ -71,7 +71,10 @@ class Sandbox:
 
         result = Sandbox.__run_cmd(["docker", "build", "-t", "sandbox", "."])
         if result.returncode != 0:
-            raise Exception("build docker fail")
+            run.stdout = str(result.stdout.decode("utf-8"))
+            run.stderr = str(result.stderr.decode("utf-8"))
+            output = run.stderr if len(run.stderr) else run.stdout
+            raise Exception(f"build docker fail: {output}")
 
         build_log = result.stdout.decode("utf-8")
         if len(build_log):

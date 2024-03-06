@@ -49,6 +49,14 @@ class Bot:
     # no need define plugin_prefix
     plugin_prefix = "bot_"
 
+    # pack ask_data
+    def bot_pack_ask_data(self, question: str, model: str = "", messages: List = []):
+        return {
+            "question": question,
+            "model": model,
+            "messages": messages,
+        }
+
     # no need define bot_get_question
     def bot_get_question(self, ask_data):
         return ask_data["question"]
@@ -198,9 +206,12 @@ class AimiPlugin:
             "model": model,
             "messages": messages,
         }
+        ask_data = self.bot_obj.bot_pack_ask_data(
+            question=question, model=model, messages=messages
+        )
         if bot_ask_type in self.bots:
             yield from self.bots[bot_ask_type].ask(self.bot_obj, ask_data, timeout)
-       
+
         log_err(f"fail find ask bot: {bot_ask_type}")
 
     def when_exit(self):
@@ -215,14 +226,14 @@ class AimiPlugin:
 
     def when_init(self):
         if not len(self.bots):
-            return 
+            return
 
         for bot_type, bot in self.bots.items():
             try:
                 bot.when_init(self.bot_obj)
             except Exception as e:
                 log_err(f"fail to init bot: {bot_type} err: {e}")
-       
+
     def __example_do_action(caller: Any, type: str, bot: Bot):
         pass
 

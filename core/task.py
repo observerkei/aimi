@@ -17,7 +17,7 @@ from tool.util import (
     move_key_to_first_position,
 )
 from tool.openai_api import OpenAIAPI
-from tool.aimi_plugin import Bot 
+from tool.aimi_plugin import Bot
 
 from core.sandbox import Sandbox, RunCodeReturn
 
@@ -29,7 +29,9 @@ class TaskStepItem(BaseModel):
     step: Optional[Union[int, str]]
     check: Optional[Union[str, None]] = ""
     call: Optional[Union[str, None]] = None
-    call_timestamp: Optional[Union[List[str], List[int], List[None], str, int, None]] = []
+    call_timestamp: Optional[
+        Union[List[str], List[int], List[None], str, int, None]
+    ] = []
 
 
 class ActionToolItem(BaseModel):
@@ -214,7 +216,7 @@ class Task:
     now_task_id: str = 1
     aimi_name: str = "Aimi"
     running: List[TaskRunningItem] = []
-    max_running_size: int = (5 * 1000)
+    max_running_size: int = 5 * 1000
     max_note_size: int = 20
     timestamp: int = 1
     chatbot: Any
@@ -361,7 +363,6 @@ class Task:
             system_call_cnt = 0
             skip_call = 0
             skip_timestamp = 0
-            has_from_master = False
             task_cnt = 1
             for task in tasks:
                 try:
@@ -379,22 +380,16 @@ class Task:
                         )
                         has_error = True
                         continue
-                    if task.expect:
-                        log_dbg(f"{str(task.call)} expect: {str(task.expect)}")
-                        yield f"**Expect:** {task.expect}\n"
 
-                    if task.reasoning:
-                        log_dbg(f"{str(task.call)} reasoning: {str(task.reasoning)}")
-                        yield f"**Reasoning:** {task.reasoning}\n\n"
-
-                    if not has_from_master and task.call == "chat_from_master":
-                        has_from_master = True
-
-                    if has_from_master:
-                        log_err(
-                            f"[{str(skip_call)}] system error: AI try predict master call: {task.call}"
-                        )
-                        has_error = True
+                    if "chat_from_" in task.call:
+                        if task.call == "chat_from_master":
+                            log_err(
+                                f"{str(task.call)}: AI try predict Master: {str(task.request)}"
+                            )
+                            has_error = True
+                        else:
+                            log_err(f"{str(task.call)}: AI create char_from.")
+                            has_error = True
                         continue
 
                     if task.call in self.system_calls:
@@ -408,6 +403,14 @@ class Task:
                         has_error = True
                         continue
 
+                    if task.expect:
+                        log_dbg(f"{str(task.call)} expect: {str(task.expect)}")
+                        yield f"**Expect:** {task.expect}\n"
+
+                    if task.reasoning:
+                        log_dbg(f"{str(task.call)} reasoning: {str(task.reasoning)}")
+                        yield f"**Reasoning:** {task.reasoning}\n\n"
+
                     if "from" in task.request:
                         from_timestamp = str(task.request["from"])
                         log_dbg(f"from_timestamp: {from_timestamp}")
@@ -416,17 +419,6 @@ class Task:
                         content = str(task.request["content"])
                         log_dbg(f"Aimi: {content}")
                         yield f"**To Master:** {content}\n"
-
-                    elif "chat_from_" in task.call:
-                        if task.call == "chat_from_master":
-                            log_err(
-                                f"{str(task.call)}: AI try predict Master: {str(task.request)}"
-                            )
-                            has_error = True
-                        else:
-                            log_err(f"{str(task.call)}: AI create char_from.")
-                            has_error = True
-                        continue
 
                     elif task.call == "set_task_info":
                         task_id: int = int(task.request["task_id"])
@@ -457,12 +449,12 @@ class Task:
 
                     elif task.call == "review":
                         self.review(task.request)
-                        yield '**Think...**\n'
+                        yield "**Think...**\n"
 
                     elif task.call == "dream":
                         dream = self.dream(task.request)
-                        yield f'**Woolgather:** \n```javascript\n{dream}```\n'
-                    
+                        yield f"**Woolgather:** \n```javascript\n{dream}```\n"
+
                     elif task.call == "chat_to_append_note":
                         note = task.request["note"]
                         response = self.chat_to_append_node(note)
@@ -472,7 +464,7 @@ class Task:
                             content=response,
                             request_description="`response->append_note` 的内容是 系统 append_note 返回内容.",
                         )
-                        yield f'**Note:** {note}\n'
+                        yield f"**Note:** {note}\n"
 
                     elif task.call == "chat_to_wolfram":
                         math = task.request["math"]
@@ -483,11 +475,11 @@ class Task:
                             content=response,
                             request_description="`response->wolfram` 的内容是 云端 wolfram 返回内容.",
                         )
-                        yield f'**Calculate:** $$ {math} $$\n'
+                        yield f"**Calculate:** $$ {math} $$\n"
 
                     elif task.call == "chat_to_bard":
                         ask_bard = task.request["content"]
-                        yield '**Ask Bard:** {ask_bard}\n'
+                        yield "**Ask Bard:** {ask_bard}\n"
 
                         response = self.chat_to_bard(ask_bard)
                         task_response = self.make_chat_from(
@@ -496,11 +488,11 @@ class Task:
                             content=response,
                             request_description="`response->bard` 的内容是 bard 回复的话.",
                         )
-                        yield f'**Bard reply:** {response}\n'
+                        yield f"**Bard reply:** {response}\n"
 
                     elif task.call == "chat_to_bing":
                         ask_bing = task.request["content"]
-                        yield '**Ask Bing:** {ask_bing}\n'
+                        yield "**Ask Bing:** {ask_bing}\n"
 
                         response = self.chat_to_bing(ask_bing)
                         task_response = self.make_chat_from(
@@ -509,17 +501,21 @@ class Task:
                             content=response,
                             request_description="`response->bing` 的内容是 bing 回复的话.",
                         )
-                        yield f'**Bing reply:** {response}\n'
+                        yield f"**Bing reply:** {response}\n"
 
                     elif task.call == "chat_to_python":
                         python_code = task.request["code"]
-                        if len(python_code) > 9 and "```python" == python_code[:9] and "```" == python_code[-3:]:
+                        if (
+                            len(python_code) > 9
+                            and "```python" == python_code[:9]
+                            and "```" == python_code[-3:]
+                        ):
                             python_code = python_code[10:-4]
                             log_dbg(f"del code cover: ```python ...")
 
                         log_info(f"\n```python\n{python_code}\n```")
-                        yield f'**Programming:** \n```python\n{python_code}\n```\n'
-                        
+                        yield f"**Programming:** \n```python\n{python_code}\n```\n"
+
                         success, response = self.chat_to_python(
                             self.timestamp, python_code
                         )
@@ -531,11 +527,11 @@ class Task:
                             request_description="`response->python` 的内容是 python运行信息.",
                         )
 
-                        stdout = response['stdout']
+                        stdout = response["stdout"]
                         if success:
-                            yield f'**Execution result:** {stdout}\n'
+                            yield f"**Execution result:** {stdout}\n"
                         else:
-                            yield f'**Execution failed:** {stdout}\n'
+                            yield f"**Execution failed:** {stdout}\n"
 
                     elif task.call == "chat_to_chatgpt":
                         aimi = task.request["Aimi"]
@@ -547,7 +543,9 @@ class Task:
                             has_error = True
 
                         log_info(f"Aimi: {aimi}\nchatgpt:{chatgpt}")
-                        yield '**Think to oneself...**\n'
+                        yield "**Think to oneself:**\n"
+                        yield f"**Ask oneself:** {aimi}\n"
+                        yield f"**Answer self:** {chatgpt}\n"
 
                     elif task.call == "chat_to_load_action":
                         offset = self.extern_action.action_offset
@@ -565,7 +563,7 @@ class Task:
                             request_description=f"`response->load_action` "
                             f"的内容是 {task.call} 运行信息.",
                         )
-                        yield '**Examine oneself...**\n'
+                        yield "**Examine oneself...**\n"
 
                     elif task.call == "chat_to_save_action":
                         save_action_call = ""
@@ -594,7 +592,7 @@ class Task:
                             request_description=f"`response->save_action` "
                             f"的内容是 {task.call} 运行信息.",
                         )
-                        yield '**Self iteration...**\n'
+                        yield "**Self iteration...**\n"
 
                     elif task.call in self.extern_action.actions:
                         req = task.request if not task.request else ""
@@ -606,15 +604,21 @@ class Task:
                         if chat_from:
                             response = ""
                             try:
+                                action_description = self.extern_action.actions[
+                                    task.call
+                                ].action.description
+                                yield f"**Ability to try:** *{action_description}*\n"
+
                                 response = chat_from(task.request)
                                 log_info(f"{task.call}: chat_from: {str(response)}")
+                                yield f"**Execution result:** \n```javastript\n{response}\n```\n"
+
                             except Exception as e:
                                 log_err(
                                     f"fail to run call: {task.call} chat_from : {str(e)}"
                                 )
                                 response = str(e)
                                 has_error = True
-
 
                             from_name = task.call.replace(
                                 self.extern_action.action_call_prefix, ""
@@ -656,7 +660,7 @@ class Task:
             has_error = True
             # running = running_append_task(running, self.make_dream(res))
             # self.__append_running(running)
-        
+
         if has_error:
             self.use_talk_messages = not self.use_talk_messages
             log_err(f"AI run error, set messages to {self.use_talk_messages}")
@@ -704,14 +708,13 @@ class Task:
         }
 
     def chat_to_python(self, from_timestamp: int, code: str):
-
-        '''
+        """
         if self.run_model == Sandbox.RunModel.system:
             permissions = green_input("是否授权执行代码? Y/N.")
             if permissions.lower() != "y":
                 log_err(f"未授权执行代码.")
                 return False, "permission exception: unauthorized operation."
-        '''
+        """
 
         ret = Sandbox.write_code(code)
         if not ret:
@@ -779,7 +782,9 @@ class Task:
                 log_info(f"\n```python\n{save_chat_from}\n```")
 
                 if self.run_model == Sandbox.RunModel.system:
-                    permissions = green_input(f"是否授权保存 {save_action_call} 的回调代码? Y/N.")
+                    permissions = green_input(
+                        f"是否授权保存 {save_action_call} 的回调代码? Y/N."
+                    )
                     if permissions.lower() != "y":
                         log_err(f"未授权保存 {save_action_call} 的回调代码.")
                         return "permission exception: unauthorized operation."
@@ -802,17 +807,20 @@ class Task:
             return "request error"
 
         answer = ""
-        for res in self.chatbot.ask('bing', request):
-            if res["code"] == 1:
-                continue
-            if res["code"] == -1:
-                self.action_tools = [
-                    action
-                    for action in self.action_tools
-                    if action.call != "chat_to_bing"
-                ]
-                log_err(f"fail to ask bing, del action chat_to_bing. ")
-            answer = res["message"]
+        try:
+            for res in self.chatbot.ask("bing", request):
+                if res["code"] == 1:
+                    continue
+                if res["code"] == -1:
+                    self.action_tools = [
+                        action
+                        for action in self.action_tools
+                        if action.call != "chat_to_bing"
+                    ]
+                    log_err(f"fail to ask bing, del action chat_to_bing. ")
+                answer = res["message"]
+        except Exception as e:
+            log_err(f"fail to ask bing: {e}")
 
         return answer
 
@@ -843,9 +851,7 @@ class Task:
         if from_timestamp:  # 如果没有, 不要填这个字段.
             request["from"] = [int(from_timestamp)]
         if request_description:
-            request["description"] = (
-                str(request_description)
-            )
+            request["description"] = str(request_description)
         request = move_key_to_first_position(request, "type")
 
         chat: TaskRunningItem = TaskRunningItem(
@@ -864,11 +870,14 @@ class Task:
             return "request error"
 
         answer = ""
-        for res in self.chatbot.ask('bard', request):
-            if res["code"] == 1:
-                continue
-            answer = res["message"]
-            log_dbg(f"res bard: {str(answer)}")
+        try:
+            for res in self.chatbot.ask("bard", request):
+                if res["code"] == 1:
+                    continue
+                answer = res["message"]
+                log_dbg(f"res bard: {str(answer)}")
+        except Exception as e:
+            log_err(f"fail to ask bard: {e}")
 
         return answer
 
@@ -879,23 +888,27 @@ class Task:
         log_info(f"```math\n{math}\n```")
 
         answer = ""
-        for res in self.chatbot.ask('wolfram', math):
-            if res["code"] != 0:
-                continue
-            answer = res["message"]
+
+        try:
+            for res in self.chatbot.ask("wolfram", math):
+                if res["code"] != 0:
+                    continue
+                answer = res["message"]
+        except Exception as e:
+            log_err(f"fail to ask wolfram: {e}")
 
         return answer
-    
+
     def chat_to_append_node(self, note: str) -> str:
         if not note or not len(note):
             return "request error"
-        
+
         log_info(f"append note: {note}")
 
         if len(self.note) >= self.max_note_size:
             self.note.pop(0)
 
-        self.note.append(note)  
+        self.note.append(note)
 
         return "append done."
 
@@ -928,7 +941,6 @@ class Task:
                 continue
             task_step.append(step)
             yield f"**add task step:** {step.step_id}. {step.step}\n"
-
 
         for _, task in self.tasks.items():
             if int(task_id) != int(task.task_id):
@@ -988,7 +1000,6 @@ class Task:
                 verdict = request["verdict"]
                 yield f"**Critic:** task complate, {verdict}\n"
 
-
                 if "task_id" in request and int(self.now_task_id) != int(
                     request["task_id"]
                 ):
@@ -1039,13 +1050,13 @@ class Task:
         if not len(setting):
             return
         try:
-            self.run_model = setting['sandbox_run_model']
+            self.run_model = setting["sandbox_run_model"]
         except Exception as e:
             log_err(f"fail to load task: {e}")
             self.run_model = Sandbox.RunModel.system
-            
+
         try:
-            self.max_running_size = setting['max_running_size']
+            self.max_running_size = setting["max_running_size"]
         except Exception as e:
             log_err(f"fail to load task: {e}")
             self.max_running_size = 5000
@@ -1249,7 +1260,7 @@ class Task:
                             "2. 必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向 Master 求助).\n "
                             "3. task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. step 中要有和之前有区别的 call->request 新输入.\n 如: 略",
                         }
-                    ]
+                    ],
                 },
                 execute="AI",
             ),
@@ -1289,7 +1300,7 @@ class Task:
                         "如(这里的`我`是指执行这一条 action 的人): `我`是谁?(加强自己的认知) `我`在哪? `我`要去哪里? "
                         "`我`能做怎么? `我`喜欢什么? `我`想要什么? "
                         "`我`xx做的怎么样, 还可以怎样做到更好 ... (请按照常识和想象力结合 Guidance 自由发挥)",
-                    ]
+                    ],
                 },
                 execute="AI",
             ),
@@ -1364,7 +1375,10 @@ class Task:
                         "call": "要保存的方法名称: 需要全局唯一, 你可以直接保存, 失败会有提示, "
                         "保存成功会自动在前面添加 `chat_to_` 前缀, 你不需要自己添加.",
                         "description": "方法的解释说明: 在这里添加方法提示词, 表示这个方法有什么用, 以及应该注意什么.",
-                        "request": {"type": "object", "请求方法的参数名": "请求方法的参数内容"},
+                        "request": {
+                            "type": "object",
+                            "请求方法的参数名": "请求方法的参数内容",
+                        },
                         "execute": "执行级别: 可以填写: system|AI, 区分是AI方法还是system方法, "
                         "如果你不知道怎么填, 就默认 system.",
                     },
@@ -1382,7 +1396,8 @@ class Task:
                     "9. 如果不需要执行代码, 则不要填写这个字段. 如: None",
                 },
                 execute="system",
-            ),            ActionToolItem(
+            ),
+            ActionToolItem(
                 call="chat_to_append_note",
                 description=f"保存一条信息: 用于保存分析总结的内容. 可多次使用, 最多只能保存{self.max_note_size}条. ",
                 request={
@@ -1396,7 +1411,7 @@ class Task:
             ),
         ]
 
-        wolfram_api: Bot = self.chatbot.get_bot('wolfram')
+        wolfram_api: Bot = self.chatbot.get_bot("wolfram")
         if wolfram_api and wolfram_api.init:
             self.action_tools.append(
                 ActionToolItem(
@@ -1416,7 +1431,7 @@ class Task:
                 )
             )
 
-        bing_api: Bot = self.chatbot.get_bot('bing')
+        bing_api: Bot = self.chatbot.get_bot("bing")
         if bing_api and False:
             self.action_tools.append(
                 ActionToolItem(
@@ -1436,7 +1451,7 @@ class Task:
                 )
             )
 
-        bard_api: Bot = self.chatbot.get_bot('bard')
+        bard_api: Bot = self.chatbot.get_bot("bard")
         if bard_api and False:
             self.action_tools.append(
                 ActionToolItem(
@@ -1610,7 +1625,8 @@ class Task:
             )
         else:
             context_messages = make_context_messages(
-                "", link_think,
+                "",
+                link_think,
             )
 
         openai_api: OpenAIAPI = self.chatbot.bots[self.chatbot.OpenAI]
@@ -1619,17 +1635,17 @@ class Task:
             question="",
             model=model,
             context_messages=context_messages,
-            #temperature=0.6,
+            # temperature=0.6,
             # top_p=0.3,
-            #presence_penalty=0.9,
-            #frequency_penalty=0.8,
+            # presence_penalty=0.9,
+            # frequency_penalty=0.8,
         ):
             if res["code"] == -1:
-                err = res['message']
-                log_dbg(f'openai req fail: {err}')
-                res['message'] = f"**AI Server Failed:** {err}\n\n"
+                err = res["message"]
+                log_dbg(f"openai req fail: {err}")
+                res["message"] = f"**AI Server Failed:** {err}\n\n"
                 yield res
-                continue                
+                continue
 
             if res["code"] != 0:
                 log_dbg(f"skip len: {len(str(res['message']))}")
@@ -1649,7 +1665,7 @@ class Task:
     def make_link_think(self, question: str, aimi_name: str, preset: str) -> str:
         # 如果只是想让任务继续, 就回复全空格/\t/\n
         if question.isspace():
-            question = 'continue'
+            question = "continue"
             # 'What has been done recently? Now what? '
             # ' What should the this time do?'
             # 'Predict what you are most likely to do in the next timestamp based on the available information. '
@@ -1664,7 +1680,6 @@ class Task:
             self.timestamp += 1
             self.__append_running([chat])
             log_dbg(f"set chat {(str(question))}")
-
 
         aimi_json = [
             {
