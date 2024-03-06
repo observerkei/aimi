@@ -164,6 +164,7 @@ class Aimi:
     md: Md
     memory: Memory
     task: Task
+    task_setting: Dict = {}
     aimi_plugin: AimiPlugin
     openai_api: OpenAIAPI
     bing_api: Bot
@@ -195,7 +196,7 @@ class Aimi:
         self.bard_api = self.chatbot.get_bot('bard')
         self.wolfram_api = self.chatbot.get_bot('wolfram')
 
-        self.task = Task(self.chatbot)
+        self.task = Task(self.chatbot, self.task_setting)
 
         self.chat_web = ChatWeb()
         self.chat_qq = ChatQQ()
@@ -681,6 +682,13 @@ answer this following question: {{
         except Exception as e:
             log_err("fail to load aimi: {e}")
             self.aimi_name = "Aimi"
+        
+        try:
+            self.task_setting = setting["task"]
+        except Exception as e:
+            log_err("fail to load aimi: {e}")
+            self.task_setting = {}
+
         try:
             self.master_name = setting["master_name"]
         except Exception as e:

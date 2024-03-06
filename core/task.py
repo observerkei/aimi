@@ -520,7 +520,7 @@ class Task:
                         log_info(f"\n```python\n{python_code}\n```")
                         yield f'**Programming:** \n```python\n{python_code}\n```\n'
                         
-                        err, response = self.chat_to_python(
+                        success, response = self.chat_to_python(
                             self.timestamp, python_code
                         )
 
@@ -531,11 +531,11 @@ class Task:
                             request_description="`response->python` 的内容是 python运行信息.",
                         )
 
-                        if err:
-                            stdout = response['stdout']
+                        stdout = response['stdout']
+                        if success:
                             yield f'**Execution result:** {stdout}\n'
                         else:
-                            yield '**Execution failed.**\n'
+                            yield f'**Execution failed:** {stdout}\n'
 
                     elif task.call == "chat_to_chatgpt":
                         aimi = task.request["Aimi"]
@@ -685,34 +685,33 @@ class Task:
 
     def make_chat_from_python_response(self, from_timestamp: int, run: RunCodeReturn):
         run_returncode = run.returncode
-        run_stdout = run.stdout
-        run_stderr = run.stderr
+        run_stdout = run.stdout if not run_returncode else run.stderr
+
         log_info(
-            f"code run result:\nreturncode:{str(run_returncode)}\nstderr:{str(run_stderr)}\nstdout:{str(run_stdout)}"
+            f"code run result:\nreturncode:{str(run_returncode)}\nstderr:{str(run.stderr)}\nstdout:{str(run.stdout)}"
         )
         return {
             "type": "object",
             "description": f"备注: "
-            f"1. 这个根据 timestamp 为 {from_timestamp} 的 action 执行后生成的内容, 对应的是你写的代码 code 的运行结果.\n "
-            f"2. 如果 returncode 为 0 但是 stdout 没有内容, 可能是你没有把运行结果打印出来,\n "
-            f"3. 如果 stdout/stderr 不正确, 也有可能是你加了非 python 的说明, "
-            f"也有可能是你没有把之前写的代码也拼在一起.\n "
-            f"4. 请结合你的代码 code 和运行 返回值(returncode/stderr/stdout) 针对具体问题具体分析:\n "
+            f"1. 这个根据 timestamp 为 {from_timestamp} 的 action 执行后生成的内容, "
+            f"对应的是你写的代码 code 的运行结果.\n "
+            f"2. 请结合你的代码 code 和运行 返回值(returncode/stdout) "
+            f"针对具体出现的问题进行具体分析, 再思考怎么修改代码, 实现目标功能:\n "
             f"returncode: 程序运行的返回值\n "
-            f"stderr: 是你的代码 code 的标准出错流输出, 如果有内容说明出现了错误.\n "
-            f"stdout: 是你的代码 code 的标准输出流输出, 你可以检查一下内容是否符合你代码预期.",
+            f"stdout: 代码执行的输出结果.",
             "returncode": str(run_returncode),
-            "stderr": str(run_stderr),
             "stdout": str(run_stdout),
         }
 
     def chat_to_python(self, from_timestamp: int, code: str):
 
+        '''
         if self.run_model == Sandbox.RunModel.system:
             permissions = green_input("是否授权执行代码? Y/N.")
             if permissions.lower() != "y":
                 log_err(f"未授权执行代码.")
                 return False, "permission exception: unauthorized operation."
+        '''
 
         ret = Sandbox.write_code(code)
         if not ret:
@@ -720,7 +719,9 @@ class Task:
 
         run = Sandbox.run_code(self.run_model)
 
-        return True, self.make_chat_from_python_response(from_timestamp, run)
+        ret = True if (not run.returncode) else False
+
+        return ret, self.make_chat_from_python_response(from_timestamp, run)
 
     def chat_to_load_action(
         self, offset: int = 0, show_call_info: str = ""
@@ -1030,7 +1031,6 @@ class Task:
             self.__chatbot_init(chatbot)
             self.__init_task()
             self.extern_action = ExternAction()
-            self.run_model = Sandbox.RunModel.docker
 
         except Exception as e:
             log_err(f"fait to init: {str(e)}")
@@ -1038,6 +1038,17 @@ class Task:
     def __load_setting(self, setting):
         if not len(setting):
             return
+        try:
+            self.run_model = setting['sandbox_run_model']
+        except Exception as e:
+            log_err(f"fail to load task: {e}")
+            self.run_model = Sandbox.RunModel.system
+            
+        try:
+            self.max_running_size = setting['max_running_size']
+        except Exception as e:
+            log_err(f"fail to load task: {e}")
+            self.max_running_size = 5000
 
     def __load_task(self):
         task_config = {}
@@ -1301,21 +1312,22 @@ class Task:
             # ),
             ActionToolItem(
                 call="chat_to_python",
-                description="执行 python 代码: 有联网, 要打印才能看到结果, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, 然后再按照设计和 python 实现要求 实现代码.\n "
+                description="执行 python 代码: 有联网, 要打印才能看到结果, "
+                "需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, "
+                "然后再按照设计和 python 实现要求 一次性实现代码.\n "
                 "python 实现要求如下:\n "
-                "1. 你最后要把结果用 `print` 接口打印出来. 如: print('hi') .\n "
+                "1. 在最后一行必须使用 `print` 把结果打印出来. 如: print('hi') .\n "
                 "2. 不要加任何反引号 ` 包裹 和 任何多余说明, 只输入 python 代码.\n "
-                "3. 你需要添加 ` if __name__ == '__main__' ` 作为主模块调用你写的代码.\n "
-                "4. 输入必须只有 python, 内容不需要单独用 ``` 包裹. 如果得不到期望值可以进行 DEBUG.\n "
-                "5. 执行成功后, 长度不会超过2048, 所以你看到的内容可能被截断, 某种情况下你可以通过代码控制输出数据的偏移\n "
-                "6. 每次调用 chat_to_python 都会覆盖之前的 python 代码, 所以需要一次性把内容写好. "
+                "4. 输入必须只有 python, 内容不需要单独用 ``` 包裹. \n "
+                "5. 执行成功后, 长度不会超过2048, 所以你看到的内容可能被截断, \n "
+                "6. 要一次性把内容写好, 不能分开几次写, 因为每次调用 chat_to_python 都会覆盖之前的 python 代码. "
                 "7. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找 Master.",
                 request={
                     "type": "object",
                     "from": [
                         "有关联的 timestamp:  action_tool 已有、已运行过 动作(action) 的 timestamp. 如: 1, 没有则填 null",
                     ],
-                    "code": "python 代码: 填写需要执行的 pyhton 代码, 需要注意调试信息. 以便进行DEBUG. 如: str = 'hi'\\nprint(str)\\n",
+                    "code": "python 代码: 填写需要执行的 pyhton 代码, 多加print. 如: str = 'hi'\\nprint(str)\\n",
                 },
                 execute="system",
             ),
@@ -1612,6 +1624,13 @@ class Task:
             #presence_penalty=0.9,
             #frequency_penalty=0.8,
         ):
+            if res["code"] == -1:
+                err = res['message']
+                log_dbg(f'openai req fail: {err}')
+                res['message'] = f"**AI Server Failed:** {err}\n\n"
+                yield res
+                continue                
+
             if res["code"] != 0:
                 log_dbg(f"skip len: {len(str(res['message']))}")
                 if len(str(res["message"])) > 500:
