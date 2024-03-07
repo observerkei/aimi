@@ -16,9 +16,8 @@ from tool.util import (
     green_input,
     move_key_to_first_position,
 )
-from tool.openai_api import OpenAIAPI
-from tool.aimi_plugin import Bot
 
+from core.aimi_plugin import ChatBot, ChatBotType
 from core.sandbox import Sandbox, RunCodeReturn
 
 
@@ -219,15 +218,12 @@ class Task:
     max_running_size: int = 5 * 1000
     max_note_size: int = 20
     timestamp: int = 1
-    chatbot: Any
+    chatbot: ChatBot
     task_has_change: bool = True
     run_model = Sandbox.RunModel.system
     use_talk_messages: bool = False
-
-    def __chatbot_init(self, chatbot):
-        from core.aimi import ChatBot
-
-        self.chatbot: ChatBot = chatbot
+    models: List[str] = []
+    init: bool = False
 
     def task_response(self, res: str) -> Generator[dict, None, None]:
         def get_json_content(answer: str):
@@ -469,26 +465,27 @@ class Task:
                     elif task.call == "chat_to_wolfram":
                         math = task.request["math"]
                         response = self.chat_to_wolfram(task.request["math"])
+                        yield f"**Calculate:** $$ {math} $$\n"
                         task_response = self.make_chat_from(
                             from_timestamp=self.timestamp,
                             from_name="wolfram",
                             content=response,
                             request_description="`response->wolfram` 的内容是 云端 wolfram 返回内容.",
                         )
-                        yield f"**Calculate:** $$ {math} $$\n"
+                        yield f"**Computation:** \n```javascript\n{response}\n```\n"
 
-                    elif task.call == "chat_to_bard":
-                        ask_bard = task.request["content"]
-                        yield "**Ask Bard:** {ask_bard}\n"
+                    elif task.call == "chat_to_gemini":
+                        ask_gemini = task.request["content"]
+                        yield f"**Ask Gemini:** {ask_gemini}\n"
 
-                        response = self.chat_to_bard(ask_bard)
+                        response = self.chat_to_gemini(ask_gemini)
                         task_response = self.make_chat_from(
                             from_timestamp=self.timestamp,
-                            from_name="bard",
+                            from_name="gemini",
                             content=response,
-                            request_description="`response->bard` 的内容是 bard 回复的话.",
+                            request_description="`response->gemini` 的内容是 gemini 回复的话.",
                         )
-                        yield f"**Bard reply:** {response}\n"
+                        yield f"**Gemini reply:** {response}\n"
 
                     elif task.call == "chat_to_bing":
                         ask_bing = task.request["content"]
@@ -808,7 +805,8 @@ class Task:
 
         answer = ""
         try:
-            for res in self.chatbot.ask("bing", request):
+            ask_data = self.chatbot.pack_ask_data(question=request)
+            for res in self.chatbot.ask(ChatBotType.Bing, ask_data):
                 if res["code"] == 1:
                     continue
                 if res["code"] == -1:
@@ -865,19 +863,20 @@ class Task:
         )
         return chat
 
-    def chat_to_bard(self, request: str) -> str:
+    def chat_to_gemini(self, request: str) -> str:
         if not request or not len(request):
             return "request error"
 
         answer = ""
         try:
-            for res in self.chatbot.ask("bard", request):
+            ask_data = self.chatbot.pack_ask_data(question=request)
+            for res in self.chatbot.ask(ChatBotType.Google, ask_data):
                 if res["code"] == 1:
                     continue
                 answer = res["message"]
-                log_dbg(f"res bard: {str(answer)}")
+                log_dbg(f"res gemini: {str(answer)}")
         except Exception as e:
-            log_err(f"fail to ask bard: {e}")
+            log_err(f"fail to ask gemini: {e}")
 
         return answer
 
@@ -890,7 +889,8 @@ class Task:
         answer = ""
 
         try:
-            for res in self.chatbot.ask("wolfram", math):
+            ask_data = self.chatbot.pack_ask_data(question=math)
+            for res in self.chatbot.ask(ChatBotType.Wolfram, ask_data):
                 if res["code"] != 0:
                     continue
                 answer = res["message"]
@@ -1035,11 +1035,24 @@ class Task:
         except Exception as e:
             log_err(f"fail to critic {str(request)} : {str(e)}")
 
-    def __init__(self, chatbot, setting={}):
+    @property
+    def init(self):
+        if not self.chatbot.has_bot_init("openai"):
+            return False
+        openai_models = self.chatbot.get_bot_models("openai")
+        for model in self.models:
+            op_model = self.get_openai_model(model)
+            if op_model in openai_models:
+                return True
+        return False
+
+    def __init__(self, chatbot: ChatBot, setting={}):
         try:
             self.__load_setting(setting)
-            self.__load_task()
-            self.__chatbot_init(chatbot)
+            self.__load_task_data()
+
+            self.chatbot = chatbot
+
             self.__init_task()
             self.extern_action = ExternAction()
 
@@ -1047,6 +1060,9 @@ class Task:
             log_err(f"fait to init: {str(e)}")
 
     def __load_setting(self, setting):
+
+        self.models = ["task", "task-4k", "task-16k"]
+
         if not len(setting):
             return
         try:
@@ -1061,7 +1077,7 @@ class Task:
             log_err(f"fail to load task: {e}")
             self.max_running_size = 5000
 
-    def __load_task(self):
+    def __load_task_data(self):
         task_config = {}
         try:
             task_config = Config.load_task()
@@ -1411,8 +1427,7 @@ class Task:
             ),
         ]
 
-        wolfram_api: Bot = self.chatbot.get_bot("wolfram")
-        if wolfram_api and wolfram_api.init:
+        if self.chatbot.has_bot_init("wolfram"):
             self.action_tools.append(
                 ActionToolItem(
                     call="chat_to_wolfram",
@@ -1431,8 +1446,7 @@ class Task:
                 )
             )
 
-        bing_api: Bot = self.chatbot.get_bot("bing")
-        if bing_api and False:
+        if self.chatbot.has_bot_init("bing"):
             self.action_tools.append(
                 ActionToolItem(
                     call="chat_to_bing",
@@ -1451,13 +1465,12 @@ class Task:
                 )
             )
 
-        bard_api: Bot = self.chatbot.get_bot("bard")
-        if bard_api and False:
+        if self.chatbot.has_bot_init("google"):
             self.action_tools.append(
                 ActionToolItem(
-                    call="chat_to_bard",
-                    description="和 bard 交互: 可以获取信息或者搜索. \n "
-                    "这是你的外国好朋友 bard, 你可以问 bard 问题, bard 有能力打开链接. \n "
+                    call="chat_to_gemini",
+                    description="和 gemini 交互: 可以获取信息或者搜索. \n "
+                    "这是你的外国好朋友 gemini, 你可以问 gemini 问题, gemini 有能力打开链接. \n "
                     "需要了解任何有时效性的内容都可以调用, 要注意他只会英文.\n "
                     "可以问有时效性的信息, 比如时间/日期或者某个网址的内容等.\n "
                     "如果要进行搜索, 你需要在文字上诱导它进行搜索. 如: search for AI",
@@ -1466,7 +1479,7 @@ class Task:
                         "from": [
                             "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
                         ],
-                        "content": "对 bard 说的内容: 在这里输入要问 bard 的内容, 要在文字中诱导 bard 用英文搜索 search/open link, "
+                        "content": "对 gemini 说的内容: 在这里输入要问 gemini 的内容, 要在文字中诱导 gemini 用英文搜索 search/open link, "
                         "翻译成英文再调用. 如: What time is it now?",
                     },
                     execute="system",
@@ -1567,7 +1580,7 @@ class Task:
 
         return False
 
-    def get_model(self, select: str) -> str:
+    def get_openai_model(self, select: str) -> str:
         if "16k" in select.lower():
             return "gpt-3.5-turbo-16k"
         if "4k" in select.lower():
@@ -1629,17 +1642,13 @@ class Task:
                 link_think,
             )
 
-        openai_api: OpenAIAPI = self.chatbot.bots[self.chatbot.OpenAI]
+        ask_data = self.chatbot.pack_ask_data(
+            question=link_think,
+            messages=context_messages,
+            model=self.get_openai_model(model),
+        )
 
-        for res in openai_api.ask(
-            question="",
-            model=model,
-            context_messages=context_messages,
-            # temperature=0.6,
-            # top_p=0.3,
-            # presence_penalty=0.9,
-            # frequency_penalty=0.8,
-        ):
+        for res in self.chatbot.ask(ChatBotType.OpenAI, ask_data):
             if res["code"] == -1:
                 err = res["message"]
                 log_dbg(f"openai req fail: {err}")
@@ -1662,7 +1671,9 @@ class Task:
         answer["code"] = 0
         yield answer
 
-    def make_link_think(self, question: str, aimi_name: str, preset: str) -> str:
+    def make_link_think(
+        self, model: str, question: str, aimi_name: str, preset: str
+    ) -> str:
         # 如果只是想让任务继续, 就回复全空格/\t/\n
         if question.isspace():
             question = "continue"

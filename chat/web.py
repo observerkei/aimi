@@ -80,7 +80,7 @@ class ChatWeb:
     app: Any
     http_server: Any
     ask_hook: Any
-    get_models_hook: Any
+    models: Dict
 
     def __init__(self):
         self.__listen_init()
@@ -88,9 +88,6 @@ class ChatWeb:
 
     def register_ask_hook(self, ask_hook: Any):
         self.ask_hook = ask_hook
-
-    def register_get_models_hook(self, get_models_hook: Any):
-        self.get_models_hook = get_models_hook
 
     def __make_model_info(self, model, owned_by) -> ModelInfo:
         def __make_model_info_permission() -> ModelInfoPermission:
@@ -176,7 +173,7 @@ class ChatWeb:
             modelsObj = ""
             try:
                 model_infos = []
-                for owned_by, models in self.get_models_hook().items():
+                for owned_by, models in self.models.items():
                     for model in models:
                         model_info = self.__make_model_info(
                             f"{owned_by}--{model}", owned_by

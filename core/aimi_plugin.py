@@ -4,6 +4,7 @@ from typing import Any, List, Generator, Dict
 
 from tool.util import log_info, log_err, log_dbg, load_module
 from tool.config import Config
+from aimi_plugin.bot_example import Bot
 
 
 # call bot_ plugin example
@@ -21,8 +22,8 @@ class Bot:
         return self.bot.init
 
     # when time call bot
-    def is_call(self, caller: Any, ask_data) -> bool:
-        question = caller.bot_get_question(ask_data)
+    def is_call(self, caller: Any, req) -> bool:
+        question = caller.bot_get_question(req)
         if trigger in question:
             return True
         return False
@@ -50,24 +51,47 @@ class Bot:
     plugin_prefix = "bot_"
 
     # pack ask_data
-    def bot_pack_ask_data(self, question: str, model: str = "", messages: List = []):
+    def bot_pack_ask_data(
+        self,
+        question: str,
+        model: str = "",
+        messages: List = [],
+        conversation_id: str = "",
+    ):
         return {
             "question": question,
             "model": model,
             "messages": messages,
+            "conversation_id": conversation_id,
         }
 
     # no need define bot_get_question
     def bot_get_question(self, ask_data):
-        return ask_data["question"]
+        if "question" in ask_data:
+            return ask_data["question"]
+        return ""
 
     # no need define bot_get_model
     def bot_get_model(self, ask_data):
-        return ask_data["model"]
+        if "model" in ask_data:
+            return ask_data["model"]
+        return ""
 
     # no need define bot_get_messages
     def bot_get_messages(self, ask_data):
-        return ask_data["messages"]
+        if "messages" in ask_data:
+            return ask_data["messages"]
+        return ""
+
+    def bot_get_conversation_id(self, ask_data):
+        if "conversation_id" in ask_data:
+            return ask_data["conversation_id"]
+        return ""
+
+    def bot_get_timeout(self, ask_data):
+        if "timeout" in ask_data:
+            return ask_data["timeout"]
+        return ""
 
     # no need define bot_set_response
     def bot_set_response(self, code: int, message: str) -> Any:
@@ -84,6 +108,73 @@ class Bot:
 
     def bot_log_info(self, msg: str):
         return log_info(msg, is_plugin=True)
+
+
+class ChatBotType:
+    Bing: str = "bing"
+    Google: str = "google"
+    OpenAI: str = "openai"
+    Wolfram: str = "wolfram"
+    ChimeraGPT: str = "wolfram"
+
+
+class ChatBot:
+    bots: Dict[str, Bot] = {}
+    bot_caller: Bot = Bot()
+
+    def __init__(self):
+        pass
+
+    def append(self, type: str, bot: Bot):
+        if type:
+            self.bots[type] = bot
+
+    def pack_ask_data(
+        self,
+        question: str,
+        model: str = "",
+        messages: List = [],
+        conversation_id: str = "",
+    ):
+        return self.bot_caller.bot_pack_ask_data(
+            question=question,
+            model=model,
+            messages=messages,
+            conversation_id=conversation_id,
+        )
+
+    def ask(self, type: str, ask_data: dict = {}) -> Generator[dict, None, None]:
+        if self.has_type(type):
+            try:
+                yield from self.bots[type].ask(self.bot_caller, ask_data)
+            except Exception as e:
+                log_err(f"fail to ask bot: {e}: {type}: {ask_data}")
+        else:
+            log_err(f"no model to ask of type: {type}")
+
+    def get_bot(self, type: str) -> Bot:
+        if self.has_type(type):
+            return self.bots[type]
+        return None
+
+    def has_type(self, type: str) -> bool:
+        if type in self.bots:
+            return True
+        return None
+
+    def has_bot_init(self, type: str) -> bool:
+        if not self.has_type(type):
+            return False
+        return self.bots[type].init
+
+    def get_bot_models(self, type: str) -> List[str]:
+        if not self.has_bot_init(type):
+            return []
+        return self.bots[type].get_models(self.bot_caller)
+
+    def each_bot(self) -> Generator[tuple[str, Bot], None, None]:
+        for bot_type, bot in self.bots.items():
+            yield bot_type, bot
 
 
 class AimiPlugin:
@@ -145,75 +236,6 @@ class AimiPlugin:
 
         return False
 
-    def bot_get_models(self) -> Dict[str, List[str]]:
-        if not len(self.bots):
-            return {}
-
-        bot_models = {}
-
-        for bot_type, bot in self.bots.items():
-            try:
-                bot_models[bot_type] = bot.get_models(self.bot_obj)
-            except Exception as e:
-                log_err(f"fail to get bot models type: {bot_type} err: {e}")
-
-        return bot_models
-
-    def bot_is_call(self, question: str) -> bool:
-        if not len(self.bots):
-            return False
-
-        ask_data = {"question": question}
-
-        for bot_type, bot in self.bots.items():
-            try:
-                if bot.is_call(self.bot_obj, ask_data):
-                    return True
-            except Exception as e:
-                log_err(f"fail to check call bot: {bot_type} err: {e}")
-
-        return False
-
-    def bot_get_call_type(self, question: Any):
-        if not len(self.bots):
-            return None
-
-        ask_data = {"question": question}
-
-        for bot_type, bot in self.bots.items():
-            try:
-                if bot.is_call(self.bot_obj, ask_data):
-                    return bot_type
-            except Exception as e:
-                log_err(f"fail to get bot call type: {bot_type} err: {e}")
-
-        return None
-
-    def bot_ask(
-        self,
-        bot_ask_type: str,
-        question: str,
-        model: str = "",
-        messages: List[Dict] = [],
-        timeout: int = 60,
-    ) -> Generator[dict, None, None]:
-        if not len(self.bots):
-            yield {message: "no bot", code: -1}
-            return
-
-        ask_data = {
-            "question": question,
-            "model": model,
-            "messages": messages,
-        }
-        ask_data = self.bot_obj.bot_pack_ask_data(
-            question=question, model=model, messages=messages
-        )
-        if bot_ask_type in self.bots:
-            yield from self.bots[bot_ask_type].ask(self.bot_obj, ask_data, timeout)
-
-        log_err(f"fail find ask bot: {bot_ask_type}")
-
     def when_exit(self):
         if not len(self.bots):
             return
@@ -234,12 +256,6 @@ class AimiPlugin:
             except Exception as e:
                 log_err(f"fail to init bot: {bot_type} err: {e}")
 
-    def __example_do_action(caller: Any, type: str, bot: Bot):
-        pass
-
-    def each_bot(self, caller, do_action):
+    def each_bot(self) -> Generator[tuple[str, Bot], None, None]:
         for bot_type, bot in self.bots.items():
-            try:
-                do_action(caller, bot_type, bot)
-            except Exception as e:
-                log_err(f"fail to each bot: {bot_type} err: {e}")
+            yield bot_type, bot

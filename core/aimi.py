@@ -3,55 +3,18 @@ import signal
 import threading
 import time
 import random
-from typing import Generator, List, Dict, Any
+from typing import Generator, List, Dict, Any, Tuple
 from contextlib import suppress
 
 from tool.config import Config
 from tool.util import log_dbg, log_err, log_info, make_context_messages
-from tool.openai_api import OpenAIAPI
-from tool.aimi_plugin import AimiPlugin, Bot
+from core.aimi_plugin import AimiPlugin, Bot, ChatBot, ChatBotType
 from chat.qq import ChatQQ
 from chat.web import ChatWeb
 
-from core.md2img import Md
+from tool.md2img import Md
 from core.memory import Memory
 from core.task import Task
-
-
-class ChatBot:
-    bots: Dict[str, Bot] = {}
-    bot_caller: Bot = Bot()
-
-    @property
-    def OpenAI(self) -> str:
-        return OpenAIAPI.type
-
-    def __init__(self):
-        self.bots = {
-            OpenAIAPI.type: OpenAIAPI(),
-        }
-
-    def append(self, type: str, bot: Bot):
-        if type:
-            self.bots[type] = bot
-
-    def ask(
-        self, type: str, question: str, model: str = "", messages: List = []
-    ) -> Generator[dict, None, None]:
-        if type in self.bots:
-            ask_data = self.bot_caller.bot_pack_ask_data(
-                question=question, model=model, messages=messages
-            )
-            try:
-                yield from self.bots[type].ask(self.bot_caller, ask_data)
-            except Exception as e:
-                log_err(f"fail to ask bot: {type}: {question}")
-        log_err(f"no model to ask of type: {Bot}")
-
-    def get_bot(self, type: str) -> Bot:
-        if type in self.bots:
-            return self.bots[type]
-        return None
 
 
 class ReplyStep:
@@ -174,10 +137,6 @@ class Aimi:
     task: Task
     task_setting: Dict = {}
     aimi_plugin: AimiPlugin
-    openai_api: OpenAIAPI
-    bing_api: Bot
-    bard_api: Bot
-    wolfram_api: Bot
     chat_web: ChatWeb
     chat_qq: ChatQQ
     chatbot: ChatBot
@@ -191,15 +150,8 @@ class Aimi:
         self.chatbot = ChatBot()
 
         self.aimi_plugin = AimiPlugin()
-
-        # setup aimi_plugin to chatbot list
-        def fill_chatbot(chatbot, type, bot):
-            chatbot.append(type, bot)
-
-        self.aimi_plugin.each_bot(self.chatbot, fill_chatbot)
-
-        self.openai_api: OpenAIAPI = self.chatbot.bots[self.chatbot.OpenAI]
-        self.max_link_think = self.openai_api.max_requestion
+        for bot_type, bot in self.aimi_plugin.each_bot():
+            self.chatbot.append(bot_type, bot)
 
         self.task = Task(self.chatbot, self.task_setting)
 
@@ -211,16 +163,12 @@ class Aimi:
         signal.signal(signal.SIGTERM, self.__signal_exit)
         signal.signal(signal.SIGINT, self.__signal_exit)
 
-        try:
-            self.aimi_plugin.when_init()
-        except Exception as e:
-            log_err(f"fail to init aimi plugin: {e}")
-
         self.chat_web.register_ask_hook(self.web_ask)
-        self.chat_web.register_get_models_hook(self.get_bot_models)
+        self.chat_web.models = self.get_all_models()
 
     def make_link_think(
         self,
+        model: str,
         question: str,
         nickname: str = None,
         api_type: str = None,
@@ -232,8 +180,10 @@ class Aimi:
         link_think = question
 
         if api_type == self.task.type:
-            link_think = self.task.make_link_think(question, self.aimi_name, preset)
-        elif api_type == self.openai_api.type and self.openai_api.use_web_ask:
+            link_think = self.task.make_link_think(
+                model, question, self.aimi_name, preset
+            )
+        elif api_type == ChatBotType.OpenAI and model == "web":
             # cul question
             history = self.memory.make_history(talk_history)
             link_think = f"""
@@ -249,7 +199,7 @@ class Aimi:
 {nickname}说: “{question}”
 }}.
 """
-        elif api_type == "bard":
+        elif api_type == ChatBotType.Google:
             link_think = f"""
 preset: {{
 \"{preset}\"
@@ -262,7 +212,8 @@ You should extract my question directly from the structure here and answer it di
 {nickname} said: '{question}'
 }}
 """
-        elif "" == "bing":
+            link_think = question
+        elif "" == ChatBotType.Bing:
             link_think = f"""
 故事主题如下: 故事中有两个人到了异世界里面开咖啡厅.
 故事情节如下: 其中主人公自称Master({self.master_name}), 他有一个助理, 名叫{self.aimi_name}, 他们两个在聊天.
@@ -275,7 +226,7 @@ You should extract my question directly from the structure here and answer it di
 {nickname}说: '{question}'
 }}
 """
-        elif api_type == "wolfram":
+        elif api_type == ChatBotType.Wolfram:
             math_html = "help me caculate math."
             for answer in self.__post_wolfram(link_think):
                 if answer["code"] != 0:
@@ -298,7 +249,7 @@ the wolfram response: {{
 {math_html}
 }}
 """
-        elif api_type == "chimeragpt":
+        elif api_type == ChatBotType.ChimeraGPT:
             # cul question
             history = self.memory.make_history(talk_history)
 
@@ -365,14 +316,19 @@ answer this following question: {{
         return ""
 
     def __question_api_type(self, question: str) -> str:
-        if self.openai_api.is_call(question):
-            return self.openai_api.type
-        if self.aimi_plugin.bot_is_call(question):
-            return self.aimi_plugin.bot_get_call_type(question)
-        if self.task.is_call(question):
-            return self.task.type
+        for bot_type, bot in self.chatbot.each_bot():
+            if not bot.init:
+                continue
+            if bot.is_call(self.chatbot.bot_caller):
+                return bot_type
 
-        return self.api[0]
+        # 一个都找不到，随机取一个.
+        for bot_type, bot in self.chatbot.each_bot():
+            if not bot.init:
+                continue
+            return bot_type
+
+        return ""
 
     @property
     def __busy_reply(self) -> str:
@@ -501,7 +457,7 @@ answer this following question: {{
                     self.chat_qq.reply_question(msg, cq_img)
 
     def reply_adjust(self, reply: str, res_api: str) -> str:
-        if res_api == "bing":
+        if res_api == ChatBotType.Bing:
             reply = reply.replace("必应", f" {self.aimi_name}通过必应得知: ")
             reply = reply.replace("你好", " Master你好 ")
             reply = reply.replace("您好", " Master您好 ")
@@ -518,20 +474,18 @@ answer this following question: {{
     ) -> Generator[dict, None, None]:
         if (owned_by == self.aimi_name) and (model == "auto"):
             return self.ask(question, nickname)
-        elif owned_by == self.aimi_name and (
-            model == "task" or model == "task-16k" or model == "task-4k"
-        ):
+        elif owned_by == self.aimi_name and model in self.task.models:
             preset = context_messages[0]["content"]
             task_link_think = self.task.make_link_think(
-                question, self.aimi_name, preset
+                model=model, question=question, aimi_name=self.aimi_name, preset=preset
             )
-            model = self.task.get_model(model)
 
             return self.task.ask(task_link_think, model)
         else:
             preset = context_messages[0]["content"]
             talk_history = context_messages[1:]
             link_think = self.make_link_think(
+                model=model,
                 question=question,
                 nickname=self.master_name,
                 api_type=owned_by,
@@ -548,7 +502,7 @@ answer this following question: {{
 
     def ask(self, question: str, nickname: str = None) -> Generator[dict, None, None]:
         api_type = self.__question_api_type(question)
-        model = self.__question_model(api_type, question)
+        model = ""
         nickname = nickname if nickname and len(nickname) else self.master_name
 
         preset = ""
@@ -557,7 +511,12 @@ answer this following question: {{
         talk_history = self.memory.search(question, self.max_link_think)
 
         link_think = self.make_link_think(
-            question, nickname, api_type, preset, talk_history
+            model=model,
+            question=question,
+            nickname=nickname,
+            api_type=api_type,
+            preset=preset,
+            talk_history=talk_history,
         )
         context_messages = make_context_messages(question, preset, talk_history)
 
@@ -584,7 +543,7 @@ answer this following question: {{
     ) -> Generator[dict, None, None]:
         log_dbg("use api: " + str(api_type))
 
-        if api_type == self.openai_api.type:
+        if api_type == ChatBotType.OpenAI:
 
             yield from self.__post_openai(
                 link_think, model, context_messages, self.memory.openai_conversation_id
@@ -594,9 +553,9 @@ answer this following question: {{
 
             yield from self.task.ask(link_think, model)
 
-        elif api_type == "wolfram":
+        elif api_type == ChatBotType.Wolfram:
             # at mk link think, already set wolfram response.
-            if True and self.api[0] != "wolfram":
+            if True and self.api[0] != ChatBotType.Wolfram:
                 yield from self.__post_question(
                     link_think,
                     self.api[0],
@@ -606,27 +565,30 @@ answer this following question: {{
             else:
                 yield from self.__post_bing(link_think)
 
-        elif self.aimi_plugin.bot_has_type(api_type):
-
-            yield from self.aimi_plugin.bot_ask(
-                api_type, link_think, model, context_messages
+        elif self.chatbot.has_type(api_type):
+            ask_data = self.chatbot.pack_ask_data(
+                question=link_think, model=model, messages=context_messages
             )
+            yield from self.chatbot.ask(api_type, ask_data)
 
         else:
             log_err("not suppurt api_type: " + str(api_type))
 
     def __post_wolfram(self, question: str) -> Generator[dict, None, None]:
-        yield from self.chatbot.ask("wolfram", question)
+        ask_data = self.chatbot.pack_ask_data(question=question)
+        yield from self.chatbot.ask(ChatBotType.Wolfram, ask_data)
 
-    def __post_bard(self, question: str) -> Generator[dict, None, None]:
-        yield from self.chatbot.ask("bard", question)
+    def __post_google(self, question: str) -> Generator[dict, None, None]:
+        ask_data = self.chatbot.pack_ask_data(question=question)
+        yield from self.chatbot.ask(ChatBotType.Google, ask_data)
 
     def __post_bing(
         self,
         question: str,
         model: str = None,
     ) -> Generator[dict, None, None]:
-        yield from self.chatbot.ask("bing", question, model)
+        ask_data = self.chatbot.pack_ask_data(question=question, model=model)
+        yield from self.chatbot.ask(ChatBotType.Bing, ask_data)
 
     def __post_openai(
         self,
@@ -635,9 +597,15 @@ answer this following question: {{
         context_messages: List[Dict] = [],
         openai_conversation_id: str = None,
     ) -> Generator[dict, None, None]:
-        answer = self.openai_api.ask(
-            question, model, context_messages, openai_conversation_id
+
+        ask_data = self.chatbot.pack_ask_data(
+            question=question,
+            messages=context_messages,
+            model=model,
+            conversation_id=openai_conversation_id,
         )
+
+        answer = self.chatbot.ask(ChatBotType.OpenAI, ask_data)
         # get yield last val
         for message in answer:
             # log_dbg('now msg: ' + str(message))
@@ -660,24 +628,28 @@ answer this following question: {{
 
             yield message
 
-    def get_bot_models(self) -> Dict[str, List[str]]:
-        bot_models = {}
+    def get_all_models(self) -> Dict[str, List[str]]:
+        bot_models: Dict[str, List[str]] = {}
 
-        bot_models[self.aimi_name] = ["auto", "task", "task-4k", "task-16k"]
+        aimi_models: List = []
+        for bot_type, bot in self.chatbot.each_bot():
+            if bot.init:
+                continue
+            aimi_models.append("auto")
+            break
 
-        models = self.openai_api.get_models()
-        if len(models):
-            bot_models[self.openai_api.type] = models
+        if self.task.init:
+            for m in self.task.models:
+                aimi_models.append(m)
 
-        try:
-            plugin_models = self.aimi_plugin.bot_get_models()
-            for bot_type, models in plugin_models.items():
-                if len(models):
-                    bot_models[bot_type] = models
-        except Exception as e:
-            log_err(f"fail to get plugin bots models: {e}")
+        if len(aimi_models):
+            bot_models[self.aimi_name] = aimi_models
 
-        # log_dbg(f"models: {str(bot_models)}")
+        for bot_type, bot in self.chatbot.each_bot():
+            if not bot.init:
+                continue
+            models = bot.get_models(self.chatbot.bot_caller)
+            bot_models[bot_type] = models
 
         return bot_models
 
@@ -711,7 +683,7 @@ answer this following question: {{
             self.api = setting["api"]
         except Exception as e:
             log_err("fail to load aimi api: " + str(e))
-            self.api = [self.openai_api.type]
+            self.api = []
 
         try:
             self.preset_facts = {}

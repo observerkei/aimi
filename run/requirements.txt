@@ -4,7 +4,6 @@ EdgeGPT==0.12.1
 Flask==2.3.1
 Flask_Cors==4.0.0
 gevent==22.10.2
-GoogleBard==1.4.0
 json5==0.9.14
 openai==1.13.3
 poe_api==0.3.1
@@ -14,3 +13,5 @@ PyYAML==6.0
 Requests==2.31.0
 revChatGPT==5.0.0
 wolframalpha==5.0.0
+python-gemini-api==1.0.4
+google-generativeai==0.4.0

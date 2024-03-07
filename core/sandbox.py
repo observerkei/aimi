@@ -106,7 +106,9 @@ class Sandbox:
             if not len(run.stdout):
                 run.returncode = -1
                 if not len(run.stderr):
-                    run.stderr = "你没有用 `print` 打印运行结果, 请添加 `print` 后才能重试 . "
+                    run.stderr = (
+                        "你没有用 `print` 打印运行结果, 请添加 `print` 后才能重试 . "
+                    )
             if len(run.stdout) > max_return_len:
                 log_err(f"run stdout over limit: {str(len(run.stdout))}")
                 run.stdout = run.stdout[max_return_len:]
