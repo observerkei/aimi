@@ -1670,7 +1670,10 @@ class Task:
                 continue
 
             for talk in self.task_dispatch(res["message"]):
-                answer["message"] += talk
+                if isinstance(talk, str):
+                    answer["message"] += talk 
+                else:
+                    log_err(f'task_response not str: {str(type(talk))}: {str(talk)}\n')
                 yield answer
 
         self.save_task()
