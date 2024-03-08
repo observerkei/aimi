@@ -1003,37 +1003,34 @@ class Task:
                     f"success: True, task complate: {str(task_info)}\ncritic:\n{str(js)}"
                 )
                 verdict = request["verdict"]
+                default_task_info = "当前没有事情可以做, 找Master聊天吧..."
+
                 yield f"**Critic:** task complate, {verdict}\n"
 
                 if "task_id" in request and int(self.now_task_id) != int(
                     request["task_id"]
                 ):
                     log_dbg(f"not task ... ")
-                    return False
-
-                default_task_info = "当前没有事情可以做, 找Master聊天吧..."
-                if task_info == default_task_info:
+                elif task_info == default_task_info:
                     log_dbg(f"task no change. skip...")
-                    return True
-                critic_task_info = request["task_info"]
-                if task_info != critic_task_info:
+                elif task_info !=  request["task_info"]:
+                    critic_task_info = request["task_info"]
                     log_dbg(
                         f"critic: {critic_task_info} not task info: {task_info} skip..."
                     )
-                    return True
+                else:
+                    self.now_task_id = int(self.now_task_id) + 1
+                    new_task = TaskItem(
+                        task_id=self.now_task_id,
+                        task_info=default_task_info,
+                        now_task_step_id=1,
+                        task_step=[],
+                    )
 
-                self.now_task_id = int(self.now_task_id) + 1
-                new_task = TaskItem(
-                    task_id=self.now_task_id,
-                    task_info=default_task_info,
-                    now_task_step_id=1,
-                    task_step=[],
-                )
-
-                self.tasks[self.now_task_id] = new_task
-                log_dbg(
-                    f"set new task {str(self.now_task_id)} to {str(self.tasks[self.now_task_id].task_info)}"
-                )
+                    self.tasks[self.now_task_id] = new_task
+                    log_dbg(
+                        f"set new task {str(self.now_task_id)} to {str(self.tasks[self.now_task_id].task_info)}"
+                    )
             else:
                 log_info(f"success: False, task no complate, continue...")
 
