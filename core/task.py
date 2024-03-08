@@ -526,9 +526,9 @@ class Task:
 
                         stdout = response["stdout"]
                         if success:
-                            yield f"**Execution result:** \n{stdout}\n"
+                            yield f"**Execution result:** \n```javascript\n{stdout}\n```\n"
                         else:
-                            yield f"**Execution failed:** \n{stdout}\n"
+                            yield f"**Execution failed:** \n```javascript\n{stdout}\n```\n"
 
                     elif task.call == "chat_to_chatgpt":
                         aimi = task.request["Aimi"]
