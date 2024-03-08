@@ -225,7 +225,7 @@ class Task:
     models: List[str] = []
     init: bool = False
 
-    def task_response(self, res: str) -> Generator[dict, None, None]:
+    def task_dispatch(self, res: str) -> Generator[dict, None, None]:
         def get_json_content(answer: str):
             has_error = False
             # del ```python
@@ -367,7 +367,7 @@ class Task:
                     )
 
                     task_cnt += 1
-                    task_response = None
+                    task_response = ''
 
                     if int(task.timestamp) < int(self.timestamp):
                         skip_timestamp += 1
@@ -414,7 +414,7 @@ class Task:
                     if task.call == "chat_to_master":
                         content = str(task.request["content"])
                         log_dbg(f"Aimi: {content}")
-                        yield f"**To Master:** {content}\n"
+                        yield f"**To Master:** \n{content}\n"
 
                     elif task.call == "set_task_info":
                         task_id: int = int(task.request["task_id"])
@@ -476,7 +476,7 @@ class Task:
 
                     elif task.call == "chat_to_gemini":
                         ask_gemini = task.request["content"]
-                        yield f"**Ask Gemini:** {ask_gemini}\n"
+                        yield f"**Ask Gemini:** \n{ask_gemini}\n"
 
                         response = self.chat_to_gemini(ask_gemini)
                         task_response = self.make_chat_from(
@@ -485,11 +485,11 @@ class Task:
                             content=response,
                             request_description="`response->gemini` 的内容是 gemini 回复的话.",
                         )
-                        yield f"**Gemini reply:** {response}\n"
+                        yield f"**Gemini reply:** \n{response}\n"
 
                     elif task.call == "chat_to_bing":
                         ask_bing = task.request["content"]
-                        yield "**Ask Bing:** {ask_bing}\n"
+                        yield f"**Ask Bing:** \n{ask_bing}\n"
 
                         response = self.chat_to_bing(ask_bing)
                         task_response = self.make_chat_from(
@@ -498,7 +498,7 @@ class Task:
                             content=response,
                             request_description="`response->bing` 的内容是 bing 回复的话.",
                         )
-                        yield f"**Bing reply:** {response}\n"
+                        yield f"**Bing reply:** \n{response}\n"
 
                     elif task.call == "chat_to_python":
                         python_code = task.request["code"]
@@ -526,9 +526,9 @@ class Task:
 
                         stdout = response["stdout"]
                         if success:
-                            yield f"**Execution result:** {stdout}\n"
+                            yield f"**Execution result:** \n{stdout}\n"
                         else:
-                            yield f"**Execution failed:** {stdout}\n"
+                            yield f"**Execution failed:** \n{stdout}\n"
 
                     elif task.call == "chat_to_chatgpt":
                         aimi = task.request["Aimi"]
@@ -541,8 +541,8 @@ class Task:
 
                         log_info(f"Aimi: {aimi}\nchatgpt:{chatgpt}")
                         yield "**Think to oneself:**\n"
-                        yield f"**Ask oneself:** {aimi}\n"
-                        yield f"**Answer self:** {chatgpt}\n"
+                        yield f"**Ask oneself:** \n{aimi}\n"
+                        yield f"**Answer self:** \n{chatgpt}\n"
 
                     elif task.call == "chat_to_load_action":
                         offset = self.extern_action.action_offset
@@ -616,6 +616,7 @@ class Task:
                                 )
                                 response = str(e)
                                 has_error = True
+                                yield f"**Self-improvement is blocked.**\n"
 
                             from_name = task.call.replace(
                                 self.extern_action.action_call_prefix, ""
@@ -934,6 +935,7 @@ class Task:
         self, task_id: str, now_task_step_id: str, req_task_step: List[TaskStepItem]
     ) -> Generator[dict, None, None]:
         task_step: List[TaskStepItem] = []
+        has_step = False
         for step in req_task_step:
             calls = self.ai_calls + self.system_calls
             if (step.call and len(step.call)) and (step.call not in calls):
@@ -941,6 +943,7 @@ class Task:
                 continue
             task_step.append(step)
             yield f"**add task step:** {step.step_id}. {step.step}\n"
+            has_step = True
 
         for _, task in self.tasks.items():
             if int(task_id) != int(task.task_id):
@@ -955,6 +958,8 @@ class Task:
                 f"set task[{str(task_id)}] now_step_id: {str(now_task_step_id)} step:\n{str(js)}"
             )
             break
+        if not has_step:
+            yield "**Think task steps...**"
 
     def set_task_info(self, task_id: int, task_info: str, now_task_step_id: int):
         for _, task in self.tasks.items():
@@ -1034,6 +1039,8 @@ class Task:
 
         except Exception as e:
             log_err(f"fail to critic {str(request)} : {str(e)}")
+        
+        yield f"**Critic:** task no compalate.\n"
 
     @property
     def init(self):
@@ -1662,7 +1669,7 @@ class Task:
                     log_dbg(f"msg: {str(res['message'])}")
                 continue
 
-            for talk in self.task_response(res["message"]):
+            for talk in self.task_dispatch(res["message"]):
                 answer["message"] += talk
                 yield answer
 
@@ -1757,9 +1764,10 @@ class Task:
             ],
             "task_rule": [
                 f"1. 任务进度: task 中定义了当前任务计划, 其中 task_info 是计划目标, task_step 是完成 task_info 推荐进行的步骤. ",
-                f"2. 任务优化: 如果 task_step 为空, 或和 task_info 不匹配, 请重新设置最合适的 tesk_step. ",
+                f"2. 任务优化: 如果 task_step(行动计划) 为空, 或和 task_info(任务目标) 不匹配, 请重新设置最合适的 tesk_step. 以便最终问题得到解决. ",
                 f"3. 任务统筹: 如果发现任务(task_info) 已经完成, 应该用 action(acll=chat_to_master) 和 Master 确认任务是否满意, 是否需要重做. ",
                 f"4. 任务执行: 优先相应 Master 的指令. 在满足Master指令的情况下继续按照任务规则(task_rule)推进任务, 然后按顺序完成所有的 task_step. ",
+                f"5. 响应continue: 当出现`continue`回复的时候,你要根据已有信息自行推理下一步该怎么做, 优先自己解决, 阻塞才找我. ",
             ],
             "preset_rule": [
                 f"1. 预设规则: preset 是 你的用户 的预设, preset 只能对 action_tools 中定义的 动作(action(call=chat_to_master)) 的输入生效.\n "

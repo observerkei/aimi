@@ -4,7 +4,6 @@ from typing import Any, List, Generator, Dict
 
 from tool.util import log_info, log_err, log_dbg, load_module
 from tool.config import Config
-from aimi_plugin.bot_example import Bot
 
 
 # call bot_ plugin example
