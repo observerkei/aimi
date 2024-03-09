@@ -219,7 +219,7 @@ class Task:
     models: List[str] = []
     init: bool = False
 
-    def task_dispatch(self, res: str) -> Generator[dict, None, None]:
+    def task_dispatch(self, res: str) -> Generator[str, None, None]:
         def get_json_content(answer: str):
             has_error = False
             # del ```python
@@ -652,7 +652,7 @@ class Task:
     def dream(self, request: Any) -> str:
         js = json.dumps(request, indent=4, ensure_ascii=False)
         log_info(f"dream:\n{str(js)}")
-        yield str(js)
+        return str(js)
 
     def make_dream(self, response: str) -> str:
         dream = TaskRunningItem(
@@ -887,7 +887,7 @@ class Task:
 
     def set_task_step(
         self, task_id: str, now_task_step_id: str, req_task_step: List[TaskStepItem]
-    ) -> Generator[dict, None, None]:
+    ) -> Generator[str, None, None]:
         yield "**Think task steps...**\n"
 
         task_step: List[TaskStepItem] = []
@@ -945,7 +945,7 @@ class Task:
         except Exception as e:
             log_err(f"fail to review {str(e)}")
 
-    def critic(self, request) -> Generator[dict, None, None]:
+    def critic(self, request) -> Generator[str, None, None]:
         try:
             js = json.dumps(request, indent=4, ensure_ascii=False)
             if request["success"] == "True" or request["success"] == True:
@@ -989,7 +989,7 @@ class Task:
         except Exception as e:
             log_err(f"fail to critic {str(request)} : {str(e)}")
 
-        yield f"**Critic:** task no compalate.\n"
+            yield f"**Critic:** task no compalate.\n"
 
     @property
     def init(self):
@@ -1625,7 +1625,7 @@ def chat_from(request: dict = None):
     ) -> str:
         # 如果只是想让任务继续, 就回复全空格/\t/\n
         if question.isspace():
-            question = "continue"
+            question = "Time passes..."
             # 'What has been done recently? Now what? '
             # ' What should the this time do?'
             # 'Predict what you are most likely to do in the next timestamp based on the available information. '
@@ -1646,11 +1646,8 @@ def chat_from(request: dict = None):
                 "type": "object",
                 "timestamp": f"时间戳(数字): 必须从现在的 timestamp={self.timestamp} 开始, 每次递增. 如: {self.timestamp}",
                 "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 想聊天. ",
-                "reasoning": "推理和分析: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
-                f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息, 不能只是复制原先内容: "
-                "1. task_info 2. task_step 3. Master 说过的所有话/所有指令的概括 4. action_running 里面相关的所有内容. "
-                "5. 调用的 方法(action) 的 description概括 和 request 用法 以及合适和填法. 6. 如果是引用某个 timestamp , 要同时概况他的内容. "
-                f"如: AimiCore 开始思考: 根据 ... , 我接下来应该 ... ",
+                "reasoning": "推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
+                f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息, 不能只是复制原先内容: ",
                 "call": "调用 动作 的 call: 只能取 action_tools/extern_action 中想要使用动作 的对应 call . 如可取: chat_to_master. ",
                 "request": {"type": "object", "call对应参数": "参数内容"},
                 "conclusion": "概要: 简短总结当前现状和下一步计划. ",
