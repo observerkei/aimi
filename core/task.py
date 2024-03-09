@@ -652,6 +652,7 @@ class Task:
     def dream(self, request: Any) -> str:
         js = json.dumps(request, indent=4, ensure_ascii=False)
         log_info(f"dream:\n{str(js)}")
+        yield str(js)
 
     def make_dream(self, response: str) -> str:
         dream = TaskRunningItem(
@@ -1702,6 +1703,8 @@ def chat_from(request: dict = None):
                 f"9. 保存信息: 你能通过 action(call=chat_to_append_note) 来保留一些关健分析信息, 信息会现实在 note 中. 要检查是否保存成功. ",
                 f"10. 任何时候 你的回复都不能出现 call 是 chat_from_*) 的动作(*是通配符). ",
                 f"11. extern_action 是拓展动作, 也属于可调用的 action, 你也可以视情况使用. ",
+                f"12. 方法功能不耦合: 每个动作都是独立的, 每个动作单独的功能说明只在每个功能内生效, "
+                f"如在 chat_to_save_action 中有说设置函数名为固定, 那只在这个方法内生效, 其他地方没有这个限制. ",
             ],
             "task_rule": [
                 f"1. 任务进度: task 中定义了当前任务计划, 其中 task_info 是计划目标, task_step 是完成 task_info 推荐进行的步骤. ",
