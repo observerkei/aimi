@@ -181,6 +181,8 @@ s_action = ActionToolItem(
                         continue
 
                     chat_from = module.chat_from
+            if save_action_code and not chat_from:
+                raise Exception(f"save failed: you need to set the function name to chat_form")
 
             shutil.move(
                 f"{self.action_path}/tmp/{save_filename}",
@@ -430,7 +432,9 @@ class Task:
                             log_err(f"fail to load task_step: {str(e)}: {str(request)}")
                             has_error = True
                             continue
-                        yield from self.set_task_step(task_id, now_task_step_id, task_step)
+                        yield from self.set_task_step(
+                            task_id, now_task_step_id, task_step
+                        )
 
                     elif task.call == "critic":
                         yield from self.critic(task.request)
@@ -568,7 +572,7 @@ class Task:
                             save_description = save_action["description"]
                             yield f"**New ability:** *{save_description}*\n"
                             if save_action_code:
-                                yield f"**ability Method:** \n```python\n{save_action_code}\n```\n"
+                                yield f"**Ability method:** \n```python\n{save_action_code}\n```\n"
 
                     elif task.call in self.extern_action.actions:
                         req = task.request if not task.request else ""
@@ -579,7 +583,7 @@ class Task:
                         action_call = self.extern_action.actions[task.call]
                         chat_from = action_call.chat_from
                         action_description = action_call.action.description
-                
+
                         yield f"**Ability to try:** *{action_description}*\n"
                         if chat_from:
                             response = ""
@@ -741,7 +745,9 @@ class Task:
             log_info(f"chat_to_save_action: {response}")
 
         except Exception as e:
-            response = f"fail to save call: {str(save_action_call)} : {str(e)}, please fix. "
+            response = (
+                f"fail to save call: {str(save_action_call)} : {str(e)}, please fix. "
+            )
             log_err(f"chat_to_save_action: {response}")
             return False, response
 
