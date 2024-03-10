@@ -149,6 +149,10 @@ qq_server_data/
 /run/sandbox/requirements.txt
 /run/sandbox/temp*
 /run/clash
+run/bing_*.json
+run/google_*.json
+run/setting.yml
+run/memory.yml
 
 #vscode
 .vscode/
