@@ -24,9 +24,7 @@ s_action = ActionToolItem(
 # 不需要执行的话, 不需要写 chat_from
 # request: 调用方法的时候的传参, 默认 None
 def chat_from(request: dict = None):
-    def get_current_time():
-        import datetime
-        now = datetime.datetime.now()
-        return now.strftime("%Y-%m-%d %H:%M:%S")
-
-    return get_current_time()
+    # 获取当前系统时间
+    import datetime
+    now = datetime.datetime.now()
+    return now.strftime("%Y-%m-%d %H:%M:%S")

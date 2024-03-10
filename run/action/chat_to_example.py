@@ -19,7 +19,6 @@ s_action = ActionToolItem(
 
 # 在这里通过字符串返回这个接口的运算结果
 # 如果什么都不返回的话说明没有返回值
-# 不需要执行的话, 不需要写 chat_from
 # request: 调用方法的时候的传参, 默认 None
 def chat_from(request: dict = None):
     return '填写调用返回值'
