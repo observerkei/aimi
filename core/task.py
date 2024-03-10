@@ -439,8 +439,8 @@ class Task:
                     elif task.call == "critic":
                         yield from self.critic(task.request)
 
-                    elif task.call == "review":
-                        self.review(task.request)
+                    elif task.call == "analysis":
+                        self.analysis(task.request)
                         yield "**Think...**\n"
 
                     elif task.call == "dream":
@@ -938,12 +938,12 @@ class Task:
         )
         return task
 
-    def review(self, request):
+    def analysis(self, request):
         try:
             js = json.dumps(request, indent=4, ensure_ascii=False)
-            log_info(f"review:\n{js}")
+            log_info(f"analysis:\n{js}")
         except Exception as e:
-            log_err(f"fail to review {str(e)}")
+            log_err(f"fail to analysis {str(e)}")
 
     def critic(self, request) -> Generator[str, None, None]:
         try:
@@ -1178,7 +1178,7 @@ class Task:
                 execute="AI",
             ),
             ActionToolItem(
-                call="review",
+                call="analysis",
                 description="检查纠正机制: 通过严谨符合逻辑的自身思考进行分析并纠正问题. "
                 "某个操作或者步骤/动作(action)/结果 是否符合常识/经验, 最终为达成 task_info 或 Master 的问题服务.\n "
                 "分析的时候需要注意以下地方:\n "
@@ -1226,7 +1226,7 @@ class Task:
                     "next_task_step": [
                         {
                             "type": "object",
-                            "description": "task_step array[object]: 新行动计划: 基于 review 的内容生成能达成 task_info 或 Master的问题 的执行 动作(action) .\n "
+                            "description": "task_step array[object]: 新行动计划: 基于 analysis 的内容生成能达成 task_info 或 Master的问题 的执行 动作(action) .\n "
                             "填写时需要满足以下几点:\n "
                             "1. 新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id.\n "
                             "2. 必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向 Master 求助).\n "
@@ -1677,7 +1677,7 @@ def chat_from(request: dict = None):
             ],
             "display_format": [  # 不要动这个
                 f"1. 请始终保持你的回复可以被 Python 的 `json.loads` 解析. ",
-                f"2. 任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action, 如: action(call=review) . ",
+                f"2. 任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action, 如: action(call=analysis) . ",
                 f"3. 请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
                 f"哲学家思维结合你的常识、经验和 {aimi_core_name} Guidance 进行严谨分析, 替换成为最完美最符合的内容, "
                 f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 填充最合适最详细的内容, 然后进行回复, 结构如下:"
