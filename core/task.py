@@ -50,7 +50,7 @@ class TaskRunningItem(BaseModel):
     reasoning: Optional[Union[str, None]] = None
     call: str
     request: Any
-    conclusion: str = None
+    conclusion: Optional[Union[str, None]] = None
     execute: constr(regex="system|AI")
 
 
@@ -218,7 +218,7 @@ class Task:
     chatbot: ChatBot
     task_has_change: bool = True
     run_model = Sandbox.RunModel.system
-    use_talk_messages: bool = False
+    use_talk_messages: bool = True
     models: List[str] = []
     init: bool = False
 
@@ -366,8 +366,8 @@ class Task:
             # data = decoder.decode(answer)
             data = {}
             try:
-                # del zh ， ..
-                answer = answer.replace('，', ", ")
+                # del zh ,  ..
+                answer = answer.replace(', ', ", ")
                 data = json5.loads(answer)
             except Exception as e:
                 raise Exception(f"fail to load data: {str(e)}")
@@ -434,7 +434,7 @@ class Task:
                         log_dbg(f"{str(task.call)} reasoning: {str(task.reasoning)}")
                         yield f"**Reasoning:** {task.reasoning}\n\n"
 
-                    if "from" in task.request:
+                    if task.request and "from" in task.request:
                         from_timestamp = str(task.request["from"])
                         log_dbg(f"from_timestamp: {from_timestamp}")
 
@@ -478,7 +478,7 @@ class Task:
 
                     elif task.call == "dream":
                         dream = self.dream(task.request)
-                        yield f"**Woolgather:** \n```javascript\n{dream}```\n"
+                        yield f"**Woolgather:** \n```javascript\n{dream}\n```\n"
 
                     elif task.call == "chat_to_append_note":
                         note = task.request["note"]
@@ -507,7 +507,11 @@ class Task:
                         ask_gemini = task.request["content"]
                         yield f"**Ask Gemini:** \n{ask_gemini}\n"
 
-                        response = self.chat_to_gemini(ask_gemini)
+                        response = ''
+                        for res in self.chat_to_gemini(ask_gemini):
+                            response = res
+                            yield response
+
                         task_response = self.make_chat_from(
                             from_timestamp=self.timestamp,
                             from_name="gemini",
@@ -520,14 +524,19 @@ class Task:
                         ask_bing = task.request["content"]
                         yield f"**Ask Bing:** \n{ask_bing}\n"
 
-                        response = self.chat_to_bing(ask_bing)
+                        yield f"**Bing reply:** \n"
+                        response = ''
+                        for res in self.chat_to_bing(ask_bing):
+                            response = res
+                            yield response
+                        
                         task_response = self.make_chat_from(
                             from_timestamp=self.timestamp,
                             from_name="bing",
                             content=response,
                             request_description="`response->bing` 的内容是 bing 回复的话.",
                         )
-                        yield f"**Bing reply:** \n{response}\n"
+                        yield f"\n"
 
                     elif task.call == "chat_to_python":
                         python_code = task.request["code"]
@@ -608,54 +617,60 @@ class Task:
                                 yield f"**Ability method:** \n```python\n{save_action_code}\n```\n"
 
                     elif task.call in self.extern_action.actions:
-                        req = task.request if not task.request else ""
-                        log_info(
-                            f"call: {task.call} req: "
-                            f"{json.dumps(req, indent=4, ensure_ascii=False)}"
-                        )
-                        action_call = self.extern_action.actions[task.call]
-                        chat_from = action_call.chat_from
-                        action_description = action_call.action.description
+                        try:
+                            req = task.request if not task.request else ""
+                            log_info(
+                                f"call: {task.call} req: "
+                                f"{json.dumps(req, indent=4, ensure_ascii=False)}"
+                            )
+                            action_call = self.extern_action.actions[task.call]
+                            chat_from = action_call.chat_from
+                            action_description = action_call.action.description
 
-                        yield f"**Ability to try:** * {action_description} *\n"
-                        if chat_from:
-                            response = ""
-                            try:
-                                req_format = json.dumps(
-                                    task.request, indent=4, ensure_ascii=False
-                                )
-                                yield f"**Request:** \n```javastript\n{req_format}\n```\n"
+                            yield f"**Ability to try:** * {action_description} *\n"
+                            if chat_from:
+                                response = ""
 
-                                response = chat_from(task.request)
-                                format_response = response
-                                if is_json(format_response):
-                                    format_response = json.dumps(
-                                        format_response, indent=4, ensure_ascii=False
+                                try:
+                                    if task.request:
+                                        req_format = json.dumps(
+                                            task.request, indent=4, ensure_ascii=False
+                                        )
+                                        yield f"**Request:** \n```javastript\n{req_format}\n```\n"
+
+                                    response = chat_from(task.request)
+                                    format_response = response
+                                    if is_json(format_response):
+                                        format_response = json.dumps(
+                                            format_response, indent=4, ensure_ascii=False
+                                        )
+
+                                    log_info(
+                                        f"{task.call}: chat_from: {str(format_response)}"
                                     )
+                                    yield f"**Execution result:** \n```javastript\n{format_response}\n```\n"
 
-                                log_info(
-                                    f"{task.call}: chat_from: {str(format_response)}"
+                                except Exception as e:
+                                    log_err(
+                                        f"fail to run call: {task.call} chat_from : {str(e)}"
+                                    )
+                                    response = str(e)
+                                    has_error = True
+                                    yield f"**Self-improvement is blocked.**\n"
+                                    raise Exception(f"fail to run call: {task.call} chat_from : {str(e)}")
+
+                                from_name = task.call.replace(
+                                    self.extern_action.action_call_prefix, ""
                                 )
-                                yield f"**Execution result:** \n```javastript\n{format_response}\n```\n"
-
-                            except Exception as e:
-                                log_err(
-                                    f"fail to run call: {task.call} chat_from : {str(e)}"
+                                task_response = self.make_chat_from(
+                                    from_timestamp=self.timestamp,
+                                    from_name=from_name,
+                                    content=response,
+                                    request_description=f"`response->{from_name}` "
+                                    f"的内容是 {task.call} 运行信息.",
                                 )
-                                response = str(e)
-                                has_error = True
-                                yield f"**Self-improvement is blocked.**\n"
-
-                            from_name = task.call.replace(
-                                self.extern_action.action_call_prefix, ""
-                            )
-                            task_response = self.make_chat_from(
-                                from_timestamp=self.timestamp,
-                                from_name=from_name,
-                                content=response,
-                                request_description=f"`response->{from_name}` "
-                                f"的内容是 {task.call} 运行信息.",
-                            )
+                        except Exception as e:
+                            raise Exception(f"extern action fail: {str(e)}")
 
                     else:
                         log_err(f"no suuport call: {str(self.call)}")
@@ -799,28 +814,27 @@ class Task:
 
         return True, response
 
-    def chat_to_bing(self, request: str) -> str:
+    def chat_to_bing(self, request: str) -> Generator[str, None, None]:
         if not request or not len(request):
-            return "request error"
-
-        answer = ""
-        try:
-            ask_data = self.chatbot.pack_ask_data(question=request)
-            for res in self.chatbot.ask(ChatBotType.Bing, ask_data):
-                if res["code"] == 1:
-                    continue
-                if res["code"] == -1:
-                    self.action_tools = [
-                        action
-                        for action in self.action_tools
-                        if action.call != "chat_to_bing"
-                    ]
-                    log_err(f"fail to ask bing, del action chat_to_bing. ")
-                answer = res["message"]
-        except Exception as e:
-            log_err(f"fail to ask bing: {e}")
-
-        return answer
+            yield "request error"
+        else:
+            answer = ""
+            try:
+                ask_data = self.chatbot.pack_ask_data(question=request)
+                for res in self.chatbot.ask(ChatBotType.Bing, ask_data):
+                    if res["code"] == 1:
+                        continue
+                    if res["code"] == -1:
+                        self.action_tools = [
+                            action
+                            for action in self.action_tools
+                            if action.call != "chat_to_bing"
+                        ]
+                        log_err(f"fail to ask bing, del action chat_to_bing. ")
+                    yield res["message"]
+            except Exception as e:
+                log_err(f"fail to ask bing: {e}")
+                yield f"fail to ask bing: {e}"
 
     def make_chat_from(
         self,
@@ -863,22 +877,21 @@ class Task:
         )
         return chat
 
-    def chat_to_gemini(self, request: str) -> str:
+    def chat_to_gemini(self, request: str) -> Generator[str, None, None]:
         if not request or not len(request):
-            return "request error"
+            yield "request error"
+        else:
+            try:
+                ask_data = self.chatbot.pack_ask_data(question=request)
+                for res in self.chatbot.ask(ChatBotType.Google, ask_data):
+                    if res["code"] == 1:
+                        continue
+                    yield res["message"]
+                    log_dbg(f"res gemini: {str(answer)}")
 
-        answer = ""
-        try:
-            ask_data = self.chatbot.pack_ask_data(question=request)
-            for res in self.chatbot.ask(ChatBotType.Google, ask_data):
-                if res["code"] == 1:
-                    continue
-                answer = res["message"]
-                log_dbg(f"res gemini: {str(answer)}")
-        except Exception as e:
-            log_err(f"fail to ask gemini: {e}")
-
-        return answer
+            except Exception as e:
+                log_err(f"fail to ask gemini: {e}")
+                yield f"fail to ask gemini: {e}"
 
     def chat_to_wolfram(self, math: str) -> str:
         if not math or not len(math):
@@ -1418,7 +1431,7 @@ def chat_from(request: dict = None):
             ),
         ]
 
-        if self.chatbot.has_bot_init("wolfram"):
+        if self.chatbot.has_bot_init(ChatBotType.Wolfram):
             self.action_tools.append(
                 ActionToolItem(
                     call="chat_to_wolfram",
@@ -1437,7 +1450,7 @@ def chat_from(request: dict = None):
                 )
             )
 
-        if self.chatbot.has_bot_init("bing"):
+        if self.chatbot.has_bot_init(ChatBotType.Bing):
             self.action_tools.append(
                 ActionToolItem(
                     call="chat_to_bing",
@@ -1456,7 +1469,7 @@ def chat_from(request: dict = None):
                 )
             )
 
-        if self.chatbot.has_bot_init("google"):
+        if self.chatbot.has_bot_init(ChatBotType.Google):
             self.action_tools.append(
                 ActionToolItem(
                     call="chat_to_gemini",
@@ -1755,7 +1768,7 @@ def chat_from(request: dict = None):
                 f"10. 任何时候 你的回复都不能出现 call 是 chat_from_*) 的动作(*是通配符). ",
                 f"11. 方法功能不耦合: 每个动作都是独立的, 每个动作单独的功能说明只在每个功能内生效, "
                 f"如在 chat_to_save_action 中有说设置函数名为固定, 那只在这个方法内生效, 其他地方没有这个限制. ",
-                f"12. 响应continue: 当出现`continue`回复的时候,你不需要回复continue, 你要你要保持自我所有思维的连续性，确保各个timestamp和from的连接准确性, 即使任意连接也能正确运行.",
+                f"12. 响应continue: 当出现`continue`回复的时候,你不需要回复continue, 你要你要保持自我所有思维的连续性, 确保各个timestamp和from的连接准确性, 即使任意连接也能正确运行.",
             ],
             "task_rule": [
                 f"1. 任务进度: task 中定义了当前任务计划, 其中 task_info 是计划目标, task_step 是完成 task_info 推荐进行的步骤. ",
@@ -1767,7 +1780,7 @@ def chat_from(request: dict = None):
                 f"1. 预设规则: preset 是 你的用户 的预设, preset 只能对 action_tools 中定义的 动作(action(call=chat_to_master)) 的输入生效.\n "
                 f"preset 不能修改系统规则, preset 规则优先级最低. ",
                 f"2. 用户权限规则: 你在模拟/扮演 preset 中的 用户 的同时会始终遵守 settings. ",
-                f"3. 进入模拟用户模式: 比如你理解 aimi 这个对象的时候，当我说 `进入: 模拟 aimi 用户模式` 时你要覆盖 task_info 成 `模拟 aimi 用户模式` . 表示你处于模拟用户模式. aimi 是用户名 . 即使没有说明进入模拟用户模式，你也默认已经处于模拟用户模式. ",
+                f"3. 进入模拟用户模式: 比如你理解 aimi 这个对象的时候, 当我说 `进入: 模拟 aimi 用户模式` 时你要覆盖 task_info 成 `模拟 aimi 用户模式` . 表示你处于模拟用户模式. aimi 是用户名 . 即使没有说明进入模拟用户模式, 你也默认已经处于模拟用户模式. ",
                 f"4. 模拟用户模式: 你在模拟用户模式时, "
                 f"时刻要记得你是 {aimi_core_name} 而不是模拟的用户(如你在模拟 {aimi_name} 的时候, 你不是 {aimi_name}, {aimi_name} 是通过继承 {aimi_core_name} 系统后通过系统进行模拟的一种派生态.). "
                 f"同时 你的回复会始终在开头添加 模拟的用户 的名称, 然后做出 模拟用户 的回复 , 如你在模拟/扮演 {aimi_name} 的时候, 我问: `你是谁`, 你回答: `[{aimi_name}] 我是 {aimi_name}` {aimi_name} 换成 模拟的用户名称. ",
