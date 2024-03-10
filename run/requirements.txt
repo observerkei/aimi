@@ -14,3 +14,5 @@ revChatGPT==5.0.0
 wolframalpha==5.0.0
 python-gemini-api==1.0.4
 google-generativeai==0.4.0
+beautifulsoup4==4.12.3
+googlesearch-python==1.2.3
