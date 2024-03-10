@@ -4,6 +4,7 @@ import colorlog
 import inspect
 import os
 import importlib
+import json5
 
 from typing import Dict, List, Generator
 
@@ -150,6 +151,14 @@ def make_context_messages(
     return context_messages
 
 
+def is_json(data):
+    try:
+        json5.loads(str(data))
+    except ValueError as e:
+        return False
+    return True
+
+
 def load_module(
     module_path: str, load_name: List[str], file_start: str = "", file_end: str = ".py"
 ) -> Generator[dict, None, None]:
@@ -194,6 +203,8 @@ def green_input(prompt: str):
 
 
 def move_key_to_first_position(dictionary: dict, key: str):
+    if key not in dictionary:
+        return dictionary
     value = dictionary.pop(key)
     dictionary = {key: value, **dictionary}
     return dictionary
