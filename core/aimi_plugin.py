@@ -1,23 +1,29 @@
-import os
-import importlib.util
-from typing import Any, List, Generator, Dict
+from typing import Any, List, Generator, Dict, Optional, Union
 import shutil
 
 from tool.util import log_info, log_err, log_dbg, load_module
 from tool.config import Config
-from aimi_plugin.bot.type import Bot as BotType
+from aimi_plugin.bot.type import Bot as BotBase
+from aimi_plugin.bot.type import BotType as ChatBotTypeBase
+from aimi_plugin.bot.type import BotAskData as BotAskDataBase
 from aimi_plugin.action.type import ActionToolItem as ActionToolItemBase
 from pydantic import BaseModel, constr
 
+class ChatBotType(ChatBotTypeBase):
+    pass
+
+class BotAskData(BotAskDataBase):
+    pass
 
 # call bot_ plugin example
-class Bot(BotType):
+class Bot(BotBase):
     # This has to be globally unique
     type: str = "public_name"
     trigger: str = "#public_name"
-    bot: BotType
+    bot: BotBase
     # no need define plugin_prefix
     plugin_prefix = "bot_"
+    chatbot: Any 
 
     def __init__(self):
         self.bot = None
@@ -27,70 +33,31 @@ class Bot(BotType):
         return self.bot.init
 
     # when time call bot
-    def is_call(self, caller: BotType, req) -> bool:
-        pass
+    def is_call(self, caller: BotBase, req) -> bool:
+        return False
 
     # get support model
-    def get_models(self, caller: BotType) -> List[str]:
+    def get_models(self, caller: BotBase) -> List[str]:
         return [self.type]
 
     # ask bot
-    def ask(self, caller: BotType, ask_data) -> Generator[dict, None, None]:
-        question = caller.bot_get_question(ask_data)
+    def ask(self, caller: BotBase, ask_data: BotAskData) -> Generator[dict, None, None]:
+        question = ask_data.question
         yield caller.bot_set_response(code=1, message="o")
         yield caller.bot_set_response(code=0, message="ok.")
         # if error, then: yield caller.bot_set_response(code=-1, message="err")
 
+    def bot_ask(self, caller: BotBase, bot_type: str, ask_data: BotAskData) -> Generator[dict, None, None]:
+        if self.chatbot and self.chatbot.bot:
+            yield from self.chatbot.bot(self, bot_type, ask_data)
+
     # exit bot
-    def when_exit(self, caller: BotType):
+    def when_exit(self, caller: BotBase):
         pass
 
     # init bot
-    def when_init(self, caller: BotType):
+    def when_init(self, caller: BotBase):
         pass
-
-    # pack ask_data
-    def bot_pack_ask_data(
-        self,
-        question: str,
-        model: str = "",
-        messages: List = [],
-        conversation_id: str = "",
-    ):
-        return {
-            "question": question,
-            "model": model,
-            "messages": messages,
-            "conversation_id": conversation_id,
-        }
-
-    # no need define bot_get_question
-    def bot_get_question(self, ask_data):
-        if "question" in ask_data:
-            return ask_data["question"]
-        return ""
-
-    # no need define bot_get_model
-    def bot_get_model(self, ask_data):
-        if "model" in ask_data:
-            return ask_data["model"]
-        return ""
-
-    # no need define bot_get_messages
-    def bot_get_messages(self, ask_data):
-        if "messages" in ask_data:
-            return ask_data["messages"]
-        return ""
-
-    def bot_get_conversation_id(self, ask_data):
-        if "conversation_id" in ask_data:
-            return ask_data["conversation_id"]
-        return ""
-
-    def bot_get_timeout(self, ask_data):
-        if "timeout" in ask_data:
-            return ask_data["timeout"]
-        return ""
 
     # no need define bot_set_response
     def bot_set_response(self, code: int, message: str) -> Any:
@@ -109,40 +76,44 @@ class Bot(BotType):
         return log_info(msg, is_plugin=True)
 
 
-class ChatBotType:
-    Bing: str = "bing"
-    Google: str = "google"
-    OpenAI: str = "openai"
-    Wolfram: str = "wolfram"
-    ChimeraGPT: str = "wolfram"
-
-
 class ChatBot:
     bots: Dict[str, Bot] = {}
     bot_caller: Bot = Bot()
+    bot_path: str = "./aimi_plugin/bot"
 
-    def __init__(self):
-        pass
+    def __init__(self, bot_path):
+        self.bot_path = bot_path
+        self.bot_caller.chatbot = self
+        self.__load_bot()
+
+    def __load_bot(self):
+        # 遍历目录中的文件
+        for filename, module in load_module(
+            module_path=self.bot_path,
+            load_name=["Bot"],
+            file_start=self.bot_caller.plugin_prefix,
+        ):
+            # skip example
+            if self.bot_caller.plugin_prefix + "example.py" == filename:
+                continue
+
+            try:
+                bot: Bot = module.Bot()
+                bot_type = bot.type
+                if self.has_type(bot_type):
+                    raise Exception(f"{bot_type} has in bots")
+
+                self.append(bot_type, bot)
+
+                log_info(f"add bot bot_type:{bot_type}  from: {filename}")
+            except Exception as e:
+                log_err(f"fail to add bot bot: {e} file: {filename}")
 
     def append(self, type: str, bot: Bot):
         if type:
             self.bots[type] = bot
-
-    def pack_ask_data(
-        self,
-        question: str,
-        model: str = "",
-        messages: List = [],
-        conversation_id: str = "",
-    ):
-        return self.bot_caller.bot_pack_ask_data(
-            question=question,
-            model=model,
-            messages=messages,
-            conversation_id=conversation_id,
-        )
-
-    def ask(self, type: str, ask_data: dict = {}) -> Generator[dict, None, None]:
+    
+    def ask(self, type: str, ask_data: BotAskData) -> Generator[dict, None, None]:
         if self.has_type(type):
             try:
                 yield from self.bots[type].ask(self.bot_caller, ask_data)
@@ -174,6 +145,26 @@ class ChatBot:
     def each_bot(self) -> Generator[tuple[str, Bot], None, None]:
         for bot_type, bot in self.bots.items():
             yield bot_type, bot
+
+    def when_exit(self):
+        if not len(self.bots):
+            return
+
+        for bot_type, bot in self.bots.items():
+            try:
+                bot.when_exit(self.bot_caller)
+            except Exception as e:
+                log_err(f"fail to exit bot: {bot_type} err: {e}")
+
+    def when_init(self):
+        if not len(self.bots):
+            return
+
+        for bot_type, bot in self.bots.items():
+            try:
+                bot.when_init(self.bot_caller)
+            except Exception as e:
+                log_err(f"fail to init bot: {bot_type} err: {e}")
 
 
 class ActionToolItem(ActionToolItemBase):
@@ -320,22 +311,19 @@ class ExternAction:
 
 
 class AimiPlugin:
-    bot_caller: Bot = Bot()
     bot_path: str = ""
     action_path: str = ""
     setting: Dict
     chatbot: ChatBot
-    actions: List[Any]
+    extern_action: ExternAction
 
     def __init__(self, setting):
         self.__load_setting(setting)
 
-        self.chatbot = ChatBot()
-
-        self.__load_bot()
+        self.chatbot = ChatBot(self.bot_path)
         self.extern_action = ExternAction(self.action_path)
 
-        self.when_init()
+        self.chatbot.when_init()
 
     def __load_setting(self, setting):
         self.setting = setting
@@ -352,43 +340,5 @@ class AimiPlugin:
             log_err(f"fail to get action_path: {e}")
             self.action_path = "./aimi_plugin/action"
 
-    def __load_bot(self):
-        # 遍历目录中的文件
-        for filename, module in load_module(
-            module_path=self.bot_path, load_name=["Bot"], file_start="bot_"
-        ):
-            # skip example
-            if self.bot_caller.plugin_prefix + "example.py" == filename:
-                continue
-
-            try:
-                bot: Bot = module.Bot()
-                bot_type = bot.type
-                if self.chatbot.has_type(bot_type):
-                    raise Exception(f"{bot_type} has in bots")
-
-                self.chatbot.append(bot_type, bot)
-
-                log_info(f"add bot bot_type:{bot_type}  from: {filename}")
-            except Exception as e:
-                log_err(f"fail to add bot bot: {e} file: {filename}")
-
     def when_exit(self):
-        if not len(self.chatbot.bots):
-            return
-
-        for bot_type, bot in self.chatbot.bots.items():
-            try:
-                bot.when_exit(self.bot_caller)
-            except Exception as e:
-                log_err(f"fail to exit bot: {bot_type} err: {e}")
-
-    def when_init(self):
-        if not len(self.chatbot.bots):
-            return
-
-        for bot_type, bot in self.chatbot.bots.items():
-            try:
-                bot.when_init(self.bot_caller)
-            except Exception as e:
-                log_err(f"fail to init bot: {bot_type} err: {e}")
+        self.chatbot.when_exit()

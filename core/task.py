@@ -1,7 +1,6 @@
 import json5
 import json
 import os
-import importlib
 from typing import Dict, Any, List, Generator, Optional, Union, Set
 from pydantic import BaseModel, constr
 
@@ -23,11 +22,11 @@ from core.aimi_plugin import (
     ChatBot,
     ChatBotType,
     ActionToolItem,
-    ActionCall,
     ExternAction,
+    BotAskData,
+    Bot,
 )
 from core.sandbox import Sandbox, RunCodeReturn
-from aimi_plugin.action.type import ActionToolItem as ActionToolItemBase
 
 
 class TaskStepItem(BaseModel):
@@ -61,7 +60,7 @@ class TaskItem(BaseModel):
     task_step: List[TaskStepItem] = []
 
 
-class Task:
+class Task(Bot):
     type: str = "task"
     tasks: Dict[int, TaskItem] = {}
     action_tools: List[ActionToolItem] = []
@@ -80,7 +79,6 @@ class Task:
     run_model = Sandbox.RunModel.system
     use_talk_messages: bool = True
     models: List[str] = []
-    init: bool = False
 
     def task_dispatch(self, res: str) -> Generator[str, None, None]:
         def get_json_content(answer: str):
@@ -704,7 +702,7 @@ s_action = ActionToolItem(
         else:
             answer = ""
             try:
-                ask_data = self.chatbot.pack_ask_data(question=request)
+                ask_data = BotAskData(question=request)
                 for res in self.chatbot.ask(ChatBotType.Bing, ask_data):
                     if res["code"] == 1:
                         continue
@@ -770,7 +768,7 @@ s_action = ActionToolItem(
             yield "request error"
         else:
             try:
-                ask_data = self.chatbot.pack_ask_data(question=request)
+                ask_data = BotAskData(question=request)
                 for res in self.chatbot.ask(ChatBotType.Google, ask_data):
                     if res["code"] == 1:
                         continue
@@ -791,7 +789,7 @@ s_action = ActionToolItem(
         answer = ""
 
         try:
-            ask_data = self.chatbot.pack_ask_data(question=math)
+            ask_data = BotAskData(question=math)
             for res in self.chatbot.ask(ChatBotType.Wolfram, ask_data):
                 if res["code"] != 0:
                     continue
@@ -1541,10 +1539,14 @@ def chat_from(request: dict = None):
 
         return messages
 
-    def ask(self, link_think: str, model: str) -> Generator[dict, None, None]:
+    def ask(self, ask_data: BotAskData) -> Generator[dict, None, None]:
         answer = {"code": 1, "message": ""}
 
         self.task_has_change = True
+        link_think = self.make_link_think(
+            ask_data.model, ask_data.question, ask_data.aimi_name, ask_data.preset
+        )
+        model = ask_data.model
 
         if self.use_talk_messages:
             context_messages = make_context_messages(
@@ -1556,7 +1558,7 @@ def chat_from(request: dict = None):
                 link_think,
             )
 
-        ask_data = self.chatbot.pack_ask_data(
+        ask_data = BotAskData(
             question=link_think,
             messages=context_messages,
             model=self.get_openai_model(model),
@@ -1642,7 +1644,7 @@ def chat_from(request: dict = None):
                 f"2. 任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action, 如: action(call=analysis) . ",
                 f"3. 请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
                 f"哲学家思维结合你的常识、经验和 {aimi_core_name} Guidance 进行严谨分析, 替换成为最完美最符合的内容, "
-                f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 填充最合适最详细的内容, 然后进行回复, 结构在 action_format 中完成定义. "
+                f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 填充最合适最详细的内容, 然后进行回复, 结构在 action_format 中完成定义. ",
             ],
             "action_format": {
                 "type": "object",

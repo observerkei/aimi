@@ -8,7 +8,7 @@ from contextlib import suppress
 
 from tool.config import Config
 from tool.util import log_dbg, log_err, log_info, make_context_messages
-from core.aimi_plugin import AimiPlugin, Bot, ChatBot, ChatBotType
+from core.aimi_plugin import AimiPlugin, Bot, ChatBot, ChatBotType, BotAskData
 from app.app_qq import ChatQQ
 from app.app_web import ChatWeb
 
@@ -164,111 +164,6 @@ class Aimi:
         self.chat_web.register_ask_hook(self.web_ask)
         self.chat_web.models = self.get_all_models()
 
-    def make_link_think(
-        self,
-        model: str,
-        question: str,
-        nickname: str = None,
-        api_type: str = None,
-        preset: str = "",
-        talk_history: Any = None,
-    ) -> str:
-        nickname = nickname if nickname and len(nickname) else self.master_name
-        api_type = api_type if api_type and len(api_type) else self.api[0]
-        link_think = question
-
-        if api_type == self.task.type:
-            link_think = self.task.make_link_think(
-                model, question, self.aimi_name, preset
-            )
-        elif api_type == ChatBotType.OpenAI and model == "web":
-            # cul question
-            history = self.memory.make_history(talk_history)
-            link_think = f"""
-设定: {{
-“{preset}”
-}}.
-
-请只关注最新消息,历史如下: {{
-{history}
-}}.
-
-请根据设定和最新对话历史和你的历史回答, 不用“{self.aimi_name}:”开头, 回答如下问题: {{
-{nickname}说: “{question}”
-}}.
-"""
-        elif api_type == ChatBotType.Google:
-            link_think = f"""
-preset: {{
-\"{preset}\"
-}}.
-
-Please answer the following question based on the preset, 
-the latest conversation history, and your previous answers.
-and without starting with '{self.aimi_name}:'
-You should extract my question directly from the structure here and answer it directly: {{
-{nickname} said: '{question}'
-}}
-"""
-            link_think = question
-        elif "" == ChatBotType.Bing:
-            link_think = f"""
-故事主题如下: 故事中有两个人到了异世界里面开咖啡厅.
-故事情节如下: 其中主人公自称Master({self.master_name}), 他有一个助理, 名叫{self.aimi_name}, 他们两个在聊天.
-故事背景如下: {{
-{preset}
-{self.aimi_name}能问她的朋友 Bing 来尽力解答Master的问题.
-}}
-
-请不显示故事主题/情节/背景的分析过程, 以“{self.aimi_name}”的身份, 让聊天足够自然, 接下以下聊天: {{
-{nickname}说: '{question}'
-}}
-"""
-        elif api_type == ChatBotType.Wolfram:
-            math_html = "help me caculate math."
-            for answer in self.__post_wolfram(link_think):
-                if answer["code"] != 0:
-                    continue
-                math_html = answer["message"]
-            link_think = f"""
-{link_think}
-需求:
-1. 使用 latex 显示内容比如:
-' $$ 
-x_1 
-$$ ' .
-
-2. 我需要你使用翻译功能, 帮我把 the wolfram response 的内容翻译成我的语言.
-3. 请忽略历史记录, 你现在是严谨的逻辑分析翻译结构.
-4. 你的品味很高,你会使内容更加美观,你会添加足够多的二次换行,并在不同层次追加换行,并按照自己经验让内容变得更加好看,答案要重点突出,并用latex显示.
-5. 不要试图解决这个问题，你只能显示 the wolfram response 里面的内容.
-
-the wolfram response: {{
-{math_html}
-}}
-"""
-        elif api_type == ChatBotType.ChimeraGPT:
-            # cul question
-            history = self.memory.make_history(talk_history)
-
-            link_think = f"""
-preset: {{
-“{preset}”
-}}.
-
-Please focus only on the latest news. History follows: {{
-{history}
-}}
-
-Based on the preset and our conversation history, and my previous responses, 
-answer the following question without adding additional descriptions, 
-and without starting with '{self.aimi_name}:'
-answer this following question: {{
-{nickname} say: “{question}”
-}}.
-"""
-        return link_think
-
     def run(self):
         self.notify_online()
 
@@ -308,14 +203,20 @@ answer this following question: {{
 
         log_dbg("aimi exit")
 
-    def __question_api_type(self, question: str) -> str:
+    def __get_api_type_by_question(self, question: str) -> str:
         for bot_type, bot in self.chatbot.each_bot():
             if not bot.init:
                 continue
 
-            ask_data = self.chatbot.pack_ask_data(question=question)
+            ask_data = BotAskData(question=question)
             if bot.is_call(self.chatbot.bot_caller, ask_data):
                 return bot_type
+
+        if self.task.is_call(question=question):
+            return self.task.type
+
+        if self.task.init:
+            return self.task.type
 
         # 一个都找不到，随机取一个.
         for bot_type, bot in self.chatbot.each_bot():
@@ -355,7 +256,7 @@ answer this following question: {{
                 question = self.chat_qq.get_question(msg)
                 log_info("{}: {}".format(nickname, question))
 
-                api_type = self.__question_api_type(question)
+                api_type = self.__get_api_type_by_question(question)
 
                 reply = ""
                 reply_line = ""
@@ -468,61 +369,52 @@ answer this following question: {{
         context_messages: Any = None,
     ) -> Generator[dict, None, None]:
         preset = context_messages[0]["content"]
-        if (owned_by == self.aimi_name) and (model == "auto"):
-            return self.ask(question=question, nickname=nickname, preset=preset)
-        elif owned_by == self.aimi_name and model in self.task.models:
-            task_link_think = self.task.make_link_think(
-                model=model, question=question, aimi_name=self.aimi_name, preset=preset
-            )
+        api_type = owned_by
 
-            return self.task.ask(link_think=task_link_think, model=model)
-        else:
-            talk_history = context_messages[1:]
-            link_think = self.make_link_think(
-                model=model,
-                question=question,
-                nickname=self.master_name,
-                api_type=owned_by,
-                preset=preset,
-                talk_history=talk_history,
-            )
-
-            return self.__post_question(
-                link_think=link_think,
-                api_type=owned_by,
-                model=model,
-                context_messages=context_messages,
-            )
-
-    def ask(self, question: str, nickname: str = None, preset: str = "") -> Generator[dict, None, None]:
-        api_type = self.__question_api_type(question)
-        model = ""
         nickname = nickname if nickname and len(nickname) else self.master_name
+
+        talk_history = context_messages[1:-1]
+
+        ask_data = BotAskData(
+            question=question,
+            model=model,
+            aimi_name=self.aimi_name,
+            preset=preset,
+            nickname=nickname,
+            messages=context_messages,
+            conversation_id=self.memory.openai_conversation_id,
+        )
+
+        if (api_type == self.aimi_name) and (model == "auto"):
+            return self.ask(
+                question=question, nickname=nickname, preset=preset, ask_data=ask_data
+            )
+        else:
+            ask_data.history = self.memory.make_history(talk_history)
+            return self.__post_question(
+                api_type=api_type,
+                ask_data=ask_data,
+            )
+
+    def ask(
+        self, api_type, ask_data: BotAskData, talk_history, question
+    ) -> Generator[dict, None, None]:
+        model = ""
 
         if preset.isspace():
             with suppress(KeyError):
                 preset = self.preset_facts[api_type]
-    
+
         talk_history = self.memory.search(question, self.max_link_think)
+        ask_data.messages = make_context_messages(question, preset, talk_history)
 
-        link_think = self.make_link_think(
-            model=model,
-            question=question,
-            nickname=nickname,
+        history = self.memory.make_history(talk_history)
+        ask_data.history = history
+
+        for message in self.__post_question(
             api_type=api_type,
-            preset=preset,
-            talk_history=talk_history,
-        )
-        context_messages = make_context_messages(question, preset, talk_history)
-
-        answer = self.__post_question(
-            link_think=link_think,
-            api_type=api_type,
-            model=model,
-            context_messages=context_messages,
-        )
-
-        for message in answer:
+            ask_data=ask_data,
+        ):
             if not message:
                 continue
             # log_dbg(f'message: {str(type(message))} {str(message)} answer: {str(type(answer))} {str(answer))}'
@@ -534,71 +426,20 @@ answer this following question: {{
             yield message
 
     def __post_question(
-        self, link_think: str, api_type: str, model: str, context_messages: Any
+        self, api_type: str, ask_data: BotAskData
     ) -> Generator[dict, None, None]:
         log_dbg("use api: " + str(api_type))
 
         if api_type == ChatBotType.OpenAI:
-
-            yield from self.__post_openai(
-                link_think, model, context_messages, self.memory.openai_conversation_id
-            )
-
+            yield from self.__post_openai(ask_data)
         elif api_type == self.task.type:
-
-            yield from self.task.ask(link_think, model)
-
-        elif api_type == ChatBotType.Wolfram:
-            # at mk link think, already set wolfram response.
-            if True and self.api[0] != ChatBotType.Wolfram:
-                yield from self.__post_question(
-                    link_think,
-                    self.api[0],
-                    model,
-                    context_messages=[{"role": "user", "content": link_think}],
-                )
-            else:
-                yield from self.__post_bing(link_think)
-
+            yield from self.task.ask(ask_data)
         elif self.chatbot.has_type(api_type):
-            ask_data = self.chatbot.pack_ask_data(
-                question=link_think, model=model, messages=context_messages
-            )
             yield from self.chatbot.ask(api_type, ask_data)
-
         else:
             log_err("not suppurt api_type: " + str(api_type))
 
-    def __post_wolfram(self, question: str) -> Generator[dict, None, None]:
-        ask_data = self.chatbot.pack_ask_data(question=question)
-        yield from self.chatbot.ask(ChatBotType.Wolfram, ask_data)
-
-    def __post_google(self, question: str) -> Generator[dict, None, None]:
-        ask_data = self.chatbot.pack_ask_data(question=question)
-        yield from self.chatbot.ask(ChatBotType.Google, ask_data)
-
-    def __post_bing(
-        self,
-        question: str,
-        model: str = None,
-    ) -> Generator[dict, None, None]:
-        ask_data = self.chatbot.pack_ask_data(question=question, model=model)
-        yield from self.chatbot.ask(ChatBotType.Bing, ask_data)
-
-    def __post_openai(
-        self,
-        question: str,
-        model: str,
-        context_messages: List[Dict] = [],
-        openai_conversation_id: str = None,
-    ) -> Generator[dict, None, None]:
-
-        ask_data = self.chatbot.pack_ask_data(
-            question=question,
-            messages=context_messages,
-            model=model,
-            conversation_id=openai_conversation_id,
-        )
+    def __post_openai(self, ask_data: BotAskData) -> Generator[dict, None, None]:
 
         answer = self.chatbot.ask(ChatBotType.OpenAI, ask_data)
         # get yield last val
@@ -607,12 +448,10 @@ answer this following question: {{
 
             try:
                 if (
-                    (message)
-                    and (message["code"] == 0)
+                    message
+                    and message["code"] == 0
                     and message["conversation_id"]
-                    and (
-                        message["conversation_id"] != self.memory.openai_conversation_id
-                    )
+                    and message["conversation_id"] != self.memory.openai_conversation_id
                 ):
                     self.memory.openai_conversation_id = message["conversation_id"]
                     log_info(

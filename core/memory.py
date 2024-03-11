@@ -233,7 +233,6 @@ class Memory:
                     continue
                 content = v
             history += f"{talk_count} {it} {content}\n"
-        # todo
         return history
 
     def __model_enable(self) -> bool:
