@@ -1,17 +1,23 @@
 import os
 import importlib.util
 from typing import Any, List, Generator, Dict
+import shutil
 
 from tool.util import log_info, log_err, log_dbg, load_module
 from tool.config import Config
+from aimi_plugin.bot.type import Bot as BotType
+from aimi_plugin.action.type import ActionToolItem as ActionToolItemBase
+from pydantic import BaseModel, constr
 
 
 # call bot_ plugin example
-class Bot:
+class Bot(BotType):
     # This has to be globally unique
     type: str = "public_name"
     trigger: str = "#public_name"
-    bot: Any
+    bot: BotType
+    # no need define plugin_prefix
+    plugin_prefix = "bot_"
 
     def __init__(self):
         self.bot = None
@@ -21,33 +27,27 @@ class Bot:
         return self.bot.init
 
     # when time call bot
-    def is_call(self, caller: Any, req) -> bool:
-        question = caller.bot_get_question(req)
-        if trigger in question:
-            return True
-        return False
+    def is_call(self, caller: BotType, req) -> bool:
+        pass
 
     # get support model
-    def get_models(self, caller: Any) -> List[str]:
+    def get_models(self, caller: BotType) -> List[str]:
         return [self.type]
 
     # ask bot
-    def ask(self, caller: Any, ask_data) -> Generator[dict, None, None]:
+    def ask(self, caller: BotType, ask_data) -> Generator[dict, None, None]:
         question = caller.bot_get_question(ask_data)
         yield caller.bot_set_response(code=1, message="o")
         yield caller.bot_set_response(code=0, message="ok.")
         # if error, then: yield caller.bot_set_response(code=-1, message="err")
 
     # exit bot
-    def when_exit(self, caller: Any):
+    def when_exit(self, caller: BotType):
         pass
 
     # init bot
-    def when_init(self, caller: Any):
+    def when_init(self, caller: BotType):
         pass
-
-    # no need define plugin_prefix
-    plugin_prefix = "bot_"
 
     # pack ask_data
     def bot_pack_ask_data(
@@ -176,85 +176,219 @@ class ChatBot:
             yield bot_type, bot
 
 
-class AimiPlugin:
-    bots: Dict[str, Bot] = {}
-    bots_type: List[str] = []
-    bot_obj: Bot = Bot()
-    plugin_path = "./aimi_plugin"
+class ActionToolItem(ActionToolItemBase):
+    type: str = "object"
+    call: str
+    description: str
+    request: Any
+    execute: constr(regex="system|AI")
 
-    def __init__(self):
-        self.__load_setting()
+
+class ActionCall(BaseModel):
+    brief: str = ""
+    action: ActionToolItem
+    chat_from: Any = None
+
+
+class ExternAction:
+    action_path: str = "./aimi_plugin/action/"
+    action_call_prefix: str = "chat_to_"
+    action_offset: int = 0
+    actions: Dict[str, ActionCall] = {}
+
+    def __init__(self, action_path: str):
+        self.action_path = action_path
+        self.__load_extern_action()
+
+    def brief(self) -> List[ActionToolItem]:
+        cnt = 0
+        catalog = []
+        for call, action_call in self.actions.items():
+            # 计算显示偏移 只有数量足够多才需要滑动
+            if len(self.actions) - self.action_offset > 10:
+                cnt += 1
+                if cnt < self.action_offset:
+                    continue
+
+                if len(catalog) >= 10:
+                    break
+            catalog.append(action_call.action)
+
+        return catalog
+
+    def __append_extern_action(self, action: ActionToolItem, chat_from: Any = None):
+        action_brief = action.description
+        # 只挑选 前面部分作为简介
+        brief_idx = action_brief.find(":")
+        if brief_idx != -1 and brief_idx < 15:
+            action_brief = action_brief[:brief_idx]
+
+        self.actions[action.call] = ActionCall(
+            action=action,
+            brief=action_brief,
+            chat_from=chat_from,
+        )
+
+    def __load_extern_action(self):
+        # 指定目录路径
+        for filename, module in load_module(
+            module_path=self.action_path,
+            load_name=["s_action"],
+            file_start=self.action_call_prefix,
+        ):
+            if filename == f"{self.action_call_prefix}example.py":
+                continue
+
+            try:
+                action: ActionToolItem = module.s_action
+                action_call = filename.replace(".py", "")
+                action.call = action_call
+
+                # log_dbg(f"action: {json.dumps(action.dict(), indent=4, ensure_ascii=False)}")
+
+                chat_from = None
+                if hasattr(module, "chat_from"):
+                    chat_from = module.chat_from
+
+                self.__append_extern_action(action, chat_from)
+
+                log_info(f"load action: {action_call}")
+
+            except Exception as e:
+                log_err(f"fail to load {filename} : {str(e)}")
+
+    def save_action(
+        self,
+        action: ActionToolItem,
+        save_action_example: str,
+        save_action_code: str = None,
+    ):
+        response = ""
+        if action.call in self.actions:
+            response = f"fail to save call: {action.call}, arealy exsit."
+            log_err(response)
+            return False, response
+
+        if save_action_code:
+            save_action_example += save_action_code
+            log_dbg(f"append chat_from code:\n```python\n{save_action_code}\n```")
+
+        if self.action_call_prefix in action.call:
+            action.call = action.call.replace(self.action_call_prefix, "")
+            log_err(f"fix action call chat_to_ prefix")
+
+        action.call = f"{self.action_call_prefix}{action.call}"
+
+        try:
+            save_filename = f"{action.call}.py"
+            file = open(
+                f"{self.action_path}/tmp/{save_filename}",
+                "w",
+                encoding="utf-8",
+            )
+            file.write(save_action_example)
+            file.close()
+
+            log_dbg(f"write action: {action.call} done")
+
+            chat_from = None
+            if save_action_code:
+                for filename, module in load_module(
+                    module_path=self.action_path, load_name=["chat_from"]
+                ):
+                    if filename != save_filename:
+                        continue
+
+                    chat_from = module.chat_from
+            if save_action_code and not chat_from:
+                raise Exception(
+                    f"save failed: you need to set the function name to chat_form"
+                )
+
+            shutil.move(
+                f"{self.action_path}/tmp/{save_filename}",
+                f"{self.action_path}/{save_filename}",
+            )
+
+            self.__append_extern_action(action, chat_from)
+
+            return True, "save done"
+        except Exception as e:
+            response = f"fail to save {action.call} : {str(e)}"
+            log_err(response)
+        return False, response
+
+
+class AimiPlugin:
+    bot_caller: Bot = Bot()
+    bot_path: str = ""
+    action_path: str = ""
+    setting: Dict
+    chatbot: ChatBot
+    actions: List[Any]
+
+    def __init__(self, setting):
+        self.__load_setting(setting)
+
+        self.chatbot = ChatBot()
 
         self.__load_bot()
+        self.extern_action = ExternAction(self.action_path)
 
         self.when_init()
 
-    def __load_setting(self):
-        try:
-            setting = Config.load_setting("aimi")
-        except Exception as e:
-            log_err(f"fail to load {self.type}: {e}")
-            setting = {}
-            return
+    def __load_setting(self, setting):
+        self.setting = setting
 
         try:
-            self.plugin_path = setting["plugin_path"]
+            self.bot_path = setting["bot_path"]
         except Exception as e:
-            log_err(f"fail to get plugin_path: {e}")
-            self.plugin_path = "./aimi_plugin"
+            log_err(f"fail to get bot_path: {e}")
+            self.bot_path = "./aimi_plugin/bot"
+
+        try:
+            self.action_path = setting["action_path"]
+        except Exception as e:
+            log_err(f"fail to get action_path: {e}")
+            self.action_path = "./aimi_plugin/action"
 
     def __load_bot(self):
         # 遍历目录中的文件
         for filename, module in load_module(
-            module_path=self.plugin_path, load_name=["Bot"], file_start="bot_"
+            module_path=self.bot_path, load_name=["Bot"], file_start="bot_"
         ):
             # skip example
-            if self.bot_obj.plugin_prefix + "example.py" == filename:
+            if self.bot_caller.plugin_prefix + "example.py" == filename:
                 continue
 
             try:
-                bot = module.Bot()
+                bot: Bot = module.Bot()
                 bot_type = bot.type
-                if bot_type in self.bots:
+                if self.chatbot.has_type(bot_type):
                     raise Exception(f"{bot_type} has in bots")
-                self.bots[bot_type] = bot
-                log_info(f"add plugin bot_type:{bot_type}  from: {filename}")
+
+                self.chatbot.append(bot_type, bot)
+
+                log_info(f"add bot bot_type:{bot_type}  from: {filename}")
             except Exception as e:
-                log_err(f"fail to add plugin bot: {e} file: {filename}")
-
-    def bot_has_type(self, type) -> bool:
-        if not len(self.bots):
-            return False
-
-        for bot_type, bot in self.bots.items():
-            try:
-                if bot_type == type:
-                    return True
-            except Exception as e:
-                log_err(f"fail to check type bot: {bot_type} err: {e}")
-
-        return False
+                log_err(f"fail to add bot bot: {e} file: {filename}")
 
     def when_exit(self):
-        if not len(self.bots):
+        if not len(self.chatbot.bots):
             return
 
-        for bot_type, bot in self.bots.items():
+        for bot_type, bot in self.chatbot.bots.items():
             try:
-                bot.when_exit(self.bot_obj)
+                bot.when_exit(self.bot_caller)
             except Exception as e:
                 log_err(f"fail to exit bot: {bot_type} err: {e}")
 
     def when_init(self):
-        if not len(self.bots):
+        if not len(self.chatbot.bots):
             return
 
-        for bot_type, bot in self.bots.items():
+        for bot_type, bot in self.chatbot.bots.items():
             try:
-                bot.when_init(self.bot_obj)
+                bot.when_init(self.bot_caller)
             except Exception as e:
                 log_err(f"fail to init bot: {bot_type} err: {e}")
-
-    def each_bot(self) -> Generator[tuple[str, Bot], None, None]:
-        for bot_type, bot in self.bots.items():
-            yield bot_type, bot

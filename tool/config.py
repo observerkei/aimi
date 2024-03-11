@@ -102,6 +102,7 @@ class Config:
             task["now_task_id"] = obj.get("now_task_id", "1")
             task["timestamp"] = obj.get("timestamp", 1)
             task["running"] = obj.get("running", [])
+            task["notes"] = obj.get("notes", [])
 
             log_dbg("cfg load task done.")
 

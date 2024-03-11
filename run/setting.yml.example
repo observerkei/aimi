@@ -250,7 +250,9 @@ aimi:
     - poe
   api_port: 4642
   web_port: 2464
-  plugin_path: './aimi_plugin'
+  aimi_plugin:
+    bot_path: './aimi_plugin/bot'
+    action_path: './aimi_plugin/action'
   task:
     extern_action_path: './run/action'
     sandbox_path: './run/sandbox'

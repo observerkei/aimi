@@ -9,8 +9,8 @@ from contextlib import suppress
 from tool.config import Config
 from tool.util import log_dbg, log_err, log_info, make_context_messages
 from core.aimi_plugin import AimiPlugin, Bot, ChatBot, ChatBotType
-from chat.qq import ChatQQ
-from chat.web import ChatWeb
+from app.app_qq import ChatQQ
+from app.app_web import ChatWeb
 
 from tool.md2img import Md
 from core.memory import Memory
@@ -147,13 +147,11 @@ class Aimi:
         self.md = Md()
         self.memory = Memory()
 
-        self.chatbot = ChatBot()
+        self.aimi_plugin = AimiPlugin(self.aimi_plugin_setting)
 
-        self.aimi_plugin = AimiPlugin()
-        for bot_type, bot in self.aimi_plugin.each_bot():
-            self.chatbot.append(bot_type, bot)
+        self.chatbot = self.aimi_plugin.chatbot
 
-        self.task = Task(self.chatbot, self.task_setting)
+        self.task = Task(self.aimi_plugin, self.task_setting)
 
         self.chat_web = ChatWeb()
         self.chat_qq = ChatQQ()
@@ -666,7 +664,12 @@ answer this following question: {{
         except Exception as e:
             log_err("fail to load aimi: {e}")
             self.aimi_name = "Aimi"
-
+        try:
+            self.aimi_plugin_setting = setting["aimi_plugin"]
+        except Exception as e:
+            log_err("fail to load aimi: {e}")
+            self.aimi_plugin_setting = {}
+                
         try:
             self.task_setting = setting["task"]
         except Exception as e:

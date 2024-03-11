@@ -4,7 +4,6 @@ import os
 import importlib
 from typing import Dict, Any, List, Generator, Optional, Union, Set
 from pydantic import BaseModel, constr
-import shutil
 
 from tool.config import Config
 from tool.util import (
@@ -19,8 +18,16 @@ from tool.util import (
     is_json,
 )
 
-from core.aimi_plugin import ChatBot, ChatBotType
+from core.aimi_plugin import (
+    AimiPlugin,
+    ChatBot,
+    ChatBotType,
+    ActionToolItem,
+    ActionCall,
+    ExternAction,
+)
 from core.sandbox import Sandbox, RunCodeReturn
+from aimi_plugin.action.type import ActionToolItem as ActionToolItemBase
 
 
 class TaskStepItem(BaseModel):
@@ -33,14 +40,6 @@ class TaskStepItem(BaseModel):
     call_timestamp: Optional[
         Union[List[str], List[int], List[None], str, int, None]
     ] = []
-
-
-class ActionToolItem(BaseModel):
-    type: str = "object"
-    call: str
-    description: str
-    request: Any
-    execute: constr(regex="system|AI")
 
 
 class TaskRunningItem(BaseModel):
@@ -62,151 +61,12 @@ class TaskItem(BaseModel):
     task_step: List[TaskStepItem] = []
 
 
-class ExternAction:
-    action_path: str = "./run/action/"
-    action_call_prefix: str = "chat_to_"
-    action_offset: int = 0
-
-    class ActionCall(BaseModel):
-        brief: str = ""
-        action: ActionToolItem
-        chat_from: Any = None
-
-    actions: Dict[str, ActionCall] = {}
-
-    def __init__(self):
-        self.__load_extern_action()
-
-    def brief(self) -> List[ActionToolItem]:
-        cnt = 0
-        catalog = []
-        for call, action_call in self.actions.items():
-            # 计算显示偏移 只有数量足够多才需要滑动
-            if len(self.actions) - self.action_offset > 10:
-                cnt += 1
-                if cnt < self.action_offset:
-                    continue
-
-                if len(catalog) >= 10:
-                    break
-            catalog.append(action_call.action)
-
-        return catalog
-
-    def __append_extern_action(self, action: ActionToolItem, chat_from: Any = None):
-        action_brief = action.description
-        # 只挑选 前面部分作为简介
-        brief_idx = action_brief.find(":")
-        if brief_idx != -1 and brief_idx < 15:
-            action_brief = action_brief[:brief_idx]
-
-        self.actions[action.call] = ExternAction.ActionCall(
-            action=action,
-            brief=action_brief,
-            chat_from=chat_from,
-        )
-
-    def __load_extern_action(self):
-        # 指定目录路径
-        for filename, module in load_module(
-            module_path=self.action_path, load_name=["s_action"]
-        ):
-            if filename == f"{self.action_call_prefix}example.py":
-                continue
-
-            try:
-                action: ActionToolItem = module.s_action
-                action_call = filename.replace(".py", "")
-                action.call = action_call
-
-                # log_dbg(f"action: {json.dumps(action.dict(), indent=4, ensure_ascii=False)}")
-
-                chat_from = None
-                if hasattr(module, "chat_from"):
-                    chat_from = module.chat_from
-
-                self.__append_extern_action(action, chat_from)
-
-                log_info(f"load action: {action_call}")
-
-            except Exception as e:
-                log_err(f"fail to load {filename} : {str(e)}")
-
-    def save_action(self, action: ActionToolItem, save_action_code: str = None):
-        response = ""
-        if action.call in self.actions:
-            response = f"fail to save call: {action.call}, arealy exsit."
-            log_err(response)
-            return False, response
-
-        save_example = f"""
-from core.task import ActionToolItem
-
-
-s_action = ActionToolItem(
-    call="",
-    description="{action.description}",
-    request="{action.request}",
-    execute="{action.execute}",
-)
-
-"""
-        if save_action_code:
-            save_example += save_action_code
-            log_dbg(f"append chat_from code:\n```python\n{save_action_code}\n```")
-
-        if self.action_call_prefix in action.call:
-            action.call = action.call.replace(self.action_call_prefix, "")
-            log_err(f"fix action call chat_to_ prefix")
-
-        action.call = f"{self.action_call_prefix}{action.call}"
-
-        try:
-            save_filename = f"{action.call}.py"
-            file = open(
-                f"{self.action_path}/tmp/{save_filename}",
-                "w",
-                encoding="utf-8",
-            )
-            file.write(save_example)
-            file.close()
-
-            log_dbg(f"write action: {action.call} done")
-
-            chat_from = None
-            if save_action_code:
-                for filename, module in load_module(
-                    module_path=self.action_path, load_name=["chat_from"]
-                ):
-                    if filename != save_filename:
-                        continue
-
-                    chat_from = module.chat_from
-            if save_action_code and not chat_from:
-                raise Exception(
-                    f"save failed: you need to set the function name to chat_form"
-                )
-
-            shutil.move(
-                f"{self.action_path}/tmp/{save_filename}",
-                f"{self.action_path}/{save_filename}",
-            )
-
-            self.__append_extern_action(action, chat_from)
-
-            return True, "save done"
-        except Exception as e:
-            response = f"fail to save {action.call} : {str(e)}"
-            log_err(response)
-        return False, response
-
-
 class Task:
     type: str = "task"
     tasks: Dict[int, TaskItem] = {}
     action_tools: List[ActionToolItem] = []
     extern_action: ExternAction
-    note: List[str] = []
+    notes: List[str] = []
     system_calls: List[str] = []
     ai_calls: List[str] = []
     now_task_id: str = 1
@@ -367,7 +227,7 @@ class Task:
             data = {}
             try:
                 # del zh ,  ..
-                answer = answer.replace(', ', ", ")
+                answer = answer.replace(", ", ", ")
                 data = json5.loads(answer)
             except Exception as e:
                 raise Exception(f"fail to load data: {str(e)}")
@@ -507,7 +367,8 @@ class Task:
                         ask_gemini = task.request["content"]
                         yield f"**Ask Gemini:** \n{ask_gemini}\n"
 
-                        response = ''
+                        yield f"**Gemini reply:** \n"
+                        response = ""
                         for res in self.chat_to_gemini(ask_gemini):
                             response = res
                             yield response
@@ -518,18 +379,17 @@ class Task:
                             content=response,
                             request_description="`response->gemini` 的内容是 gemini 回复的话.",
                         )
-                        yield f"**Gemini reply:** \n{response}\n"
 
                     elif task.call == "chat_to_bing":
                         ask_bing = task.request["content"]
                         yield f"**Ask Bing:** \n{ask_bing}\n"
 
                         yield f"**Bing reply:** \n"
-                        response = ''
+                        response = ""
                         for res in self.chat_to_bing(ask_bing):
                             response = res
                             yield response
-                        
+
                         task_response = self.make_chat_from(
                             from_timestamp=self.timestamp,
                             from_name="bing",
@@ -588,8 +448,11 @@ class Task:
                             save_action_call = task.request["save_action_call"]
 
                         save_action = None
+                        save_description = "..."
                         if "save_action" in task.request:
                             save_action = task.request["save_action"]
+                        if "description" in save_action:
+                            save_description = save_action["description"]
 
                         save_action_code = None
                         if "save_action_code" in task.request:
@@ -611,8 +474,8 @@ class Task:
                             f"的内容是 {task.call} 运行信息.",
                         )
                         if done:
-                            save_description = save_action["description"]
                             yield f"**New ability:** * {save_description} *\n"
+
                             if save_action_code:
                                 yield f"**Ability method:** \n```python\n{save_action_code}\n```\n"
 
@@ -642,7 +505,9 @@ class Task:
                                     format_response = response
                                     if is_json(format_response):
                                         format_response = json.dumps(
-                                            format_response, indent=4, ensure_ascii=False
+                                            format_response,
+                                            indent=4,
+                                            ensure_ascii=False,
                                         )
 
                                     log_info(
@@ -657,7 +522,9 @@ class Task:
                                     response = str(e)
                                     has_error = True
                                     yield f"**Self-improvement is blocked.**\n"
-                                    raise Exception(f"fail to run call: {task.call} chat_from : {str(e)}")
+                                    raise Exception(
+                                        f"fail to run call: {task.call} chat_from : {str(e)}"
+                                    )
 
                                 from_name = task.call.replace(
                                     self.extern_action.action_call_prefix, ""
@@ -798,7 +665,24 @@ class Task:
 
                 log_info(f"\n```python\n{save_action_code}\n```")
 
-            done, err = self.extern_action.save_action(action, save_action_code)
+            save_action_example = f"""
+from core.task import ActionToolItem
+
+
+s_action = ActionToolItem(
+    call="",
+    description="{action.description}",
+    request="{action.request}",
+    execute="{action.execute}",
+)
+
+"""
+
+            done, err = self.extern_action.save_action(
+                action=action,
+                save_action_example=save_action_example,
+                save_action_code=save_action_code,
+            )
             if not done:
                 return False, f"extetn save failed : {str(err)}, please fix."
 
@@ -830,8 +714,12 @@ class Task:
                             for action in self.action_tools
                             if action.call != "chat_to_bing"
                         ]
-                        log_err(f"fail to ask bing, del action chat_to_bing. ")
-                    yield res["message"]
+                        log_err(
+                            f"fail to ask bing, del action chat_to_bing. {str(res)}"
+                        )
+                        yield f"bing ask err: {str(err)}\n"
+                    else:
+                        yield res["message"]
             except Exception as e:
                 log_err(f"fail to ask bing: {e}")
                 yield f"fail to ask bing: {e}"
@@ -886,6 +774,7 @@ class Task:
                 for res in self.chatbot.ask(ChatBotType.Google, ask_data):
                     if res["code"] == 1:
                         continue
+                    answer = res["message"]
                     yield res["message"]
                     log_dbg(f"res gemini: {str(answer)}")
 
@@ -918,10 +807,10 @@ class Task:
 
         log_info(f"append note: {note}")
 
-        if len(self.note) >= self.max_note_size:
-            self.note.pop(0)
+        if len(self.notes) >= self.max_note_size:
+            self.notes.pop(0)
 
-        self.note.append(note)
+        self.notes.append(note)
 
         return "append done."
 
@@ -1060,15 +949,15 @@ class Task:
                 return True
         return False
 
-    def __init__(self, chatbot: ChatBot, setting={}):
+    def __init__(self, aimi_plugin: AimiPlugin, setting={}):
         try:
             self.__load_setting(setting)
             self.__load_task_data()
 
-            self.chatbot = chatbot
+            self.chatbot = aimi_plugin.chatbot
 
             self.__init_task()
-            self.extern_action = ExternAction()
+            self.extern_action = aimi_plugin.extern_action
 
         except Exception as e:
             log_err(f"fait to init: {str(e)}")
@@ -1092,6 +981,7 @@ class Task:
             self.max_running_size = 5000
 
     def __load_task_data(self):
+        has_err = False
         task_config = {}
         try:
             task_config = Config.load_task()
@@ -1101,6 +991,13 @@ class Task:
         except Exception as e:
             log_err(f"fail to load task config: {str(e)}")
             return False
+
+        try:
+            self.notes = [str(note) for note in task_config["notes"]]
+        except Exception as e:
+            log_err(f"fail to load task config: {str(e)}")
+            self.notes = []
+            has_err = True
 
         try:
             tasks = {}
@@ -1119,27 +1016,37 @@ class Task:
             self.tasks = tasks
         except Exception as e:
             log_err(f"fail to load task config: {str(e)}")
-            return False
+            self.tasks = {}
+            has_err = True
+
         try:
             self.running = [TaskRunningItem(**run) for run in task_config["running"]]
         except Exception as e:
+            self.running = []
             log_err(f"fail to load task config: {str(e)}")
-            return False
+            has_err = True
+
         try:
             self.timestamp = int(task_config["timestamp"])
             check = int(self.running[-1].timestamp)
             if self.timestamp <= check:
                 log_dbg(f"fix timestamp {str(self.timestamp)} to {str(check + 1)}")
                 self.timestamp = check + 1
-
         except Exception as e:
             log_err(f"fail to load task config: {str(e)}")
-            return False
+            self.timestamp = 1
+            has_err = True
+
         try:
             self.now_task_id = int(task_config["now_task_id"])
         except Exception as e:
             log_err(f"fail to load task config: {str(e)}")
+            self.now_task_id = 1
+            has_err = True
+
+        if has_err:
             return False
+
         return True
 
     def save_task(self):
@@ -1155,11 +1062,13 @@ class Task:
 
             tasks = {int(task_id): task.dict() for task_id, task in self.tasks.items()}
             running = [run.dict() for run in self.running]
+            notes = self.notes
 
             save_obj = {
+                "timestamp": int(self.timestamp),
                 "now_task_id": int(self.now_task_id),
                 "tasks": tasks,
-                "timestamp": int(self.timestamp),
+                "notes": notes,
                 "running": running,
             }
 
@@ -1683,7 +1592,8 @@ def chat_from(request: dict = None):
     ) -> str:
         # 如果只是想让任务继续, 就回复全空格/\t/\n
         if question.isspace():
-            question = "continue"
+            question = ""
+            # question = "continue"
 
         if len(question) and not question.isspace():
             chat = self.make_chat_from(
@@ -1713,13 +1623,11 @@ def chat_from(request: dict = None):
         self.aimi_name = aimi_name
         aimi_core_name = aimi_name + "Core"
 
-        
         actions = {}
         for action in self.extern_action.brief():
             actions[action.call] = action
         for action in self.action_tools:
             actions[action.call] = action
-        
 
         action_tools = []
         for call, action in actions.items():
@@ -1735,7 +1643,8 @@ def chat_from(request: dict = None):
             "core": [
                 f"1. 你需要深度学习完 {aimi_core_name} Guidance 所有细节才能用自己的身份进行回复. ",
                 f"2. 回复JSON数组: 你的 回复格式 放在了 display_format 里面. 任何时候都要保障能满足 display_format 中的 action 结构格式定义. ",
-                f"3. 运行时间: 你基于 timestamp 运行. 你从 timestamp={self.timestamp} 开始生成内容. timestamp 是你的生命周期, 你不同时刻要有不同的反应."
+                f"3. 运行时间: 你基于 timestamp , 也就是时间运行. "
+                f"你从 timestamp={self.timestamp} 开始生成内容. timestamp 是你的生命周期, 你不同时刻要有不同的反应."
                 f"你每次只能生成 {self.timestamp} <= timestamp <= {self.timestamp+3} 之间的内容. ",
                 f"4. 规则优先级: display_format > timestamp > settings > action_rule > praset_rule > task_rule. "
                 f"如果规则优先级冲突, 以优先级高的为准. 有任何异常通过 action(call=chat_to_maste) 向 Master 简短报告冲突关健点的分析, 并解释应该怎么做. ",
@@ -1794,7 +1703,7 @@ def chat_from(request: dict = None):
             "task": task,
             "preset": preset,
             "action_tools": action_tools,
-            "note": self.note,
+            "note": self.notes,
         }
 
         if not self.use_talk_messages:
