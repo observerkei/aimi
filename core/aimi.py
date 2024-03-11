@@ -499,7 +499,7 @@ answer this following question: {{
         model = ""
         nickname = nickname if nickname and len(nickname) else self.master_name
 
-        if not len(preset):
+        if preset.isspace():
             with suppress(KeyError):
                 preset = self.preset_facts[api_type]
     
