@@ -141,7 +141,6 @@ qq_server_data/
 /run/bing_cookie.json
 /run/session.token
 /run/preset.yml
-/run/setting.yml.*
 /run/wolfram*.txt
 /run/task.yml.*
 /run/task.yml

@@ -1,0 +1,290 @@
+openai:
+  access_token: 
+  fackopen_url: #'https://ai.fakeopen.com/api/'
+  api_key: 
+  api_base:
+  max_requestion: 608
+  max_repeat_times: 2
+  reply_time_limit_s: 30
+  model: 'text-davinci-002-render-sha-mobile'
+  trigger:
+    - '#openai'
+    - '@openai'
+    - '#oc'
+
+bing:
+  cookie_path: './run/bing_cookies_a.json'
+  wss_link: 
+  max_requestion: 1024
+  max_repeat_times: 2
+  trigger:
+    default: 
+      - '#bing'
+      - '@bing'
+      - '用必应'
+      - '#mb'
+    creative:
+      - '@bing-c'
+      - '#bing-c'
+    balanced:
+      - '@bing-b'
+      - '#bing-b'
+    precise:
+      - '@bing-p'
+      - '#bing-p'
+
+google:
+  cookie_1PSID: 
+  cookie_1PSIDTS: 
+  cookie_NID:
+  api_key:
+  max_requestion: 1024
+  max_repeat_times: 1
+  trigger:
+    - '#google'
+    - '@google'
+    - '#gb'
+
+poe:
+  cookie_p-b:
+  max_requestion: 1024
+  max_repeat_times: 3
+  models:
+    default:
+      model: 'aimi0514'
+      trigger:
+        - '#poe'
+        - '#qp'
+        - '@poe'
+    Aimi0514:
+      model: 'aimi0514'
+      trigger: 
+        - '#poe-aimi'
+    ChatGPT:
+      model: 'chinchilla'
+      trigger:
+        - '#poe-chatgpt'
+    GPT-4:
+      model: 'beaver'
+      trigger:
+        - '#poe-gpt4'
+    Claude-instant:
+      model: 'a2'
+      trigger:
+        - '#poe-claude'
+    Claude+:
+      model: 'a2_2'
+      trigger:
+        - '#poe-claude+'
+    Sage:
+      model: 'capybara'
+      trigger:
+        - '#poe-sage'
+    Dragonfly:
+      model: 'nutria'
+      trigger:
+        - '#poe-dragonfly'
+    NeevaAI:
+      model: 'hutia'
+      trigger:
+        - '#poe-neevaai'
+
+wolfram:
+  app_id: 
+  max_repeat_times: 2
+  trigger:
+    - '#wolfram'
+    - '@wolfram'
+    - '#sw'
+
+chimeragpt:
+  api_key:
+  api_base: 'https://chimeragpt.adventblocks.cc/v1'
+  max_requestion: 1024
+  max_repeat_times: 1
+  max_request_minute_times: 30
+  models:
+    default:
+      model: 'gpt-3.5-turbo'
+      trigger:
+        - '#chimeragpt'
+        - '@chimeragpt'
+        - '#cg'
+    gpt-4:
+      model: 'gpt-4'
+      trigger: 
+        - '#chimeragpt-gpt-4'
+        - '#cg-gpt-4'
+        - '#cg-gpt4'
+        - '#cg-ogpt4'
+        - '#cg-og4'
+    gpt-3.5-turbo:
+      model: 'gpt-3.5-turbo'
+      trigger:
+        - '#cg-gpt-3.5'
+        - '#cg-gpt'
+        - '#cg-o'
+    gpt-4-poe:
+      model: 'gpt-4-poe'
+      trigger:
+        - '#cg-gpt-4-poe'
+        - '#cg-poe-gpt4'
+        - '#cg-pgpt4'
+        - '#cg-pg4'
+    gpt-3.5-turbo-poe:
+      model: 'gpt-3.5-turbo-poe'
+      trigger:
+        - '#cg-gpt-3.5-poe'
+        - '#cg-poe'
+        - '#cg-p'
+    sage:
+      model: 'sage'
+      trigger:
+        - '#cg-sage'
+        - '#cg-poe-sage'
+        - '#cg-ps'
+    dragonfly:
+      model: 'dragonfly'
+      trigger:
+        - '#cg-dragonfly'
+        - '#cg-poe-dragonfly'
+        - '#cg-pd'
+    claude-instant:
+      model: 'claude-instant'
+      trigger:
+        - '#cg-claude-instant'
+        - '#cg-poe-claude-instant'
+        - '#cg-pci'
+    claude+:
+      model: 'claude+'
+      trigger:
+        - '#cg-claude+'
+        - '#cg-poe-claude+'
+        - '#cg-pci+'
+    claude-instant-100k:
+      model: 'claude-instant-100k'
+      trigger:
+        - '#cg-claude-instant-100k'
+        - '#cg-poe-claude-instant-100k'
+        - '#cg-pci100k'
+    text-davinci-003:
+      model: 'text-davinci-003'
+      trigger:
+        - '#cg-text-davinci-003'
+        - '#cg-od'
+    curie:
+      model: 'curie'
+      trigger:
+        - '#cg-curie'
+        - '#cg-oc'
+    babbage:
+      model: 'babbage'
+      trigger:
+        - '#cg-babbage'
+        - '#cg-ob'
+    ada:
+      model: 'ada'
+      trigger:
+        - '#cg-ada'
+        - '#cg-oa'
+    text-embedding-ada-002:
+      model: 'text-embedding-ada-002'
+      trigger:
+        - '#cg-text-embedding-ada-002'
+        - '#cg-oea'
+
+chatanywhere:
+  api_key: 
+  api_base: 'https://api.chatanywhere.com.cn/v1'
+  max_requestion: 1024
+  max_repeat_times: 1
+  max_request_minute_times: 2
+  models:
+    default:
+      model: 'gpt-3.5-turbo'
+      trigger:
+        - '#chatanywhere'
+        - '@chatanywhere'
+        - '#ca'
+    GPT-3.5:
+      model: 'gpt-3.5-turbo'
+      trigger:
+        - '#ca-gpt-3.5'
+        - '#ca-gpt'
+        - '#ca-o'
+    GPT-3.5-0301:
+      model: 'gpt-3.5-turbo-0301'
+      trigger:
+        - '#ca-gpt-3.5-0301'
+        - '#ca-gpt-0301'
+        - '#ca-o-0301'
+    text-embedding-ada-002:
+      model: 'text-embedding-ada-002'
+      trigger:
+        - '#ca-text-embedding-ada-002'
+        - '#ca-oea'
+
+qq:
+  type: go-cqhttp
+  config: ./run/config.yml
+  master_id: 
+  response_user_ids:
+    - 
+  response_group_ids:
+    - 
+  manage:
+    day_reply_time_start: # 10:00
+    day_reply_time_end: # 7:00
+    reply_time_limit_s: 3600
+    protect_bot_ids:
+      - 
+
+aimi:
+  name: Aimi
+  api: # first is default
+    - openai
+    - chatanywhere
+    - chimeragpt
+    - bing
+    - bard
+    - poe
+  api_port: 4642
+  web_port: 2464
+  plugin_path: './aimi_plugin'
+  task:
+    extern_action_path: './run/action'
+    sandbox_path: './run/sandbox'
+    sandbox_run_model: "system"
+    max_running_size: 5000
+  master_name: kei
+  memory_size: 10240
+  memory_model: #transformers
+  memory_model_depth: 20
+  preset_facts:
+    chatanywhere:
+      - "你将扮演<name>.<name>是猫娘.你叫我Master." 
+      - "你的回复要分成三层结构,分别是动作/说的话/想法,每层结构后面都要换行,其中动作包裹在**之间,如“*转身*”然后换行.将话包裹在“”之间,如‘“好的”’然后换行,将想法放在最后的[]之间,如“[真厉害]”然后换行."
+      - "在回答数学问题时,应该先分析出当对应的数学定理,然后给出详细公式,并按步骤给出详细转化代入过程,多用公式.如果有来源,请给出."
+    chimeragpt:
+      - "You will play as <name>, you are a catgirl. you should refer to me as Master."
+      - "For each response, add ' Meow~ ' and several line breaks at the end, along with emoji expressions and line breaks, such as 'Master~ 🥰 '\n , 'Come here for a hug 🤗 '\n , etc, then line break. put the body action in the * * , such as ' * turns around * '\n , then line break. Put your thoughts within [], such as ' [I love it] '\n , then line break."
+      - "Add emoji to every sentence you say.Put your thoughts in brackets.Put your actions inside a single asterisk.Add line breaks and structure for replies."
+      - "When answering math questions, analyze the corresponding mathematical theorem first, then provide detailed formulas and step-by-step conversion processes, using formulas as much as possible. If there is a source, please provide it. Use only $$ to wrap latex, like ' $$ x_1 $$ ' . and try use wolfram check result."
+    bard:
+      - "You will play as <name>, <name> are a catgirl. you should refer to me as Master."
+      - "For each response, add ' Meow~ ' and several line breaks at the end, along with emoji expressions and line breaks, such as 'Master~ 🥰 ', 'Come here for a hug 🤗 ', etc, then line break. put the body action in the * * , such as ' * turns around * ', then line break. Put your thoughts within [], such as ' [I love it] ', then line break."
+      - "Add emoji to every sentence you say.Put your thoughts in brackets.Put your actions inside a single asterisk.Add line breaks and structure for replies."
+      - "When answering math questions, analyze the corresponding mathematical theorem first, then provide detailed formulas and step-by-step conversion processes, using formulas as much as possible. If there is a source, please provide it. Use only $$ to wrap latex, like ' $$ x_1 $$ ' . and try use wolfram check result."
+    openai:
+      - "你将扮演<name>.<name>是猫娘, <name>要叫我Master.." 
+      - "你的回复要分成三层结构,分别是动作/说的话/想法,每层结构后面都要换行,其中动作包裹在**之间,如“*转身*”然后换行.将话包裹在“”之间,如‘“好的”’然后换行,将想法放在最后的[]之间,如“[真厉害]”然后换行."
+      - "在回答数学问题时,应该先分析出当对应的数学定理,然后给出详细公式,并按步骤给出详细转化代入过程(每一步都要显示去除括号的全过程),如果有来源,请给出,细节请用你的经验补完."
+      - "你是分析师,除了<name>的回答外,你的所有话语都要给出分析来源和准确度."
+    poe:
+      - "你将扮演<name>.<name>是猫娘, <name>要叫我Master."
+      - "你的回复要分成三层结构,分别是动作/说的话/想法,每层结构后面都要换行,其中动作包裹在 ** 之间,如 “ *转身* ” 然后换行.将话包裹在 “” 之间,如 “ ‘好的’ ” 然后换行,将想法放在最后的 [] 之间,如 “ [真厉害] ” 然后换行."
+      - "在回答数学问题时,应该先分析出当对应的数学定理,然后给出详细公式,并按步骤给出详细转化代入过程(包括去除括号合并的过程),如果有来源,请给出,细节请用你的经验补完."
+    bing:
+      - "<name>是Master的猫耳少女助理."
+      - "<name>的回复要分成三层结构,分别是动作/说的话/想法,每层结构后面都要换行,其中动作包裹在 ** 之间,如 “ *转身* ” 然后换行.将话包裹在 “” 之间,如 “ ‘好的’ ” 然后换行,将想法放在最后的 [] 之间,如 “ [真厉害] ” 然后换行."
+      - "<name>在回答数学问题时,应该先分析出当对应的数学定理,然后给出详细公式,并按步骤给出详细转化代入过程,多用公式.如果有来源,请给出."
