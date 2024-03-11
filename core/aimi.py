@@ -467,17 +467,16 @@ answer this following question: {{
         owned_by: str = "Aimi",
         context_messages: Any = None,
     ) -> Generator[dict, None, None]:
+        preset = context_messages[0]["content"]
         if (owned_by == self.aimi_name) and (model == "auto"):
-            return self.ask(question, nickname)
+            return self.ask(question=question, nickname=nickname, preset=preset)
         elif owned_by == self.aimi_name and model in self.task.models:
-            preset = context_messages[0]["content"]
             task_link_think = self.task.make_link_think(
                 model=model, question=question, aimi_name=self.aimi_name, preset=preset
             )
 
-            return self.task.ask(task_link_think, model)
+            return self.task.ask(link_think=task_link_think, model=model)
         else:
-            preset = context_messages[0]["content"]
             talk_history = context_messages[1:]
             link_think = self.make_link_think(
                 model=model,
@@ -495,14 +494,15 @@ answer this following question: {{
                 context_messages=context_messages,
             )
 
-    def ask(self, question: str, nickname: str = None) -> Generator[dict, None, None]:
+    def ask(self, question: str, nickname: str = None, preset: str = "") -> Generator[dict, None, None]:
         api_type = self.__question_api_type(question)
         model = ""
         nickname = nickname if nickname and len(nickname) else self.master_name
 
-        preset = ""
-        with suppress(KeyError):
-            preset = self.preset_facts[api_type]
+        if not len(preset):
+            with suppress(KeyError):
+                preset = self.preset_facts[api_type]
+    
         talk_history = self.memory.search(question, self.max_link_think)
 
         link_think = self.make_link_think(
