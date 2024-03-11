@@ -371,6 +371,9 @@ class Aimi:
         preset = context_messages[0]["content"]
         api_type = owned_by
 
+        if api_type == self.aimi_name and self.task.type in model:
+            api_type = self.task.type
+
         nickname = nickname if nickname and len(nickname) else self.master_name
 
         talk_history = context_messages[1:-1]
@@ -385,9 +388,9 @@ class Aimi:
             conversation_id=self.memory.openai_conversation_id,
         )
 
-        if (api_type == self.aimi_name) and (model == "auto"):
+        if (api_type == self.aimi_name):
             return self.ask(
-                question=question, nickname=nickname, preset=preset, ask_data=ask_data
+                question=question, preset=preset, ask_data=ask_data
             )
         else:
             ask_data.history = self.memory.make_history(talk_history)
@@ -397,9 +400,9 @@ class Aimi:
             )
 
     def ask(
-        self, api_type, ask_data: BotAskData, talk_history, question
+        self, question: str, preset: str, ask_data: BotAskData, talk_history 
     ) -> Generator[dict, None, None]:
-        model = ""
+        api_type = self.__get_api_type_by_question(question)
 
         if preset.isspace():
             with suppress(KeyError):
