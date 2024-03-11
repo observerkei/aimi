@@ -308,16 +308,13 @@ answer this following question: {{
 
         log_dbg("aimi exit")
 
-    def __question_model(self, api_type, question: str) -> str:
-        if api_type == self.task.type:
-            return self.task.get_model(question)
-        return ""
-
     def __question_api_type(self, question: str) -> str:
         for bot_type, bot in self.chatbot.each_bot():
             if not bot.init:
                 continue
-            if bot.is_call(self.chatbot.bot_caller):
+
+            ask_data = self.chatbot.pack_ask_data(question=question)
+            if bot.is_call(self.chatbot.bot_caller, ask_data):
                 return bot_type
 
         # 一个都找不到，随机取一个.
@@ -669,7 +666,7 @@ answer this following question: {{
         except Exception as e:
             log_err("fail to load aimi: {e}")
             self.aimi_plugin_setting = {}
-                
+
         try:
             self.task_setting = setting["task"]
         except Exception as e:
