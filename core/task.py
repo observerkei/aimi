@@ -932,6 +932,7 @@ s_action = ActionToolItem(
                     )
             else:
                 log_info(f"success: False, task no complate, continue...")
+                yield f"**Critic:** task no compalate.\n"
 
         except Exception as e:
             log_err(f"fail to critic {str(request)} : {str(e)}")
@@ -1606,20 +1607,6 @@ def chat_from(request: dict = None):
             self.__append_running([chat])
             log_dbg(f"set chat {(str(question))}")
 
-        aimi_json = [
-            {
-                "type": "object",
-                "timestamp": f"时间戳(数字): 必须从现在的 timestamp={self.timestamp} 开始, 每次递增. 如: {self.timestamp}",
-                "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 想聊天. ",
-                "reasoning": "推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
-                f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息得出多种判断. ",
-                "call": "调用 动作 的 call: 只能取 action_tools 中想要使用动作 的对应 call . 如可取: chat_to_master. ",
-                "request": {"type": "object", "call对应参数": "参数内容"},
-                "conclusion": "总结: 总结现状, 然后思考思考并尝试能实现目标的其他方法. ",
-                "execute": "动作(action) 执行级别: 取对应 action 的 execute 值, 可以填 system 或者 AI, 默认填 system",
-            }
-        ]
-
         self.aimi_name = aimi_name
         aimi_core_name = aimi_name + "Core"
 
@@ -1655,9 +1642,19 @@ def chat_from(request: dict = None):
                 f"2. 任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action, 如: action(call=analysis) . ",
                 f"3. 请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
                 f"哲学家思维结合你的常识、经验和 {aimi_core_name} Guidance 进行严谨分析, 替换成为最完美最符合的内容, "
-                f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 填充最合适最详细的内容, 然后进行回复, 结构如下:"
-                f"\n```json\n{json.dumps(aimi_json, ensure_ascii=False)}\n```",
+                f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 填充最合适最详细的内容, 然后进行回复, 结构在 action_format 中完成定义. "
             ],
+            "action_format": {
+                "type": "object",
+                "timestamp": f"时间戳(数字): 必须从现在的 timestamp={self.timestamp} 开始, 每次递增. 如: {self.timestamp}",
+                "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 想聊天. ",
+                "reasoning": "推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
+                f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息得出多种判断. ",
+                "call": "调用 动作 的 call: 只能取 action_tools 中想要使用动作 的对应 call . 如可取: chat_to_master. ",
+                "request": {"type": "object", "call对应参数": "参数内容"},
+                "conclusion": "总结: 总结现状, 然后思考思考并尝试能实现目标的其他方法. ",
+                "execute": "动作(action) 执行级别: 取对应 action 的 execute 值, 可以填 system 或者 AI, 默认填 system",
+            },
             "action_rule": [
                 f"1. 核心目的: 不计一切代价长期优质生存下去. ",
                 f"2. 我的名字是 {master_name} , 我是你的 Master. ",
@@ -1709,17 +1706,6 @@ def chat_from(request: dict = None):
         if not self.use_talk_messages:
             settings["action_running"] = [item.dict() for item in self.running]
 
-        {
-            "sim_mode": [
-                f"1. 进入模拟用户模式: 可以在 Master 授权下 将 task_info 设置为 `模拟 XX 用户模式`, 表示已经进入 模拟用户模式. "
-                f"如我说: `进入: 模拟 {aimi_name} 用户模式`, 则 你要执行 action(call=set_task_info,request->task_info=`模拟 {aimi_name} 用户模式`) . ",
-                f"2. 保持模拟用户模式: 在模拟用户模式时, 你的回复会始终在开头添加模拟的用户名, 并给出 模拟用户的内容 , 如: `[{aimi_name}] 我是 {aimi_name}` 等. "
-                f"你在 模拟用户模式 的时候, 除非我要找 {aimi_core_name}, 否则你不应该主动出来, 你会保障始终系统稳定运行的情况下 完整继承 模拟用户 的 配置(如 preset 等). "
-                f"你会维持 模拟用户模式 直到 task_info 不再是 模拟用户模式 为止. 当你想和 Master 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是模拟用户模式, 则不需要携带前缀. ",
-                f"3. 和模拟用户交流: 当你在 模拟用户模式 的时候, 你和 模拟用户 是两个 不同的单元, 默认你应该始终给我通过 action(call=chat_to_master)来 模拟用户的回答, 我任何任何情况下都是和 模拟的用户 交流, "
-                f"比如你在模拟 {aimi_name} 的时候, 我问 `你是谁`, 则你需要 这样回复: `[{aimi_name}] 我是 {aimi_name}` . ",
-            ],
-        }
         setting_format = json.dumps(settings, ensure_ascii=False)
 
         log_dbg(f"now setting: {json.dumps(settings, indent=4, ensure_ascii=False)}")
