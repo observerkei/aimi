@@ -39,7 +39,7 @@ google:
   cookie_NID:
   api_key:
   max_requestion: 1024
-  max_repeat_times: 1
+  max_repeat_times: 2
   trigger:
     - '#google'
     - '@google'
