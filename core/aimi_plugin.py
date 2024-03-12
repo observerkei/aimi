@@ -156,13 +156,14 @@ class ChatBot:
             except Exception as e:
                 log_err(f"fail to exit bot: {bot_type} err: {e}")
 
-    def when_init(self):
+    def when_init(self, setting: dict = {}):
         if not len(self.bots):
             return
 
         for bot_type, bot in self.bots.items():
             try:
-                bot.when_init(self.bot_caller)
+                bot_setting = self.bot_caller.bot_load_setting(bot_type)
+                bot.when_init(self.bot_caller, bot_setting)
             except Exception as e:
                 log_err(f"fail to init bot: {bot_type} err: {e}")
 

@@ -365,6 +365,7 @@ class Aimi:
         question: str,
         nickname: str = None,
         model: str = "auto",
+        api_key: str = "",
         owned_by: str = "Aimi",
         context_messages: Any = None,
     ) -> Generator[dict, None, None]:
@@ -381,6 +382,7 @@ class Aimi:
         ask_data = BotAskData(
             question=question,
             model=model,
+            api_key=api_key,
             aimi_name=self.aimi_name,
             preset=preset,
             nickname=nickname,

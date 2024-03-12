@@ -1333,7 +1333,7 @@ def chat_from(request: dict = None):
                     "from": [
                         "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
                     ],
-                    "note": "需要保存的内容: 不可太长, 如: 小鸟也是鸟. ",
+                    "note": "需要保存的内容: 不可太长, 可以进行总结, 如: 小鸟也是鸟. ",
                 },
                 execute="system",
             ),

@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, Response
+from flask import Flask, request, render_template, Response, make_response
 from flask_cors import CORS
 import json
 from typing import Any, List, Dict
@@ -120,7 +120,7 @@ class ChatWeb:
     def __make_models(self, models: List[ModelInfo]) -> Models:
         return Models(object="list", data=models)
 
-    def __make_stream_reply(self, reply: str) -> str:
+    def __make_stream_reply(self, reply: str, index: int = 0) -> str:
         stream = {
             "choices": [
                 {
@@ -128,7 +128,7 @@ class ChatWeb:
                         "content": str(reply),
                     },
                     "finish_reason": None,
-                    "index": 2,
+                    "index": index,
                 }
             ],
             "created": 1677825464,
@@ -138,9 +138,9 @@ class ChatWeb:
         }
         return "event: message\ndata:" + json.dumps(stream) + "\n\n"
 
-    def __make_stream_stop(self) -> str:
+    def __make_stream_stop(self, index: int = 0) -> str:
         stream = {
-            "choices": [{"delta": {}, "finish_reason": "stop", "index": 2}],
+            "choices": [{"delta": {}, "finish_reason": "stop", "index": index}],
             "created": 1677825464,
             "id": "chatcmpl-6ptKyqKOGXZT6iQnqiXAH8adNLUzD",
             "model": "gpt-3.5-turbo-0301",
@@ -165,7 +165,7 @@ class ChatWeb:
             except:
                 pass
             log_dbg(
-                f"Received a get request: URL={url}, Authorization={auth_header}, body={body}"
+                f"Received a get request: URL={url}, Headers->Authorization={auth_header}, body={body}"
             )
 
             modelsObj = ""
@@ -204,34 +204,61 @@ class ChatWeb:
             return "ok"
 
         @self.app.route("/v1/chat/completions", methods=["POST"])
-        def handle_post_api_request():
+        def handle_post_api_make_response():
             def event_stream(
-                question: str, model: str, owned_by: str, context_messages: List[Dict]
+                question: str, model: str, api_key: str, owned_by: str, context_messages: List[Dict]
             ):
+                index = 0
                 if not len(question):
-                    yield self.__make_stream_reply("question is empty.")
-                    yield self.__make_stream_stop()
+                    yield self.__make_stream_reply("question is empty.", index)
+                    index += 1
+                    yield self.__make_stream_stop(index)
+                    index += 1
                     yield "event: end\ndata: [DONE]\n\n"
                     return
 
                 prev_text = ""
 
+
                 for answer in self.ask_hook(
-                    question, None, model, owned_by, context_messages
+                    question, None, model, api_key, owned_by, context_messages
                 ):
                     message = answer["message"][len(prev_text) :]
-                    yield self.__make_stream_reply(message)
+                    yield self.__make_stream_reply(message, index)
+                    index += 1
                     if answer["code"] == -1:
                         yield self.__make_stream_reply("\n\n")
+                        index += 1
                     prev_text = answer["message"]
 
                 yield self.__make_stream_stop()
+                index += 1
                 yield "event: end\ndata: [DONE]\n\n"
 
-            url = request.url
-            body = request.get_data().decode("utf-8")
-            log_dbg(f"Received a api request: URL={url}, body={body}")
+            url = ''
+            api_key = ''
+            body = ''
+            
+            # 获取HTTP头部中的 Authorization 值
+            try :
+                url = request.url
+                body = request.get_data().decode("utf-8")
+                log_dbg(f"Received a api request: \nURL={url} \nbody={body}")
+                
+                authorization = request.headers.get("Authorization")
+                api_key = authorization[6:]
+                # 调试用, 上线不要打印出来
+                log_dbg(f"Key: {api_key}")
 
+            except Exception as e:
+                error_message = f"request failed: {str(e)}"
+                log_err(error_message)
+                # 创建错误响应
+                response = make_response(error_message)
+                response.status_code = 400  # 设置状态码为400 (Bad Request)
+
+                return response
+            
             question = ""
             model = ""
             owned_by = ""
@@ -266,7 +293,7 @@ class ChatWeb:
 
             # 返回该响应
             return Response(
-                event_stream(question, model, owned_by, context_messages),
+                event_stream(question=question, model=model, api_key=api_key, owned_by=owned_by, context_messages=context_messages),
                 mimetype="text/event-stream",
             )
 
