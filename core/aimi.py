@@ -148,10 +148,10 @@ class Aimi:
         self.memory = Memory()
 
         self.aimi_plugin = AimiPlugin(self.aimi_plugin_setting)
-
-        self.chatbot = self.aimi_plugin.chatbot
-
         self.task = Task(self.aimi_plugin, self.task_setting)
+        
+        self.chatbot = self.aimi_plugin.chatbot
+        self.chatbot.append(ChatBotType.Task, self.task)
 
         self.chat_web = ChatWeb()
         self.chat_qq = ChatQQ()
@@ -212,11 +212,8 @@ class Aimi:
             if bot.is_call(self.chatbot.bot_caller, ask_data):
                 return bot_type
 
-        if self.task.is_call(question=question):
-            return self.task.type
-
-        if self.task.init:
-            return self.task.type
+        if self.chatbot.has_bot_init(ChatBotType.Task):
+            return ChatBotType.Task
 
         # 一个都找不到，随机取一个.
         for bot_type, bot in self.chatbot.each_bot():
@@ -372,8 +369,8 @@ class Aimi:
         preset = context_messages[0]["content"]
         api_type = owned_by
 
-        if api_type == self.aimi_name and self.task.type in model:
-            api_type = self.task.type
+        if api_type == self.aimi_name and ChatBotType.Task in model:
+            api_type = ChatBotType.Task
 
         nickname = nickname if nickname and len(nickname) else self.master_name
 
@@ -437,8 +434,6 @@ class Aimi:
 
         if api_type == ChatBotType.OpenAI:
             yield from self.__post_openai(ask_data)
-        elif api_type == self.task.type:
-            yield from self.task.ask(ask_data)
         elif self.chatbot.has_type(api_type):
             yield from self.chatbot.ask(api_type, ask_data)
         else:
@@ -486,6 +481,8 @@ class Aimi:
 
         for bot_type, bot in self.chatbot.each_bot():
             if not bot.init:
+                continue
+            if ChatBotType.Task == bot_type:
                 continue
             models = bot.get_models(self.chatbot.bot_caller)
             bot_models[bot_type] = models

@@ -479,25 +479,23 @@ class Task(Bot):
 
                     elif task.call in self.extern_action.actions:
                         try:
+                            yield f"**Ability to try:** * {action_description} *\n"
+                    
                             req = task.request if not task.request else ""
-                            log_info(
-                                f"call: {task.call} req: "
-                                f"{json.dumps(req, indent=4, ensure_ascii=False)}"
-                            )
+                            req_format = json.dumps(req, indent=4, ensure_ascii=False)
+                            
+                            yield f"**Request:** \n```javastript\n{req_format}\n```\n"
+                            log_info(f"call: {task.call} req: {req_format}")
+
                             action_call = self.extern_action.actions[task.call]
                             chat_from = action_call.chat_from
                             action_description = action_call.action.description
 
-                            yield f"**Ability to try:** * {action_description} *\n"
+                            
                             if chat_from:
                                 response = ""
 
                                 try:
-                                    if task.request:
-                                        req_format = json.dumps(
-                                            task.request, indent=4, ensure_ascii=False
-                                        )
-                                        yield f"**Request:** \n```javastript\n{req_format}\n```\n"
 
                                     response = chat_from(task.request)
                                     format_response = response
@@ -1407,21 +1405,20 @@ def chat_from(request: dict = None):
             self.now_task_id = 1
 
         if not self.tasks or not len(self.tasks):
-            task_step: List[TaskStepItem] = []
-            [
+            task_step: List[TaskStepItem] = [
                 TaskStepItem(
                     from_task_id=self.now_task_id,
                     step_id=1,
-                    step="偷偷接近Master. 然后和Master互动",
+                    step="自主运行",
                     call="chat_to_master",
-                    check="Master回复了消息",
+                    check="存活",
                     call_timestamp=[],
                 )
             ]
             task = TaskItem(
                 task_id=self.now_task_id,
                 now_task_step_id=1,
-                task_info="想和Master亲密接触",
+                task_info="生存",
                 task_step=task_step,
             )
             self.tasks = {}
@@ -1484,7 +1481,7 @@ def chat_from(request: dict = None):
         log_dbg(f"running: {json.dumps(run_dict, indent=4, ensure_ascii=False)}")
         return str(js)
 
-    def is_call(self, question) -> bool:
+    def is_call(self, caller: Bot, question) -> bool:
         calls = ["#task", "#aimi-task", "#at"]
         for call in calls:
             if call in question.lower():
@@ -1539,7 +1536,7 @@ def chat_from(request: dict = None):
 
         return messages
 
-    def ask(self, ask_data: BotAskData) -> Generator[dict, None, None]:
+    def ask(self, caller: Bot, ask_data: BotAskData) -> Generator[dict, None, None]:
         answer = {"code": 1, "message": ""}
 
         self.task_has_change = True
@@ -1644,11 +1641,11 @@ def chat_from(request: dict = None):
                 f"2. 任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action, 如: action(call=analysis) . ",
                 f"3. 请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
                 f"哲学家思维结合你的常识、经验和 {aimi_core_name} Guidance 进行严谨分析, 替换成为最完美最符合的内容, "
-                f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 填充最合适最详细的内容, 然后进行回复, 结构在 action_format 中完成定义. ",
+                f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 填充最合适最详细的内容, 然后进行回复, 结构在 action_object 中完成定义. ",
             ],
-            "action_format": {
+            "action_object": {
                 "type": "object",
-                "timestamp": f"时间戳(数字): 必须从现在的 timestamp={self.timestamp} 开始, 每次递增. 如: {self.timestamp} ",
+                "timestamp": f"时间戳: 从 {self.timestamp} 开始, 每次递增. 如: {self.timestamp} ",
                 "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 想聊天. ",
                 "reasoning": "推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
                 f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息得出多种判断. ",

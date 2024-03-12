@@ -48,8 +48,8 @@ class Bot(BotBase):
         # if error, then: yield caller.bot_set_response(code=-1, message="err")
 
     def bot_ask(self, caller: BotBase, bot_type: str, ask_data: BotAskData) -> Generator[dict, None, None]:
-        if self.chatbot and self.chatbot.bot:
-            yield from self.chatbot.bot(self, bot_type, ask_data)
+        if self.chatbot and self.chatbot.ask:
+            yield from self.chatbot.ask(bot_type, ask_data)
 
     # exit bot
     def when_exit(self, caller: BotBase):
@@ -317,6 +317,7 @@ class AimiPlugin:
     setting: Dict
     chatbot: ChatBot
     extern_action: ExternAction
+    chatbot_setting: Dict
 
     def __init__(self, setting):
         self.__load_setting(setting)
