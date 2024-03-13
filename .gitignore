@@ -133,6 +133,7 @@ qq_server_data/
 # run
 /run/md
 /run/*log
+/run/aimi.log.bak
 /run/config.yml
 /run/device.json
 /run/go-cqhttp
