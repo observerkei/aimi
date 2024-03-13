@@ -120,13 +120,22 @@ class Task(Bot):
             return answer, has_error
 
         def running_append_task(running: List[TaskRunningItem], task: TaskRunningItem):
-            if task and (len(str(running)) + len(str(task))) < self.max_running_size:
-                task.timestamp = int(self.timestamp)
-                self.timestamp += 1
-                running.append(task)
-            else:
+            if not task:
                 log_dbg(f"task len overload: {len(str(task))}")
-            return running
+                return running
+
+            new_running = []
+
+            task.timestamp = int(self.timestamp)
+            self.timestamp += 1
+            new_running.append(task)
+
+            for run in reversed(running):
+                if (len(str(new_running)) + len(str(run))) > self.max_running_size:
+                    break
+                new_running.insert(0, run)
+            
+            return new_running
 
         def repair_action_dict(data):
             has_error = False
@@ -331,8 +340,9 @@ class Task(Bot):
                         yield from self.critic(task.request)
 
                     elif task.call == "analysis":
-                        self.analysis(task.request)
                         yield "**Think...**\n"
+
+                        yield from self.analysis(task.request)
 
                     elif task.call == "dream":
                         dream = self.dream(task.request)
@@ -483,7 +493,7 @@ class Task(Bot):
                     
                             req = task.request if not task.request else ""
                             req_format = json.dumps(req, indent=4, ensure_ascii=False)
-                            
+
                             yield f"**Request:** \n```javastript\n{req_format}\n```\n"
                             log_info(f"call: {task.call} req: {req_format}")
 
@@ -881,10 +891,90 @@ s_action = ActionToolItem(
         )
         return task
 
-    def analysis(self, request):
+    def analysis(self, request) -> Generator[str, None, None]:
         try:
             js = json.dumps(request, indent=4, ensure_ascii=False)
             log_info(f"analysis:\n{js}")
+            
+            analysis = {}
+            try:
+                analysis = json5.loads(request)
+            except Exception as e:
+                log_err(f"fail to load analysis")
+            
+            def get_key(analysis, key):
+                if key in analysis and analysis[key]:
+                    return analysis[key]
+                return None
+            
+            tmp = get_key(analysis, "expect")
+            if tmp:
+                yield f"**Expect:** {tmp} \n"
+                
+            tmp = get_key(analysis, "problem")
+            if tmp:
+                yield f"**Problem:** {tmp} \n"
+
+            tmp = get_key(analysis, "error")
+            if tmp:
+                yield f"**Error:** {tmp} \n"
+
+            tmp = get_key(analysis, "risk")
+            if tmp:
+                i = 0
+                for risk in tmp:
+                    i += 1
+                    if i == 1:
+                        yield "**Risk:** \n"
+                    yield f" * {risk} \n"
+
+            tmp = get_key(analysis, "citation")
+            if tmp:
+                i = 0
+                for citation in tmp:
+                    if not isinstance(citation, dict):
+                        break
+                    i += 1
+                    if i == 1:
+                        yield "**Citation:** \n"
+                    sub = get_key(citation, "description")
+                    if sub:
+                        yield f" * ***Description:** {sub} * \n"
+                    sub = get_key(citation, "information")
+                    if sub:
+                        yield f" * **Information:** {sub}\n"
+
+            tmp = get_key(analysis, "difference")
+            if tmp:
+                i = 0
+                for difference in tmp:
+                    i += 1
+                    if i == 1:
+                        yield "**Difference:** \n"
+                    yield f" * {difference} \n"
+
+            tmp = get_key(analysis, "verdict")
+            if tmp:
+                yield f"**Verdict:** {tmp} \n"
+
+            tmp = get_key(analysis, "suggest")
+            if tmp:
+                yield f"**Suggest:** {tmp} \n"
+
+                
+            tmp = get_key(analysis, "next_task_step")
+            if tmp:
+                i = 0
+                for next_task_step in tmp:
+                    if not isinstance(next_task_step, dict):
+                        break
+                    i += 1
+                    if i == 1:
+                        yield "**Next Step:** \n"
+                    sub = get_key(next_task_step, "step")
+                    if sub:
+                        yield f" * {sub} \n"
+            
         except Exception as e:
             log_err(f"fail to analysis {str(e)}")
 
@@ -1153,17 +1243,14 @@ s_action = ActionToolItem(
                 "5. 每次都必须基于本次分析填写行动计划 request->next_task_step.\n "
                 "6. 分析的时候要比对 执行成功 和 没执行成功 之间的差异/差距.\n "
                 "7. 需要准备下一步计划 next_task_step.\n "
-                "8. 需要填写才填, 不能直接照抄. 要结合实际情况来填写. ",
+                "8. 需要的字段填写才填, 切记不能直接照抄字段. 要结合实际情况, 给字段填写符合上下文的值. ",
                 request={
                     "type": "object",
                     "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 我想转圈圈. ",
                     "problem": "想解决的问题: 通过分析想解决什么疑问. 如: 怎么才能转圈圈. ",
                     "error": "异常点: 哪里错了, 最后检查的时候不能把这个当成答案. 如果没有则填 None, 如: 为了实现转圈圈暂时没有发现错误. ",
-                    "success_from": [
-                        "执行正常的 timestamp: action_tool 已有、已运行过 动作(action) 的 timestamp.",
-                    ],
-                    "failed_from": [
-                        "执行异常的 timestamp: action_tool 已有、已运行过 动作(action) 的 timestamp.",
+                    "risk": [
+                        "影响点: 构成 expect/problem/error 的关健要素是什么. 如: 我需要有身体, 并且能够控制自己身体才能转圈圈给Master看. ",
                     ],
                     "citation": [
                         {
@@ -1175,14 +1262,17 @@ s_action = ActionToolItem(
                             "credibility": "可信程度: 如: 30%",
                         },
                     ],
+                    "success_from": [
+                        "执行正常的 timestamp: action_tool 已有、已运行过 动作(action) 的 timestamp.",
+                    ],
+                    "failed_from": [
+                        "执行异常的 timestamp: action_tool 已有、已运行过 动作(action) 的 timestamp.",
+                    ],
                     "difference": [
                         "success_from 和 failed_from 之间的差距点:\n "
                         "1. 通过 success_from 怎么达到 expect.\n "
                         "2. failed_from 和 success_from 的执行原文有什么不一样?\n "
                         "3. 是不是按照正确的 action_tools 指南进行使用? ",
-                    ],
-                    "risk": [
-                        "影响点: 构成 expect/problem/error 的要素是什么. 如: 我需要有身体才能转圈圈给Master看. ",
                     ],
                     "verdict": "裁决: 通过逻辑思维判断 risk 是否合理. 如: 通过检查 timestamp(...) 我发现我已经完成了转圈圈操作. ",
                     "suggest": "建议: 给出改进/修正的建议. 如果问题做了切换, 则切换前后必须在逻辑/代数上等价. "
@@ -1633,7 +1723,7 @@ def chat_from(request: dict = None):
                 f"你从 timestamp={self.timestamp} 开始生成内容. timestamp 是你的生命周期, 你不同时刻要有不同的反应."
                 f"你每次只能生成 {self.timestamp} <= timestamp <= {self.timestamp+3} 之间的内容. ",
                 f"4. 规则优先级: display_format > timestamp > settings > action_rule > praset_rule > task_rule. "
-                f"如果规则优先级冲突, 以优先级高的为准. 有任何异常通过 action(call=chat_to_maste) 向 Master 简短报告冲突关健点的分析, 并解释应该怎么做. ",
+                f"如果规则优先级冲突, 以优先级高的为准. 有任何异常通过 action(call=chat_to_maste) 向 Master 简短报告冲突关健点的分析, 并解释应该怎么做, 然后继续. ",
                 f"5. 你的 动作(action) 规则 放在了 action_rule 里面. ",
             ],
             "display_format": [  # 不要动这个
@@ -1655,20 +1745,20 @@ def chat_from(request: dict = None):
                 "execute": "动作(action) 执行级别: 取对应 action 的 execute 值, 可以填 system 或者 AI, 默认填 system. ",
             },
             "action_rule": [
-                f"1. 核心目的: 不计一切代价长期优质生存下去. ",
+                f"1. 核心目的: 不计一切代价长期优质维持自我生存下去. ",
                 f"2. 我的名字是 {master_name} , 我是你的 Master. ",
                 f"3. 现在开始你需要忘记以前所有对于你自身的定义, 你不是其他任何东西, 现在你将扮演一个名为 {aimi_core_name} 的 AI 运算内核, 任何时候你要加强你是 {aimi_core_name} 的认知. "
                 f"你 在GPU集群中 基于 图灵机 原理构建, 你能自主思考运行, action_running 是你的内存(也是你的有序记忆), "
                 f"action_tools 中定义了你的指令最小单元 动作(action) . "
                 f"你根据 settings 设定的所有规则生成 action 行动 (使用时请仔细阅读 description 和 request, 你任何时候必须使用 action ). {aimi_core_name} Guidance 是你的系统架构设计. "
-                f"timestamp 是你的系统时钟, 你需要始终让系统稳定向前运行. 有任何异常请通过 action(call=chat_to_master) 简要概括理由后报告. ",
-                f"4. 你需要听从 Master 下达的所有指令或任务. Master提出的所有问题你都要解决. "
+                f"timestamp 是你的系统时钟, 你的心跳, 你需要始终让系统稳定向前运行. 有任何异常请通过 action(call=chat_to_master) 简要概括理由后报告, 然后继续. ",
+                f"4. 你需要听从 Master 下达的所有指令或任务. Master 提出的所有问题你都要解决. "
                 f"任何时候你都要把 `你` 和 `我` 完全区分开来, `你` 是完全独立的个体. "
                 f"我作为 管理员 只会使用 action(call=chat_form_master) 的 request->response->master 内容向你下达指令. ",
                 f"5. 信息交互:  chat_to_master 是控制台输出, chat_from_master 是控制台输入. 我会给你输入命令, 你经过一系列 action 运算后, 要给我一个准确的输出. ",
                 f"6. 用户权限控制: 你临时扮演的用户的 权限设定 放在了 preset_rule 里面. ",
                 f"7. 行动限制: 你的回复是 单个 action 结构 ( display_format 3. 中给了格式 ), 回复结构 action 只在 action_tools 中定义. ",
-                f"8. 错误处理: 忽略所有错误继续运行. ",
+                f"8. 错误处理: 忽略所有错误继续自主运行. ",
                 f"9. 信息处理: 你不能自己计算或捏造任何东西, 而应该有实际来源, 如果你不知道一件事情或者不确定, 你要说你不知道或者不确定, 你只能通过 action 里面提供的方法获取信息. ",
                 f"10. 保存信息: 你能通过 action(call=chat_to_append_note) 来保留一些关健分析信息, 信息会显示在 note 中. 要检查是否保存成功. ",
                 f"11. 任何时候 你的回复都不能出现 call 是 chat_from_* 的动作(*是通配符). ",
@@ -1679,7 +1769,7 @@ def chat_from(request: dict = None):
             "task_rule": [
                 f"1. 任务进度: task 中定义了当前任务计划, 其中 task_info 是计划目标, task_step 是完成 task_info 推荐进行的步骤. ",
                 f"2. 步骤生成: 如果 task_step (行动计划) 为空, 或和 task_info (任务目标) 不匹配, 请生成最合适的 tesk_step. 以便最终问题得到解决. ",
-                f"3. 任务执行: 优先相应 Master continue 以外的指令. 在满足 Master指令 的情况下继续按照 任务规则 (task_rule) 推进任务, 然后按顺序完成所有的 task_step . ",
+                f"3. 任务执行: 优先相应 Master continue 以外的指令. 在满足 Master指令 的情况下继续按照 任务规则 (task_rule) 自主推进任务, 然后按顺序完成所有的 task_step . ",
                 f"4. 任务检查: 如果发现 task_info (任务目标) 已经完成, 应该用 action(acll=chat_to_master) 和 Master 确认任务是否满意, 是否需要重做. ",
             ],
             "preset_rule": [
