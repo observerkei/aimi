@@ -63,7 +63,8 @@ class Config:
     def __init__(self) -> None:
         self.meme = Meme()
 
-    def load_memory() -> dict:
+    @classmethod
+    def load_memory(cls) -> dict:
         try:
             obj = read_yaml(Config.memory_config)
             mem = {}
@@ -93,7 +94,8 @@ class Config:
             log_err("fail to load memory: " + str(e))
             return {}
 
-    def load_task() -> dict:
+    @classmethod
+    def load_task(cls) -> dict:
         try:
             obj = read_yaml(Config.task_config)
             task = {}
@@ -111,7 +113,8 @@ class Config:
             log_err("fail to load task: " + str(e))
             return {}
 
-    def load_setting(type) -> dict:
+    @classmethod
+    def load_setting(cls, type) -> dict:
         try:
             obj = read_yaml(Config.setting_config)
         except Exception as e:

@@ -153,11 +153,9 @@ aimi:
     - poe
   api_port: 4642
   web_port: 2464
-  aimi_plugin:
-    bot_path: './aimi_plugin/bot'
-    action_path: './aimi_plugin/action'
+  bot_path: './aimi_plugin/bot'
   task:
-    extern_action_path: './run/action'
+    extern_action_path: './aimi_plugin/action'
     sandbox_path: './run/sandbox'
     sandbox_run_model: "system"
     max_running_size: 5000

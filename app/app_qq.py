@@ -273,7 +273,7 @@ class BotManage:
         return ""
 
 
-class ChatQQ:
+class AppQQ:
     response_user_ids: Set[int] = {}
     response_group_ids: Set[int] = {}
     master_id: int = 0

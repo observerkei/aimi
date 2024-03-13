@@ -1,10 +1,18 @@
-from flask import Flask, request, render_template, Response, make_response
+from flask import (
+    Flask,
+    request,
+    render_template,
+    stream_with_context,
+    Response,
+    make_response,
+)
 from flask_cors import CORS
 import json
 from typing import Any, List, Dict
 from pydantic import BaseModel
 
 from tool.util import log_info, log_err, log_dbg
+from core.session import Session
 
 openai_stream_response = [
     {
@@ -72,20 +80,24 @@ class Models(BaseModel):
     data: List[ModelInfo]
 
 
-class ChatWeb:
+class AppWEB:
     api_host: str = "localhost"
     api_port: int = 4642
     app: Any
     http_server: Any
     ask_hook: Any
     models: Dict
+    session: Session
+    session_setting: Any
+    get_all_models_hook: Any
 
-    def __init__(self):
+    def __init__(self, session, ask, get_all_models, session_setting):
+        self.session = session
+        self.ask_hook = ask
+        self.get_all_models_hook = get_all_models
+        self.session_setting = session_setting
         self.__listen_init()
         log_dbg("web init done")
-
-    def register_ask_hook(self, ask_hook: Any):
-        self.ask_hook = ask_hook
 
     def __make_model_info(self, model, owned_by) -> ModelInfo:
         def __make_model_info_permission() -> ModelInfoPermission:
@@ -150,28 +162,51 @@ class ChatWeb:
 
     def __listen_init(self):
         self.app = Flask(__name__)
-        CORS(self.app)
+        # 允许浏览器跨域请求 
+        CORS(self.app, resources={r"/v1/*": {"origins": "*", "supports_credentials": True}})
+
 
         @self.app.route("/v1/models", methods=["GET"])
         def handle_get_models_request():
             url = request.url
-            auth_header = ""
+            resp = make_response()
+
+            api_key = ""
+            session_id = ""
             body = ""
             try:
                 body = request.get_data().decode("utf-8")
                 # 获取HTTP头部中的 Authorization 值
                 auth_header = request.headers.get("Authorization")
+                api_key = auth_header[7:]
+                session_id = request.cookies.get("session_id")
+            except Exception as e:
+                log_err(f"fail to get req info: {e}")
 
-            except:
-                pass
             log_dbg(
-                f"Received a get request: URL={url}, Headers->Authorization={auth_header}, body={body}"
+                f"Received a get request: session_id={session_id}, "
+                f"URL={url}, Headers->Authorization={auth_header}, body={body}"
             )
+
+            if not session_id or not len(session_id):
+                session_id = self.session.create_session_id(api_key)
+
+            if not self.session.has_session(session_id):
+                ret = self.session.new_session(api_key, self.session_setting)
+                if not ret:
+                    err = "Cannot create session."
+                    resp.set_data(err)
+                    return resp
+                resp.set_cookie("session_id", session_id)
 
             modelsObj = ""
             try:
                 model_infos = []
-                for owned_by, models in self.models.items():
+                all_models = self.get_all_models_hook(session_id)
+                if not len(all_models):
+                    raise Exception("Cannot get models.")
+
+                for owned_by, models in all_models.items():
                     for model in models:
                         model_info = self.__make_model_info(
                             f"{owned_by}--{model}", owned_by
@@ -188,8 +223,9 @@ class ChatWeb:
                 log_err(f"{e}")
 
             # log_dbg(f"models obj: f{str(modelsObj)}")
+            resp.set_data(str(modelsObj))
 
-            return str(modelsObj)
+            return resp
 
         @self.app.route("/", methods=["POST"])
         def handle_post_index_request():
@@ -206,8 +242,14 @@ class ChatWeb:
         @self.app.route("/v1/chat/completions", methods=["POST"])
         def handle_post_api_make_response():
             def event_stream(
-                question: str, model: str, api_key: str, owned_by: str, context_messages: List[Dict]
+                session_id: str,
+                question: str,
+                model: str,
+                api_key: str,
+                owned_by: str,
+                context_messages: List[Dict],
             ):
+                log_dbg(f"wait ask stream.")
                 index = 0
                 if not len(question):
                     yield self.__make_stream_reply("question is empty.", index)
@@ -219,9 +261,14 @@ class ChatWeb:
 
                 prev_text = ""
 
-
                 for answer in self.ask_hook(
-                    question, None, model, api_key, owned_by, context_messages
+                    session_id,
+                    question,
+                    None,
+                    model,
+                    api_key,
+                    owned_by,
+                    context_messages,
                 ):
                     message = answer["message"][len(prev_text) :]
                     yield self.__make_stream_reply(message, index)
@@ -235,18 +282,20 @@ class ChatWeb:
                 index += 1
                 yield "event: end\ndata: [DONE]\n\n"
 
-            url = ''
-            api_key = ''
-            body = ''
-            
+            url = ""
+            api_key = ""
+            session_id = ""
+            body = ""
+
             # 获取HTTP头部中的 Authorization 值
-            try :
+            try:
                 url = request.url
                 body = request.get_data().decode("utf-8")
                 log_dbg(f"Received a api request: \nURL={url} \nbody={body}")
-                
+
                 authorization = request.headers.get("Authorization")
-                api_key = authorization[6:]
+                api_key = authorization[7:]
+                session_id = request.cookies.get("session_id")
                 # 调试用, 上线不要打印出来
                 log_dbg(f"Key: {api_key}")
 
@@ -258,11 +307,12 @@ class ChatWeb:
                 response.status_code = 400  # 设置状态码为400 (Bad Request)
 
                 return response
-            
+
             question = ""
             model = ""
             owned_by = ""
             context_messages = []
+
             try:
                 # 将json字符串转化为json数据
                 web_request = json.loads(body)
@@ -291,11 +341,35 @@ class ChatWeb:
                 model = "auto"
                 owned_by = "Aimi"
 
-            # 返回该响应
-            return Response(
-                event_stream(question=question, model=model, api_key=api_key, owned_by=owned_by, context_messages=context_messages),
+            has_session_id = True
+
+            if not session_id or not len(session_id):
+                session_id = self.session.create_session_id(api_key)
+                has_session_id = False
+
+            if not self.session.has_session(session_id):
+                ret = self.session.new_session(api_key, self.session_setting)
+                if not ret:
+                    err = "Cannot create session."
+                    log_err(f"not session: {err}")
+                    return make_response(err)
+
+            resp = Response(
+                event_stream(
+                    session_id=session_id,
+                    question=question,
+                    model=model,
+                    api_key=api_key,
+                    owned_by=owned_by,
+                    context_messages=context_messages,
+                ),
                 mimetype="text/event-stream",
             )
+            
+            if not has_session_id:
+                resp.set_cookie("session_id", session_id)
+
+            return resp
 
     def server(self):
         from gevent import pywsgi

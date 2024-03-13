@@ -56,7 +56,7 @@ class Bot(BotBase):
         pass
 
     # init bot
-    def when_init(self, caller: BotBase):
+    def __when_init(self, caller: BotBase):
         pass
 
     # no need define bot_set_response
@@ -80,32 +80,71 @@ class ChatBot:
     bots: Dict[str, Bot] = {}
     bot_caller: Bot = Bot()
     bot_path: str = "./aimi_plugin/bot"
+    setting: Dict[str, Dict] = {}
 
-    def __init__(self, bot_path):
-        self.bot_path = bot_path
+    def __init__(self, setting):
+        self.setting = setting
+        self.bot_path = setting['bot_path'] if "bot_path" in setting else "./aimi_plugin/bot"
         self.bot_caller.chatbot = self
         self.__load_bot()
+        self.__when_init(setting)
+    
+    @classmethod
+    def load_bot_setting(cls, module_path: str):
+        import os
+        if not module_path.endswith("/"):
+            module_path += "/"
 
-    def __load_bot(self):
+        setting = {}
+
         # 遍历目录中的文件
         for filename, module in load_module(
-            module_path=self.bot_path,
+            module_path=module_path,
             load_name=["Bot"],
-            file_start=self.bot_caller.plugin_prefix,
+            file_start=Bot.plugin_prefix,
         ):
             # skip example
-            if self.bot_caller.plugin_prefix + "example.py" == filename:
+            if Bot.plugin_prefix + "example.py" == filename:
                 continue
 
             try:
                 bot: Bot = module.Bot()
                 bot_type = bot.type
+                setting[bot_type] = Config.load_setting(bot_type)
+ 
+                log_dbg(f"load bot_type:{bot_type} setting from: {filename}")
+            except Exception as e:
+                log_err(f"fail to load bot setting: {e} file: {filename}")
+
+        return setting
+    
+    def __load_bot(self):
+        # 遍历目录中的文件
+        for filename, module in load_module(
+            module_path=self.bot_path,
+            load_name=["Bot"],
+            file_start=Bot.plugin_prefix,
+        ):
+            # skip example
+            if Bot.plugin_prefix + "example.py" == filename:
+                continue
+
+            try:
+                bot: Bot = module.Bot()
+                bot_type = bot.type
+                old_bot: Bot = None
                 if self.has_type(bot_type):
-                    raise Exception(f"{bot_type} has in bots")
+                    old_bot = self.get_bot(bot_type)
 
                 self.append(bot_type, bot)
 
-                log_info(f"add bot bot_type:{bot_type}  from: {filename}")
+                try:
+                    if old_bot:
+                        old_bot.when_exit(self.bot_caller)
+                except Exception as e:
+                    log_err(f"fail to exit old bot: {bot_type}: {e}")
+                
+                log_dbg(f"add bot bot_type:{bot_type}  from: {filename}")
             except Exception as e:
                 log_err(f"fail to add bot bot: {e} file: {filename}")
 
@@ -156,14 +195,20 @@ class ChatBot:
             except Exception as e:
                 log_err(f"fail to exit bot: {bot_type} err: {e}")
 
-    def when_init(self, setting: dict = {}):
+    def __when_init(self, setting: dict = {}):
         if not len(self.bots):
             return
 
         for bot_type, bot in self.bots.items():
             try:
-                bot_setting = self.bot_caller.bot_load_setting(bot_type)
-                bot.when_init(self.bot_caller, bot_setting)
+               if bot_type in setting:
+                   # 存在自定义配置则覆盖.
+                   self.setting[bot_type] = setting[bot_type]
+               else:
+                   # 不存在自定义配置使用默认配置.
+                   self.setting[bot_type] = self.bot_caller.bot_load_setting(bot_type)
+
+               bot.when_init(self.bot_caller, self.setting[bot_type])
             except Exception as e:
                 log_err(f"fail to init bot: {bot_type} err: {e}")
 
@@ -244,7 +289,7 @@ class ExternAction:
 
                 self.__append_extern_action(action, chat_from)
 
-                log_info(f"load action: {action_call}")
+                log_dbg(f"load action: {action_call}")
 
             except Exception as e:
                 log_err(f"fail to load {filename} : {str(e)}")
@@ -310,37 +355,3 @@ class ExternAction:
             log_err(response)
         return False, response
 
-
-class AimiPlugin:
-    bot_path: str = ""
-    action_path: str = ""
-    setting: Dict
-    chatbot: ChatBot
-    extern_action: ExternAction
-    chatbot_setting: Dict
-
-    def __init__(self, setting):
-        self.__load_setting(setting)
-
-        self.chatbot = ChatBot(self.bot_path)
-        self.extern_action = ExternAction(self.action_path)
-
-        self.chatbot.when_init()
-
-    def __load_setting(self, setting):
-        self.setting = setting
-
-        try:
-            self.bot_path = setting["bot_path"]
-        except Exception as e:
-            log_err(f"fail to get bot_path: {e}")
-            self.bot_path = "./aimi_plugin/bot"
-
-        try:
-            self.action_path = setting["action_path"]
-        except Exception as e:
-            log_err(f"fail to get action_path: {e}")
-            self.action_path = "./aimi_plugin/action"
-
-    def when_exit(self):
-        self.chatbot.when_exit()

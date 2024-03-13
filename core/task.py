@@ -18,7 +18,6 @@ from tool.util import (
 )
 
 from core.aimi_plugin import (
-    AimiPlugin,
     ChatBot,
     ChatBotType,
     ActionToolItem,
@@ -1036,15 +1035,19 @@ s_action = ActionToolItem(
                 return True
         return False
 
-    def __init__(self, aimi_plugin: AimiPlugin, setting={}):
+    def __init__(
+        self, 
+        chatbot: ChatBot,
+        setting={}
+    ):
         try:
             self.__load_setting(setting)
             self.__load_task_data()
 
-            self.chatbot = aimi_plugin.chatbot
+            self.chatbot = chatbot
 
             self.__init_task()
-            self.extern_action = aimi_plugin.extern_action
+            self.extern_action = ExternAction(self.extern_action_path)
 
         except Exception as e:
             log_err(f"fait to init: {str(e)}")
@@ -1066,6 +1069,12 @@ s_action = ActionToolItem(
         except Exception as e:
             log_err(f"fail to load task: {e}")
             self.max_running_size = 5000
+
+        try:
+            self.extern_action_path = setting["extern_action_path"]
+        except Exception as e:
+            log_err(f"fail to load task: {e}")
+            self.extern_action_path = './aimi_plugin/action'
 
     def __load_task_data(self):
         has_err = False
@@ -1170,6 +1179,13 @@ s_action = ActionToolItem(
             ret = False
 
         return ret
+
+    # chatbot notify exit task
+    def when_exit(self, caller: Bot):
+        if self.save_task():
+            log_info("exit: save task done.")
+        else:
+            log_err("exit: fail to task config.")
 
     def __init_task(self):
         self.action_tools: List[ActionToolItem] = [
@@ -1585,6 +1601,9 @@ def chat_from(request: dict = None):
         if "4k" in select.lower():
             return "gpt-3.5-turbo"
         return "gpt-3.5-turbo-16k"
+    
+    def get_models(self) -> List[str]:
+        return self.models
 
     def action_running_to_messages(self) -> List[Dict]:
         messages = []
