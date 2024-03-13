@@ -88,14 +88,12 @@ class AppWEB:
     ask_hook: Any
     models: Dict
     session: Session
-    session_setting: Any
     get_all_models_hook: Any
 
-    def __init__(self, session, ask, get_all_models, session_setting):
+    def __init__(self, session, ask, get_all_models):
         self.session = session
         self.ask_hook = ask
         self.get_all_models_hook = get_all_models
-        self.session_setting = session_setting
         self.__listen_init()
         log_dbg("web init done")
 
@@ -173,6 +171,7 @@ class AppWEB:
 
             api_key = ""
             session_id = ""
+            need_update_cookie = True
             body = ""
             try:
                 body = request.get_data().decode("utf-8")
@@ -188,16 +187,22 @@ class AppWEB:
                 f"URL={url}, Headers->Authorization={auth_header}, body={body}"
             )
 
-            if not session_id or not len(session_id):
-                session_id = self.session.create_session_id(api_key)
 
-            if not self.session.has_session(session_id):
-                ret = self.session.new_session(api_key, self.session_setting)
-                if not ret:
-                    err = "Cannot create session."
-                    resp.set_data(err)
-                    return resp
+            session_id, need_update_cookie = self.cul_session_id(session_id=session_id, api_key=api_key)
+            if not session_id:
+                err = "Cannot create session."
+                log_err(f"not session: {err}")
+                resp.set_data(err)
+                return resp
+            
+            if need_update_cookie:
+                log_dbg(f"Update Browser cookie of session_id.")
                 resp.set_cookie("session_id", session_id)
+            
+            key_session_id = self.session.create_session_id(api_key)
+            if key_session_id != session_id:
+                # 如果 key 发生了变更, 需要更新 key, 但是不替换 sesionid. 
+                pass
 
             modelsObj = ""
             try:
@@ -286,6 +291,7 @@ class AppWEB:
             api_key = ""
             session_id = ""
             body = ""
+            need_update_cookie = True
 
             # 获取HTTP头部中的 Authorization 值
             try:
@@ -340,19 +346,12 @@ class AppWEB:
                 log_err(f"fail to get requestion: {e}")
                 model = "auto"
                 owned_by = "Aimi"
-
-            has_session_id = True
-
-            if not session_id or not len(session_id):
-                session_id = self.session.create_session_id(api_key)
-                has_session_id = False
-
-            if not self.session.has_session(session_id):
-                ret = self.session.new_session(api_key, self.session_setting)
-                if not ret:
-                    err = "Cannot create session."
-                    log_err(f"not session: {err}")
-                    return make_response(err)
+            
+            session_id, need_update_cookie = self.cul_session_id(session_id=session_id, api_key=api_key)
+            if not session_id:
+                err = "Cannot create session."
+                log_err(f"not session: {err}")
+                return make_response(err)
 
             resp = Response(
                 event_stream(
@@ -366,10 +365,30 @@ class AppWEB:
                 mimetype="text/event-stream",
             )
             
-            if not has_session_id:
+            if need_update_cookie:
+                log_dbg(f"Update Browser cookie of session_id.")
                 resp.set_cookie("session_id", session_id)
 
             return resp
+    
+    def cul_session_id(self, session_id, api_key):
+        need_update_cookie = True
+        if not session_id or not len(session_id) or not self.session.has_session(session_id):
+            # 浏览器提供的 session_id 不可用
+            need_update_cookie = True
+
+            # 重新通过key计算 session_id
+            session_id = self.session.create_session_id(api_key)
+            
+            # 如果不存在session_id 才需要重建.
+            if not self.session.has_session(session_id):
+                new_setting = self.session.dup_setting(api_key)
+                session_id = self.session.new_session(api_key, new_setting)
+            
+        else:
+            need_update_cookie = False
+        
+        return session_id, need_update_cookie
 
     def server(self):
         from gevent import pywsgi

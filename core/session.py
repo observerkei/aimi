@@ -1,4 +1,5 @@
 import hashlib
+import copy
 from typing import Any, Dict
 
 from tool.util import log_dbg, log_info, log_err
@@ -9,9 +10,20 @@ from core.task import Task
 
 class Session:
     chatbots: Dict[str, ChatBot] = {}
+    __setting: Dict = {}
 
-    def __init__(self):
-        pass
+    def __init__(self, setting):
+        self.__setting = setting
+    
+    @property
+    def setting(self):
+        return self.__setting
+
+    def dup_setting(self, api_key: str):
+        setting = copy.deepcopy(self.__setting)
+        if ChatBotType.OpenAI in setting and 'api_key' in setting[ChatBotType.OpenAI]:
+            setting[ChatBotType.OpenAI]['api_key'] = api_key
+        return setting
 
     def create_session_id(self, key: str):
         return hashlib.sha256(key.encode()).hexdigest()

@@ -146,23 +146,18 @@ class Aimi:
     def session(self):
         return self.__session
     
-    @property
-    def session_setting(self):
-        return self.__session_setting
-
     def __init__(self):
         self.__load_setting()
         self.config = Config()
         self.md = Md()
         self.memory = Memory()
 
-        self.__session = Session()
+        self.__session = Session(self.__session_setting)
 
         self.app_web = AppWEB(
             session=self.session, 
             ask=self.web_ask, 
-            get_all_models=self.get_all_models,
-            session_setting=self.session_setting)
+            get_all_models=self.get_all_models)
 
         self.app_qq = AppQQ()
 
@@ -275,7 +270,7 @@ class Aimi:
                 ask_data = BotAskData(question=question, nickname=nickname)
                 session_id = self.session.create_session_id(self.aimi_name)
                 if not self.session.has_session(session_id):
-                    session_id = self.session.new_session(session_id, self.default_chatbot_setting)
+                    session_id = self.session.new_session(session_id, self.session.setting)
                     if not ret:
                         log_err(f"fail to get new session_id.")
                         break
