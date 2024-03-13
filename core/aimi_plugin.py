@@ -86,7 +86,7 @@ class ChatBot:
         self.setting = setting
         self.bot_path = setting['bot_path'] if "bot_path" in setting else "./aimi_plugin/bot"
         self.bot_caller.chatbot = self
-        self.__load_bot()
+        self.__load_bots()
         self.__when_init(setting)
     
     @classmethod
@@ -118,7 +118,37 @@ class ChatBot:
 
         return setting
     
-    def __load_bot(self):
+    def get_bot_setting(self, type) -> Dict:
+        if type in self.setting:
+            return self.setting[type]
+        return {}
+    
+    def reload_bot(self, type, bot_setting) -> Bot:
+        # 遍历目录中的文件
+        for filename, module in load_module(
+            module_path=self.bot_path,
+            load_name=["Bot"],
+            file_start=Bot.plugin_prefix,
+        ):
+            if f"{Bot.plugin_prefix}{type}.py" != filename:
+                continue
+
+            try:
+                bot: Bot = module.Bot()
+                bot_type = bot.type
+
+                self.append(bot_type, bot)
+                bot.when_init(self.bot_caller, bot_setting)
+
+                log_dbg(f"reload bot bot_type:{bot_type}  from: {filename}")
+                return bot
+            except Exception as e:
+                log_err(f"fail to reload bot bot: {e} file: {filename}")
+            
+            break
+    
+        return None
+    def __load_bots(self):
         # 遍历目录中的文件
         for filename, module in load_module(
             module_path=self.bot_path,
@@ -132,25 +162,27 @@ class ChatBot:
             try:
                 bot: Bot = module.Bot()
                 bot_type = bot.type
-                old_bot: Bot = None
-                if self.has_type(bot_type):
-                    old_bot = self.get_bot(bot_type)
 
                 self.append(bot_type, bot)
-
-                try:
-                    if old_bot:
-                        old_bot.when_exit(self.bot_caller)
-                except Exception as e:
-                    log_err(f"fail to exit old bot: {bot_type}: {e}")
                 
                 log_dbg(f"add bot bot_type:{bot_type}  from: {filename}")
             except Exception as e:
                 log_err(f"fail to add bot bot: {e} file: {filename}")
 
     def append(self, type: str, bot: Bot):
-        if type:
-            self.bots[type] = bot
+        if not type:
+            return
+        old_bot: Bot = None
+        if type in self.bots:
+            old_bot = self.bots[type]
+            
+        self.bots[type] = bot
+
+        try:
+            if old_bot:
+                old_bot.when_exit(self.bot_caller)
+        except Exception as e:
+            log_err(f"fail to exit old bot: {type}: {e}")
     
     def ask(self, type: str, ask_data: BotAskData) -> Generator[dict, None, None]:
         if self.has_type(type):

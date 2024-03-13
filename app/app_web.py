@@ -199,10 +199,15 @@ class AppWEB:
                 log_dbg(f"Update Browser cookie of session_id.")
                 resp.set_cookie("session_id", session_id)
             
-            key_session_id = self.session.create_session_id(api_key)
-            if key_session_id != session_id:
-                # 如果 key 发生了变更, 需要更新 key, 但是不替换 sesionid. 
-                pass
+            session_api_key = self.session.get_chatbot_setting_api_key(session_id)
+            if session_api_key != api_key:
+                # 如果 key 发生了变更, 需要更新 key, 但是不替换 sesion id.
+                done = self.session.update_session_by_api_key(session_id, api_key)
+                if not done:
+                    err = "Cannot update session data."
+                    log_err(f"Error: {err}")
+                    resp.set_data(err)
+                    return resp
 
             modelsObj = ""
             try:
@@ -352,6 +357,15 @@ class AppWEB:
                 err = "Cannot create session."
                 log_err(f"not session: {err}")
                 return make_response(err)
+            
+            session_api_key = self.session.get_chatbot_setting_api_key(session_id)
+            if session_api_key != api_key:
+                # 如果 key 发生了变更, 需要更新 key, 但是不替换 sesion id.
+                done = self.session.update_session_by_api_key(session_id, api_key)
+                if done:
+                    err = "Cannot update session data."
+                    log_err(f"Error: {err}")
+                    return make_response(err)
 
             resp = Response(
                 event_stream(
@@ -378,12 +392,8 @@ class AppWEB:
             need_update_cookie = True
 
             # 重新通过key计算 session_id
-            session_id = self.session.create_session_id(api_key)
-            
-            # 如果不存在session_id 才需要重建.
-            if not self.session.has_session(session_id):
-                new_setting = self.session.dup_setting(api_key)
-                session_id = self.session.new_session(api_key, new_setting)
+            new_setting = self.session.dup_setting(api_key)
+            session_id = self.session.new_session(api_key, new_setting)
             
         else:
             need_update_cookie = False

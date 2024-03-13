@@ -1602,7 +1602,7 @@ def chat_from(request: dict = None):
             return "gpt-3.5-turbo"
         return "gpt-3.5-turbo-16k"
     
-    def get_models(self) -> List[str]:
+    def get_models(self, caller: Bot) -> List[str]:
         return self.models
 
     def action_running_to_messages(self) -> List[Dict]:

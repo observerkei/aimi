@@ -31,17 +31,21 @@ class Session:
     def has_session(self, session_id: str) -> bool:
         return session_id in self.chatbots
 
-    def new_session(self, key: str, setting: Dict):
-        try:
-            chatbot = ChatBot(setting)
-            task_setting = setting['task'] if 'task' in setting else {}
-            task = Task(
-                chatbot=chatbot, 
-                setting=task_setting)
-            chatbot.append(ChatBotType.Task, task)
-            
-            session_id = self.create_session_id(key)
+    def __create_chabot(self, setting: Dict) -> ChatBot:
+        chatbot = ChatBot(setting)
+        task_setting = setting['task'] if 'task' in setting else {}
+        task = Task(
+            chatbot=chatbot, 
+            setting=task_setting)
+        chatbot.append(ChatBotType.Task, task)
+        return chatbot
 
+    # 整个 chatbot 结构更新才能用这个, 会主动释放原来的 chatbot (调用exit保存信息)
+    def __update_session(self, session_id: str, chatbot: ChatBot) -> str:
+        if session_id not in self.chatbots or not chatbot:
+            return None
+
+        try:
             old_chatbot = None
             if session_id in self.chatbots:
                 old_chatbot = self.chatbots[session_id]
@@ -62,13 +66,55 @@ class Session:
         except Exception as e:
             log_err(f"fail to create new session: {key} :{str(e)}")
             return None
+    
+    def new_session(self, key: str, setting: Dict) -> str:
+        session_id = self.create_session_id(key)
+        if self.has_session(session_id):
+            log_err(f"already have session_id: {session_id}")
+            return None 
 
-    def get_chatbot(self, session_id: str):
+        try:
+            self.chatbots[session_id] = self.__create_chabot(setting)
+            return session_id
+        except Exception as e:
+            log_err(f"fail to new session: {e}")
+            return None
+
+    def update_session_by_api_key(self, session_id: str, api_key: str) -> bool:
+        if not self.has_session(session_id):
+            return False
+        
+        chatbot = self.chatbots[session_id]
+
+        bot_setting = chatbot.get_bot_setting(ChatBotType.OpenAI)
+        bot_setting['api_key'] = api_key
+
+        bot = chatbot.reload_bot(ChatBotType.OpenAI, bot_setting)
+        if not bot:
+            log_err(f"fail to reload bot: {session_id}")
+            return False
+
+        return True
+
+    def get_chatbot(self, session_id: str) -> ChatBot:
         if not self.has_session(session_id):
             log_dbg(f"no has session_id: {session_id}")
             return None
 
         return self.chatbots[session_id]
+
+    def get_chatbot_setting_api_key(self, session_id: str) -> str:
+        if session_id not in self.chatbots:
+            return ""
+        chatbot = self.get_chatbot(session_id)
+
+        api_key = ""
+        try:
+            api_key = chatbot.setting[ChatBotType.OpenAI]["api_key"]
+        except Exception as e:
+            log_err(f"fail to get api_key, session_id({session_id})")
+            api_key = ""
+        return api_key
 
     def when_exit(self):
         for session_id, chatbot in self.chatbots.items():
