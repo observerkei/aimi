@@ -160,9 +160,11 @@ class AppWEB:
 
     def __listen_init(self):
         self.app = Flask(__name__)
-        # 允许浏览器跨域请求 
-        CORS(self.app, resources={r"/v1/*": {"origins": "*", "supports_credentials": True}})
-
+        # 允许浏览器跨域请求
+        CORS(
+            self.app,
+            resources={r"/v1/*": {"origins": "*", "supports_credentials": True}},
+        )
 
         @self.app.route("/v1/models", methods=["GET"])
         def handle_get_models_request():
@@ -170,35 +172,40 @@ class AppWEB:
             resp = make_response()
 
             api_key = ""
-            session_id = ""
+            broswer_session_id = ""
+            authorization = ""
             need_update_cookie = True
             body = ""
+
             try:
                 body = request.get_data().decode("utf-8")
                 # 获取HTTP头部中的 Authorization 值
-                auth_header = request.headers.get("Authorization")
-                api_key = auth_header[7:]
-                session_id = request.cookies.get("session_id")
+                authorization = request.headers.get("Authorization")
+                api_key = authorization[7:]
+                broswer_session_id = request.cookies.get("session_id")
             except Exception as e:
                 log_err(f"fail to get req info: {e}")
 
+            authorization = authorization[:18] + "..."
+
             log_dbg(
-                f"Received a get request: session_id={session_id}, "
-                f"URL={url}, Headers->Authorization={auth_header}, body={body}"
+                f"Received a get request: session_id={broswer_session_id}, "
+                f"URL={url}, Headers->Authorization={authorization}, body={body}"
             )
 
-
-            session_id, need_update_cookie = self.cul_session_id(session_id=session_id, api_key=api_key)
+            session_id, need_update_cookie = self.cul_session_id(
+                broswer_session_id=broswer_session_id, api_key=api_key
+            )
             if not session_id:
                 err = "Cannot create session."
                 log_err(f"not session: {err}")
                 resp.set_data(err)
                 return resp
-            
+
             if need_update_cookie:
                 log_dbg(f"Update Browser cookie of session_id.")
                 resp.set_cookie("session_id", session_id)
-            
+
             session_api_key = self.session.get_chatbot_setting_api_key(session_id)
             if session_api_key != api_key:
                 # 如果 key 发生了变更, 需要更新 key, 但是不替换 sesion id.
@@ -294,22 +301,18 @@ class AppWEB:
 
             url = ""
             api_key = ""
-            session_id = ""
+            broswer_session_id = ""
+            authorization = ""
             body = ""
             need_update_cookie = True
 
             # 获取HTTP头部中的 Authorization 值
             try:
                 url = request.url
-                body = request.get_data().decode("utf-8")
-                log_dbg(f"Received a api request: \nURL={url} \nbody={body}")
-
+                broswer_session_id = request.cookies.get("session_id")
                 authorization = request.headers.get("Authorization")
                 api_key = authorization[7:]
-                session_id = request.cookies.get("session_id")
-                # 调试用, 上线不要打印出来
-                log_dbg(f"Key: {api_key}")
-
+                body = request.get_data().decode("utf-8")
             except Exception as e:
                 error_message = f"request failed: {str(e)}"
                 log_err(error_message)
@@ -318,6 +321,13 @@ class AppWEB:
                 response.status_code = 400  # 设置状态码为400 (Bad Request)
 
                 return response
+            
+            authorization = authorization[:18] + "..."
+
+            log_dbg(
+                f"Received a get request: session_id={broswer_session_id}, "
+                f"URL={url}, Headers->Authorization={authorization}, body={body}"
+            )
 
             question = ""
             model = ""
@@ -351,13 +361,15 @@ class AppWEB:
                 log_err(f"fail to get requestion: {e}")
                 model = "auto"
                 owned_by = "Aimi"
-            
-            session_id, need_update_cookie = self.cul_session_id(session_id=session_id, api_key=api_key)
+
+            session_id, need_update_cookie = self.cul_session_id(
+                broswer_session_id=broswer_session_id, api_key=api_key
+            )
             if not session_id:
                 err = "Cannot create session."
                 log_err(f"not session: {err}")
                 return make_response(err)
-            
+
             session_api_key = self.session.get_chatbot_setting_api_key(session_id)
             if session_api_key != api_key:
                 # 如果 key 发生了变更, 需要更新 key, 但是不替换 sesion id.
@@ -378,26 +390,36 @@ class AppWEB:
                 ),
                 mimetype="text/event-stream",
             )
-            
+
             if need_update_cookie:
                 log_dbg(f"Update Browser cookie of session_id.")
                 resp.set_cookie("session_id", session_id)
 
             return resp
-    
-    def cul_session_id(self, session_id, api_key):
+
+    def cul_session_id(self, broswer_session_id, api_key):
+        session_id = broswer_session_id
         need_update_cookie = True
-        if not session_id or not len(session_id) or not self.session.has_session(session_id):
+        # 浏览器传过来的 session_id
+        if (
+            not broswer_session_id
+            or not len(broswer_session_id)
+            or not self.session.has_session(broswer_session_id)
+        ):
             # 浏览器提供的 session_id 不可用
             need_update_cookie = True
+            log_dbg(f"Browser session_id ivalid: {broswer_session_id}")
 
-            # 重新通过key计算 session_id
-            new_setting = self.session.dup_setting(api_key)
-            session_id = self.session.new_session(api_key, new_setting)
-            
+            # 重新计算 session_id
+            session_id = self.session.create_session_id(api_key)
+            if not self.session.has_session(session_id):
+                # 重新计算的 session_id 还是不存在对应会话, 尝试新建一个会话
+                new_setting = self.session.dup_setting(api_key)
+                session_id = self.session.new_session(api_key, new_setting)
+
         else:
             need_update_cookie = False
-        
+
         return session_id, need_update_cookie
 
     def server(self):

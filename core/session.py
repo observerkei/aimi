@@ -71,10 +71,11 @@ class Session:
         session_id = self.create_session_id(key)
         if self.has_session(session_id):
             log_err(f"already have session_id: {session_id}")
-            return None 
+            return session_id 
 
         try:
             self.chatbots[session_id] = self.__create_chabot(setting)
+            log_info(f"create session_id: {session_id}")
             return session_id
         except Exception as e:
             log_err(f"fail to new session: {e}")

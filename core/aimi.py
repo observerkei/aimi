@@ -270,8 +270,8 @@ class Aimi:
                 ask_data = BotAskData(question=question, nickname=nickname)
                 session_id = self.session.create_session_id(self.aimi_name)
                 if not self.session.has_session(session_id):
-                    session_id = self.session.new_session(session_id, self.session.setting)
-                    if not ret:
+                    session_id = self.session.new_session(self.aimi_name, self.session.setting)
+                    if not session_id:
                         log_err(f"fail to get new session_id.")
                         break
                 log_dbg(f"sesion_id: {session_id}")
