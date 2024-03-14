@@ -10,40 +10,32 @@ from tool.util import log_dbg, log_err, log_info, read_yaml
 from tool.config import Config
 
 
-class GoCQHttp:
+class OneBotCQ:
     name: str = "go-cqhttp"
     post_host: str = "127.0.0.1"
     post_port: int = 5700
-    notify_host: str = "127.0.0.1"
-    notify_port: int = 5701
-    account_uin: int = 0
+    account_uid: int = 0
 
     def __init__(self):
-        self.__load_go_cqhttp_config()
+        self.__load_onebot_cq_config()
 
-    def __load_go_cqhttp_config(self):
-        go_cqhttp_config = "./run/config.yml"
+    def __load_onebot_cq_config(self):
+        setting = {}
         try:
-            go_cqhttp_config = Config.setting["config"]
-        except:
-            go_cqhttp_config = "./run/config.yml"
-
+            setting = Config.load_setting("qq")
+        except Exception as e:
+            log_err(f"failt to load qq config: {e}")
+            return
+        
         try:
-            obj = read_yaml(go_cqhttp_config)
-            self.account_uin = obj["account"]["uin"]
+            self.account_uid = setting["uid"]
 
-            http_config = obj["servers"][0]["http"]
+            post_host = setting["post_host"]
+            self.post_host = str(post_host)
 
-            go_host = http_config["host"]
-            go_port = http_config["port"]
-            self.post_host = str(go_host)
-            self.post_port = int(go_port)
+            post_port = setting["post_port"]
+            self.post_port = int(post_port)
 
-            url = http_config["post"][0]["url"]
-
-            host, port = url.replace("http://", "").split(":")
-            self.notify_host = str(host)
-            self.notify_port = int(port)
 
         except Exception as e:
             log_err("fail to get go-cqhttp config: " + str(e))
@@ -82,7 +74,7 @@ class GoCQHttp:
         return "[CQ:at,qq={}]".format(id)
 
     def is_at_self(self, message) -> bool:
-        at_self = self.make_at(self.account_uin)
+        at_self = self.make_at(self.account_uid)
         if at_self in message:
             return True
         return False
@@ -183,8 +175,6 @@ class BotManage:
     reply_time: Dict[int, int] = {}
     protect_bot_ids: List[int] = []
     reply_time_limit_s: int = 1
-    day_reply_time_start: Any = 1
-    day_reply_time_end: Any = 10
     reply_max_cnt: int = 10  # max reply limit
     reply_cur_cnt: int = 0  # cur reply limit
 
@@ -213,16 +203,6 @@ class BotManage:
         except Exception as e:
             log_err(f"fail to load reply_time_limit_s: {e}")
             self.reply_time_limit_s = 3600
-        try:
-            self.day_reply_time_start = setting["day_reply_time_start"]
-        except Exception as e:
-            log_err(f"fail to load day_reply_time_start: {e}")
-            self.day_reply_time_start = None
-        try:
-            self.day_reply_time_end = setting["day_reply_time_end"]
-        except Exception as e:
-            log_err(f"fail to load day_reply_time_end: {e}")
-            self.day_reply_time_end = None
 
     def update_reply_time(self, bot_id: int):
         current_time_seconds = int(time.time())
@@ -276,11 +256,11 @@ class BotManage:
 class AppQQ:
     response_user_ids: Set[int] = {}
     response_group_ids: Set[int] = {}
-    master_id: int = 0
+    master_uid: int = 0
     port: int = 5700
     host: str = "127.0.0.1"
     type: str = "go-cqhttp"
-    go_cqhttp: GoCQHttp
+    onebot_cq: OneBotCQ
     app: Any
     http_server: Any
     message: Set[dict] = []
@@ -290,6 +270,7 @@ class AppQQ:
     running: bool = True
     manage: BotManage = BotManage()
     init: bool = False
+    type: str = OneBotCQ.name
 
     def __message_append(self, msg):
         if len(self.message) >= self.message_size:
@@ -354,62 +335,62 @@ class AppQQ:
                 self.reply_message.remove(reply_url)
 
     def is_message(self, msg) -> bool:
-        if self.type == GoCQHttp.name:
-            return self.go_cqhttp.is_message(msg)
+        if self.type == OneBotCQ.name:
+            return self.onebot_cq.is_message(msg)
         return False
 
     def is_private(self, msg) -> bool:
-        if self.type == GoCQHttp.name:
-            return self.go_cqhttp.is_private(msg)
+        if self.type == OneBotCQ.name:
+            return self.onebot_cq.is_private(msg)
         return False
 
     def is_group(self, msg) -> bool:
-        if self.type == GoCQHttp.name:
-            return self.go_cqhttp.is_group(msg)
+        if self.type == OneBotCQ.name:
+            return self.onebot_cq.is_group(msg)
         return False
 
     def get_name(self, msg):
-        if self.type == GoCQHttp.name:
-            return self.go_cqhttp.get_name(msg)
+        if self.type == OneBotCQ.name:
+            return self.onebot_cq.get_name(msg)
         return ""
 
     def get_question(self, msg):
-        if self.type == GoCQHttp.name:
-            return self.go_cqhttp.get_question(msg)
+        if self.type == OneBotCQ.name:
+            return self.onebot_cq.get_question(msg)
         return ""
 
     def get_user_id(self, msg):
-        if self.type == GoCQHttp.name:
-            return self.go_cqhttp.get_user_id(msg)
+        if self.type == OneBotCQ.name:
+            return self.onebot_cq.get_user_id(msg)
         return ""
 
     def get_group_id(self, msg):
-        if self.type == GoCQHttp.name:
-            return self.go_cqhttp.get_group_id(msg)
+        if self.type == OneBotCQ.name:
+            return self.onebot_cq.get_group_id(msg)
         return ""
 
     def get_message(self, msg):
-        if self.type == GoCQHttp.name:
-            return self.go_cqhttp.get_message(msg)
+        if self.type == OneBotCQ.name:
+            return self.onebot_cq.get_message(msg)
         return ""
 
     def reply_private(self, user_id: int, reply: str):
-        if self.type == GoCQHttp.name:
-            reply_url = self.go_cqhttp.get_reply_private(user_id, reply)
+        if self.type == OneBotCQ.name:
+            reply_url = self.onebot_cq.get_reply_private(user_id, reply)
             return self.__reply_append(reply_url)
 
         return None
 
     def reply_group(self, group_id: int, user_id: int, reply):
-        if self.type == GoCQHttp.name:
-            reply_url = self.go_cqhttp.get_reply_group(group_id, user_id, reply)
+        if self.type == OneBotCQ.name:
+            reply_url = self.onebot_cq.get_reply_group(group_id, user_id, reply)
             return self.__reply_append(reply_url)
 
         return None
 
     def get_image_message(self, file) -> str:
-        if self.type == GoCQHttp.name:
-            return self.go_cqhttp.get_image_cq(file)
+        if self.type == OneBotCQ.name:
+            return self.onebot_cq.get_image_cq(file)
         return ""
 
     def reply_question(self, msg, reply):
@@ -441,19 +422,19 @@ class AppQQ:
         self.reply_question(msg, img_meme_com)
 
     def is_online(self) -> bool:
-        qq_info_url = self.go_cqhttp.make_url_get_qq_info()
+        qq_info_url = self.onebot_cq.make_url_get_qq_info()
         return self.reply_url(qq_info_url)
 
     def reply_online(self):
-        if self.type == GoCQHttp.name:
-            return self.reply_private(self.master_id, "server init complate :)")
+        if self.type == OneBotCQ.name:
+            return self.reply_private(self.master_uid, "server init complate :)")
 
         return None
 
     def reply_offline(self):
-        if self.type == GoCQHttp.name:
-            reply_api = self.go_cqhttp.get_reply_private(
-                self.master_id, "server unknown error :("
+        if self.type == OneBotCQ.name:
+            reply_api = self.onebot_cq.get_reply_private(
+                self.master_uid, "server unknown error :("
             )
             return self.reply_url(reply_api)
 
@@ -463,7 +444,7 @@ class AppQQ:
     def is_permission_denied(self, msg) -> bool:
         if self.is_private(msg):
             uid = self.get_user_id(msg)
-            if uid == self.master_id:
+            if uid == self.master_uid:
                 return False
             if uid in self.response_user_ids:
                 return False
@@ -473,7 +454,7 @@ class AppQQ:
         elif self.is_group(msg):
             # only use at on group.
             message = self.get_message(msg)
-            if not self.go_cqhttp.is_at_self(message):
+            if not self.onebot_cq.is_at_self(message):
                 return False
 
             uid = self.get_user_id(msg)
@@ -492,14 +473,14 @@ class AppQQ:
     def need_reply(self, msg) -> bool:
         if self.is_private(msg):
             uid = self.get_user_id(msg)
-            if uid == self.master_id:
+            if uid == self.master_uid:
                 return True
             if uid in self.response_user_ids:
                 return True
         elif self.is_group(msg):
             # only use at on group.
             message = self.get_message(msg)
-            if not self.go_cqhttp.is_at_self(message):
+            if not self.onebot_cq.is_at_self(message):
                 return False
 
             gid = self.get_group_id(msg)
@@ -509,7 +490,7 @@ class AppQQ:
 
             uid = self.get_user_id(msg)
 
-            if uid == self.master_id:
+            if uid == self.master_uid:
                 return True
 
             if uid in self.response_user_ids:
@@ -556,18 +537,15 @@ class AppQQ:
             )
             return
 
-        self.reply_group(group_id, self.master_id, f" {notify_msg}")
+        self.reply_group(group_id, self.master_uid, f" {notify_msg}")
         self.manage.reply_cur_cnt = 0
-        # ban_api = self.go_cqhttp.get_group_ban(group_id, user_id, self.manage.reply_time_limit_s)
+        # ban_api = self.onebot_cq.get_group_ban(group_id, user_id, self.manage.reply_time_limit_s)
         # return self.reply_url(ban_api)
 
     def __init__(self):
         self.__load_setting()
 
-        if self.type == GoCQHttp.name:
-            self.go_cqhttp = GoCQHttp()
-            self.host = self.go_cqhttp.notify_host
-            self.port = self.go_cqhttp.notify_port
+        self.onebot_cq = OneBotCQ()
 
         self.__listen_init()
 
@@ -619,10 +597,10 @@ class AppQQ:
             return
 
         try:
-            self.master_id = setting["master_id"]
+            self.master_uid = setting["master_uid"]
         except Exception as e:
             log_err(f"fail to load qq: {e}")
-            self.master_id = 0
+            self.master_uid = 0
 
         try:
             self.response_user_ids = set(setting["response_user_ids"])
@@ -634,9 +612,19 @@ class AppQQ:
         except Exception as e:
             log_err(f"fail to load qq: {e}")
             self.response_group_ids = set()
+        
+        try:
+            host = setting['host']
+            self.host = str(host)
+        except Exception as e:
+            log_err(f"fail to load host: {e}")
+            self.host = '127.0.0.1'
 
         try:
-            self.type = setting["type"]
+            port = setting['port']
+            self.port = int(port)
         except Exception as e:
-            log_err(f"fail to load qq: {e}")
-            self.type = GoCQHttp.name
+            log_err(f"fail to load port: {e}")
+            self.port = 5701
+
+        

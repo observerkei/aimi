@@ -561,11 +561,6 @@ class Aimi:
             self.master_name = ""
 
         try:
-            self.api = setting["api"]
-        except Exception as e:
-            log_err(f"fail to load aimi api: " + str(e))
-            self.api = []
-        try:
             self.bot_path = setting["bot_path"]
         except Exception as e:
             log_err(f"fail to load aimi bot_path: " + str(e))
