@@ -599,7 +599,10 @@ class AppQQ:
 
     def stop(self):
         self.running = False
-        self.http_server.stop()
+        try:
+            self.http_server.stop()
+        except Exception as e:
+            log_dbg(f"Exit raise: {e}") 
 
     def __load_setting(self):
         try:
