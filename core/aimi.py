@@ -307,7 +307,12 @@ class Aimi:
 
                         reply_div = self.reply_adjust(reply_div, api_type)
                         log_dbg(f"send div: {str(reply_div)}")
-                        self.app_qq.reply_question(msg, reply_div)
+
+                        # 删除头尾换行符. 因为QQ不需要.
+                        reply_div = reply_div.strip()
+                        # 有消息才需要发送.
+                        if not reply_div.isspace():
+                            self.app_qq.reply_question(msg, reply_div)
 
                         break
                     if (code == -1) and (len(reply_div) or len(reply_line)):
