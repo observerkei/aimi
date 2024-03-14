@@ -162,6 +162,7 @@ aimi:
     extern_action_path: './aimi_plugin/action'
     sandbox_path: './run/sandbox'
     sandbox_run_model: "system"
+    sandbox_run_timeout: 15
     max_running_size: 5000
   master_name: kei
   memory_size: 10240

@@ -76,6 +76,7 @@ class Task(Bot):
     chatbot: ChatBot
     task_has_change: bool = True
     run_model = Sandbox.RunModel.system
+    run_timeout: int = 15
     use_talk_messages: bool = True
     models: List[str] = []
 
@@ -626,7 +627,7 @@ class Task(Bot):
         if not ret:
             return False, "system error: write code failed."
 
-        run = Sandbox.run_code(self.run_model)
+        run = Sandbox.run_code(self.run_model, self.run_timeout)
 
         ret = True if (not run.returncode) else False
 
@@ -1063,6 +1064,11 @@ s_action = ActionToolItem(
         except Exception as e:
             log_err(f"fail to load task: {e}")
             self.run_model = Sandbox.RunModel.system
+        try:
+            self.run_timeout = setting["sandbox_run_timeout"]
+        except Exception as e:
+            log_err(f"fail to load task: {e}")
+            self.run_timeout = 15
 
         try:
             self.max_running_size = setting["max_running_size"]

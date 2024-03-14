@@ -72,7 +72,7 @@ cd ./ && python3.9 main.py > ./run/aimi.log
 
 ### running as a OneBot QQ server 
 
-1. run Shamrock or another OneBot server
+1. run Shamrock, go-cqhttp or another OneBot server
 
 set setting:
 
@@ -111,7 +111,7 @@ Have a good time!
 
 
 
-4. Visit this link to get your OpenAI access_token:
+> How to get your OpenAI access token:
 
 (For development communication only)
 
@@ -120,9 +120,8 @@ https://chat.openai.com/api/auth/session
 save to ./run/setting.yml
 
 ```yaml
-openai_config:
+openai:
   access_token: # your access_token
-
 ```
 
 6. express gratitude

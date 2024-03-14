@@ -15,6 +15,7 @@ class RunCodeReturn(BaseModel):
 class Sandbox:
     sandbox_file: str = "sandbox.py"
     sandbox_path: str = "./run/sandbox"
+    code_timeout: int = 15
 
     # 容器类型
     # system:       不安全用法
@@ -41,26 +42,34 @@ class Sandbox:
             log_err(f"fail to write code: {str(e)}")
         return False
 
-    def __run_cmd(cmd: List[str]):
-        result = subprocess.run(
-            cmd,
-            cwd=Sandbox.sandbox_path,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        return result
+    def __run_cmd(cmd: List[str], timeout: int = None):
+        if not timeout:
+            return subprocess.run(
+                cmd,
+                cwd=Sandbox.sandbox_path,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        else:
+            return subprocess.run(
+                cmd,
+                cwd=Sandbox.sandbox_path,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=timeout,
+            )
 
-    def __run_system_code():
+    def __run_system_code(timeout):
         run = RunCodeReturn(returncode=-1, stdout="", stderr="")
 
-        result = Sandbox.__run_cmd([sys.executable, Sandbox.sandbox_file])
+        result = Sandbox.__run_cmd([sys.executable, Sandbox.sandbox_file], timeout)
         run.returncode = int(result.returncode)
         run.stdout = str(result.stdout.decode("utf-8"))
         run.stderr = str(result.stderr.decode("utf-8"))
 
         return run
 
-    def __run_docker_code():
+    def __run_docker_code(timeout):
         run = RunCodeReturn(returncode=-1, stdout="", stderr="")
 
         # create requirements.txt
@@ -69,7 +78,7 @@ class Sandbox:
         if result.returncode != 0:
             raise Exception(f"fail to create requirements.txt : {str(result.stderr)}")
 
-        result = Sandbox.__run_cmd(["docker", "build", "-t", "sandbox", "."])
+        result = Sandbox.__run_cmd(["docker", "build", "-t", "sandbox", "."], timeout)
         if result.returncode != 0:
             run.stdout = str(result.stdout.decode("utf-8"))
             run.stderr = str(result.stderr.decode("utf-8"))
@@ -89,15 +98,15 @@ class Sandbox:
 
         return run
 
-    def run_code(run_model: str = RunModel.system) -> RunCodeReturn:
+    def run_code(run_model: str = RunModel.system, timeout: int = None) -> RunCodeReturn:
         max_return_len = 2048
         run = RunCodeReturn(returncode=-1, stdout="", stderr="")
 
         try:
             if run_model == Sandbox.RunModel.system:
-                run = Sandbox.__run_system_code()
+                run = Sandbox.__run_system_code(timeout)
             elif run_model == Sandbox.RunModel.docker:
-                run = Sandbox.__run_docker_code()
+                run = Sandbox.__run_docker_code(timeout)
             else:
                 run.stderr = f"no support run model: {str(run_model)}"
                 log_err(f"run_code: {run.stderr}")
