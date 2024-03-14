@@ -514,11 +514,11 @@ class Task(Bot):
                                             indent=4,
                                             ensure_ascii=False,
                                         )
-
-                                    log_info(
-                                        f"{task.call}: chat_from: {str(format_response)}"
-                                    )
-                                    yield f"**Execution result:** \n```javastript\n{format_response}\n```\n"
+                                    if "null" != format_response and None != task.request:
+                                        log_info(
+                                            f"{task.call}: cha  t_from: {str(format_response)}"
+                                        )
+                                        yield f"**Execution result:** \n```javastript\n{format_response}\n```\n"
 
                                 except Exception as e:
                                     log_err(
