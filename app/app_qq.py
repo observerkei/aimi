@@ -3,23 +3,23 @@ import re
 import time
 import threading
 from typing import Set, Any, Dict, List
-from flask import Flask, request
+from flask import Flask, request, make_response
 from urllib import parse
 
 from tool.util import log_dbg, log_err, log_info, read_yaml
 from tool.config import Config
 
 
-class OneBotCQ:
+class GoCQHTTP:
     name: str = "go-cqhttp"
     post_host: str = "127.0.0.1"
     post_port: int = 5700
     account_uid: int = 0
 
     def __init__(self):
-        self.__load_onebot_cq_config()
+        self.__load_go_cqhttp_config()
 
-    def __load_onebot_cq_config(self):
+    def __load_go_cqhttp_config(self):
         setting = {}
         try:
             setting = Config.load_setting("qq")
@@ -171,6 +171,10 @@ class OneBotCQ:
         return api_group_reply
 
 
+class Shamrock(GoCQHTTP):
+    pass
+
+
 class BotManage:
     reply_time: Dict[int, int] = {}
     protect_bot_ids: List[int] = []
@@ -260,7 +264,7 @@ class AppQQ:
     port: int = 5700
     host: str = "127.0.0.1"
     type: str = "go-cqhttp"
-    onebot_cq: OneBotCQ
+    go_cqhttp: GoCQHTTP
     app: Any
     http_server: Any
     message: Set[dict] = []
@@ -270,7 +274,7 @@ class AppQQ:
     running: bool = True
     manage: BotManage = BotManage()
     init: bool = False
-    type: str = OneBotCQ.name
+    type: str = GoCQHTTP.name
 
     def __message_append(self, msg):
         if len(self.message) >= self.message_size:
@@ -335,62 +339,62 @@ class AppQQ:
                 self.reply_message.remove(reply_url)
 
     def is_message(self, msg) -> bool:
-        if self.type == OneBotCQ.name:
-            return self.onebot_cq.is_message(msg)
+        if self.type == GoCQHTTP.name:
+            return self.go_cqhttp.is_message(msg)
         return False
 
     def is_private(self, msg) -> bool:
-        if self.type == OneBotCQ.name:
-            return self.onebot_cq.is_private(msg)
+        if self.type == GoCQHTTP.name:
+            return self.go_cqhttp.is_private(msg)
         return False
 
     def is_group(self, msg) -> bool:
-        if self.type == OneBotCQ.name:
-            return self.onebot_cq.is_group(msg)
+        if self.type == GoCQHTTP.name:
+            return self.go_cqhttp.is_group(msg)
         return False
 
     def get_name(self, msg):
-        if self.type == OneBotCQ.name:
-            return self.onebot_cq.get_name(msg)
+        if self.type == GoCQHTTP.name:
+            return self.go_cqhttp.get_name(msg)
         return ""
 
     def get_question(self, msg):
-        if self.type == OneBotCQ.name:
-            return self.onebot_cq.get_question(msg)
+        if self.type == GoCQHTTP.name:
+            return self.go_cqhttp.get_question(msg)
         return ""
 
     def get_user_id(self, msg):
-        if self.type == OneBotCQ.name:
-            return self.onebot_cq.get_user_id(msg)
+        if self.type == GoCQHTTP.name:
+            return self.go_cqhttp.get_user_id(msg)
         return ""
 
     def get_group_id(self, msg):
-        if self.type == OneBotCQ.name:
-            return self.onebot_cq.get_group_id(msg)
+        if self.type == GoCQHTTP.name:
+            return self.go_cqhttp.get_group_id(msg)
         return ""
 
     def get_message(self, msg):
-        if self.type == OneBotCQ.name:
-            return self.onebot_cq.get_message(msg)
+        if self.type == GoCQHTTP.name:
+            return self.go_cqhttp.get_message(msg)
         return ""
 
     def reply_private(self, user_id: int, reply: str):
-        if self.type == OneBotCQ.name:
-            reply_url = self.onebot_cq.get_reply_private(user_id, reply)
+        if self.type == GoCQHTTP.name:
+            reply_url = self.go_cqhttp.get_reply_private(user_id, reply)
             return self.__reply_append(reply_url)
 
         return None
 
     def reply_group(self, group_id: int, user_id: int, reply):
-        if self.type == OneBotCQ.name:
-            reply_url = self.onebot_cq.get_reply_group(group_id, user_id, reply)
+        if self.type == GoCQHTTP.name:
+            reply_url = self.go_cqhttp.get_reply_group(group_id, user_id, reply)
             return self.__reply_append(reply_url)
 
         return None
 
     def get_image_message(self, file) -> str:
-        if self.type == OneBotCQ.name:
-            return self.onebot_cq.get_image_cq(file)
+        if self.type == GoCQHTTP.name:
+            return self.go_cqhttp.get_image_cq(file)
         return ""
 
     def reply_question(self, msg, reply):
@@ -422,18 +426,18 @@ class AppQQ:
         self.reply_question(msg, img_meme_com)
 
     def is_online(self) -> bool:
-        qq_info_url = self.onebot_cq.make_url_get_qq_info()
+        qq_info_url = self.go_cqhttp.make_url_get_qq_info()
         return self.reply_url(qq_info_url)
 
     def reply_online(self):
-        if self.type == OneBotCQ.name:
+        if self.type == GoCQHTTP.name:
             return self.reply_private(self.master_uid, "server init complate :)")
 
         return None
 
     def reply_offline(self):
-        if self.type == OneBotCQ.name:
-            reply_api = self.onebot_cq.get_reply_private(
+        if self.type == GoCQHTTP.name:
+            reply_api = self.go_cqhttp.get_reply_private(
                 self.master_uid, "server unknown error :("
             )
             return self.reply_url(reply_api)
@@ -454,7 +458,7 @@ class AppQQ:
         elif self.is_group(msg):
             # only use at on group.
             message = self.get_message(msg)
-            if not self.onebot_cq.is_at_self(message):
+            if not self.go_cqhttp.is_at_self(message):
                 return False
 
             uid = self.get_user_id(msg)
@@ -480,7 +484,7 @@ class AppQQ:
         elif self.is_group(msg):
             # only use at on group.
             message = self.get_message(msg)
-            if not self.onebot_cq.is_at_self(message):
+            if not self.go_cqhttp.is_at_self(message):
                 return False
 
             gid = self.get_group_id(msg)
@@ -539,13 +543,13 @@ class AppQQ:
 
         self.reply_group(group_id, self.master_uid, f" {notify_msg}")
         self.manage.reply_cur_cnt = 0
-        # ban_api = self.onebot_cq.get_group_ban(group_id, user_id, self.manage.reply_time_limit_s)
+        # ban_api = self.go_cqhttp.get_group_ban(group_id, user_id, self.manage.reply_time_limit_s)
         # return self.reply_url(ban_api)
 
     def __init__(self):
         self.__load_setting()
 
-        self.onebot_cq = OneBotCQ()
+        self.go_cqhttp = GoCQHTTP()
 
         self.__listen_init()
 
@@ -554,10 +558,13 @@ class AppQQ:
 
         @self.app.route("/", methods=["POST"])
         def listen():
+            if not request.is_json:
+                return make_response("Invalid JSON", 400)
             msg = request.get_json()
+            log_dbg(f"recv: {msg}")
             if not self.is_message(msg):
                 log_dbg("skip not msg.")
-                return "skip"
+                return make_response("Message skip", 200)
             log_info("recv msg: " + str(msg))
             if self.need_reply(msg):
                 log_info("need reply append msg.")
@@ -571,16 +578,17 @@ class AppQQ:
             else:
                 log_info("no need reply")
 
-            return "ok"
-
+            return make_response("Message ok", 200)
+        
     def server(self):
         # 开启回复线程
         threading.Thread(target=self.reply).start()
 
         from gevent import pywsgi
 
+        # flask 框架的限制, 必须是 0.0.0.0 才能监听到转发流量.
         self.http_server = pywsgi.WSGIServer(
-            listener=(self.host, self.port), application=self.app, log=None
+            listener=("0.0.0.0", self.port), application=self.app
         )
         self.http_server.serve_forever()
 
@@ -614,17 +622,8 @@ class AppQQ:
             self.response_group_ids = set()
         
         try:
-            host = setting['host']
-            self.host = str(host)
-        except Exception as e:
-            log_err(f"fail to load host: {e}")
-            self.host = '127.0.0.1'
-
-        try:
             port = setting['port']
             self.port = int(port)
         except Exception as e:
             log_err(f"fail to load port: {e}")
             self.port = 5701
-
-        
