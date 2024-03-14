@@ -498,8 +498,9 @@ class Task(Bot):
                             req = task.request if not task.request else ""
                             req_format = json.dumps(req, indent=4, ensure_ascii=False)
                             
-                            yield f"**Request:** \n```javastript\n{req_format}\n```\n"
-                            log_info(f"call: {task.call} req: {req_format}")
+                            if "null" != req_format and None != task.request:
+                                yield f"**Request:** \n```javastript\n{req_format}\n```\n"
+                                log_info(f"call: {task.call} req: {req_format}")
 
                             if chat_from:
                                 response = ""
@@ -514,11 +515,11 @@ class Task(Bot):
                                             indent=4,
                                             ensure_ascii=False,
                                         )
-                                    if "null" != format_response and None != task.request:
-                                        log_info(
-                                            f"{task.call}: cha  t_from: {str(format_response)}"
-                                        )
-                                        yield f"**Execution result:** \n```javastript\n{format_response}\n```\n"
+
+                                    log_info(
+                                        f"{task.call}: chat_from: {str(format_response)}"
+                                    )
+                                    yield f"**Execution result:** \n```javastript\n{format_response}\n```\n"
 
                                 except Exception as e:
                                     log_err(
