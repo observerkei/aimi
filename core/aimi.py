@@ -3,6 +3,7 @@ import signal
 import threading
 import time
 import random
+import unicodedata
 from typing import Generator, List, Dict, Any, Tuple
 from contextlib import suppress
 
@@ -309,7 +310,7 @@ class Aimi:
                         log_dbg(f"send div: {str(reply_div)}")
 
                         # 删除头尾换行符. 因为QQ不需要.
-                        reply_div = reply_div.strip()
+                        reply_div = unicodedata.normalize("NFKC", reply_div).strip()
                         # 有消息才需要发送.
                         if not reply_div.isspace():
                             self.app_qq.reply_question(msg, reply_div)
@@ -322,7 +323,7 @@ class Aimi:
                         log_dbg(f"fail: {str(reply_line)}, send div: {str(reply_div)}")
                         
                         # 删除头尾换行符. 因为QQ不需要.
-                        reply_div = reply_div.strip()
+                        reply_div = unicodedata.normalize("NFKC", reply_div).strip()
                         # 有消息才需要发送.
                         if not reply_div.isspace():
                             self.app_qq.reply_question(msg, reply_div)
