@@ -43,7 +43,11 @@ class GoCQHTTP:
 
     def is_message(self, msg) -> bool:
         try:
-            return msg["post_type"] == "message"
+            post_type = msg["post_type"]
+            if post_type == "message":
+                return True
+            else:
+                log_dbg(f"not messge type: {post_type}")
         except:
             log_err("fail to check msg type")
             return False
@@ -276,6 +280,13 @@ class AppQQ:
     init: bool = False
     type: str = GoCQHTTP.name
 
+    def __init__(self):
+        self.__load_setting()
+
+        self.go_cqhttp = GoCQHTTP()
+
+        self.__listen_init()
+
     def __message_append(self, msg):
         if len(self.message) >= self.message_size:
             log_err("msg full: {}. bypass: {}".format(str(len(self.message)), str(msg)))
@@ -333,7 +344,8 @@ class AppQQ:
             for reply_url in self.reply_message:
                 res = self.reply_url(reply_url)
                 if not res:
-                    log_err("fail to send reply. sleep...")
+                    log_err("fail to send reply. sleep 5s...")
+                    time.sleep(5)
                     break
 
                 self.reply_message.remove(reply_url)
@@ -546,28 +558,21 @@ class AppQQ:
         # ban_api = self.go_cqhttp.get_group_ban(group_id, user_id, self.manage.reply_time_limit_s)
         # return self.reply_url(ban_api)
 
-    def __init__(self):
-        self.__load_setting()
-
-        self.go_cqhttp = GoCQHTTP()
-
-        self.__listen_init()
-
     def __listen_init(self):
         self.app = Flask(__name__)
 
         @self.app.route("/", methods=["POST"])
         def listen():
             if not request.is_json:
-                return make_response("Invalid JSON", 400)
+                return make_response("error", 400)
             msg = request.get_json()
             log_dbg(f"recv: {msg}")
             if not self.is_message(msg):
                 log_dbg("skip not msg.")
-                return make_response("Message skip", 200)
+                return make_response("skip", 200)
             log_info("recv msg: " + str(msg))
             if self.need_reply(msg):
-                log_info("need reply append msg.")
+                log_info("need reply, append msg.")
                 self.__message_append(msg)
             elif self.is_permission_denied(msg):
                 log_info("user permission_denied")
@@ -578,7 +583,7 @@ class AppQQ:
             else:
                 log_info("no need reply")
 
-            return make_response("Message ok", 200)
+            return make_response("ok", 200)
         
     def server(self):
         # 开启回复线程

@@ -1593,10 +1593,10 @@ def chat_from(request: dict = None):
         log_dbg(f"running: {json.dumps(run_dict, indent=4, ensure_ascii=False)}")
         return str(js)
 
-    def is_call(self, caller: Bot, question) -> bool:
+    def is_call(self, caller: Bot, ask_data: BotAskData) -> bool:
         calls = ["#task", "#aimi-task", "#at"]
         for call in calls:
-            if call in question.lower():
+            if call in ask_data.question.lower():
                 return True
 
         return False

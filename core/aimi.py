@@ -96,7 +96,7 @@ class ReplyStep:
     class MathList:
         has_start: bool = False
 
-        def __is_math_format(md: Md, line: str) -> bool:
+        def __is_math_format(self, md: Md, line: str) -> bool:
             if "=" in line:
                 return True
             if md.has_latex(line):
