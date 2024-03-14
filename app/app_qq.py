@@ -453,7 +453,7 @@ class AppQQ:
     def reply_offline(self):
         if self.type == GoCQHttp.name:
             reply_api = self.go_cqhttp.get_reply_private(
-                self.master_id, "Server unknown error :("
+                self.master_id, "server unknown error :("
             )
             return self.reply_url(reply_api)
 
