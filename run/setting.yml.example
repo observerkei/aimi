@@ -42,6 +42,7 @@ google:
   max_repeat_times: 2
   trigger:
     - '#google'
+    - '#gemini'
     - '@google'
     - '#gb'
 
