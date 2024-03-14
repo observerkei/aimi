@@ -199,7 +199,7 @@ class Aimi:
                     log_err("save memory failed")
 
             except Exception as e:
-                log_err("fail to save: " + str(e))
+                log_err(f"fail to save: " + str(e))
 
         log_dbg("aimi exit")
 
@@ -545,47 +545,38 @@ class Aimi:
         try:
             self.aimi_name = setting["name"]
         except Exception as e:
-            log_err("fail to load aimi: {e}")
+            log_err(f"fail to load aimi: {e}")
             self.aimi_name = "Aimi"
-        try:
-            self.aimi_plugin_setting = setting["aimi_plugin"]
-        except Exception as e:
-            log_err("fail to load aimi: {e}")
-            self.aimi_plugin_setting = {}
 
         try:
             self.task_setting = setting["task"]
         except Exception as e:
-            log_err("fail to load aimi: {e}")
+            log_err(f"fail to load aimi: {e}")
             self.task_setting = {}
 
         try:
             self.master_name = setting["master_name"]
         except Exception as e:
-            log_err("fail to load aimi: {e}")
+            log_err(f"fail to load aimi: {e}")
             self.master_name = ""
 
         try:
             self.api = setting["api"]
         except Exception as e:
-            log_err("fail to load aimi api: " + str(e))
+            log_err(f"fail to load aimi api: " + str(e))
             self.api = []
         try:
             self.bot_path = setting["bot_path"]
         except Exception as e:
-            log_err("fail to load aimi bot_path: " + str(e))
+            log_err(f"fail to load aimi bot_path: " + str(e))
             self.bot_path = []
 
         try:
             self.preset_facts = {}
-            for api in self.api:
-                try:
-                    preset_facts: List[str] = setting["preset_facts"][api]
-                except Exception as e:
-                    log_info(f"no {api} type preset, skip.")
-                    continue
-
-                self.preset_facts[api] = ""
+            preset_facts_setting: Dict[str, List[str]] = setting["preset_facts"]
+            
+            for api_type, preset_facts in preset_facts_setting.items():
+                fill_preset_facts = ""
                 count = 0
                 for fact in preset_facts:
                     fact = fact.replace("<name>", self.aimi_name)
@@ -593,11 +584,12 @@ class Aimi:
                     count += 1
                     if count != len(preset_facts):
                         fact += "\n"
-                    self.preset_facts[api] += fact
-
-            self.preset_facts["default"] = self.preset_facts[self.api[0]]
+                    fill_preset_facts += fact
+                self.preset_facts[api_type] = fill_preset_facts
+                
+            self.preset_facts["default"] = self.preset_facts[ChatBotType.OpenAI]
         except Exception as e:
-            log_err("fail to load aimi preset: " + str(e))
+            log_err(f"fail to load aimi preset: " + str(e))
             self.preset_facts = {}
 
         try:
@@ -610,7 +602,7 @@ class Aimi:
 
     def notify_online(self):
         if not self.app_qq.is_online():
-            log_err(f"{self.app_qq.type} offline")
+            log_dbg(f"{self.app_qq.type} offline")
             return
         self.app_qq.reply_online()
 

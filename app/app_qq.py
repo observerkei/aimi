@@ -289,6 +289,7 @@ class AppQQ:
     reply_message_size: int = 1024
     running: bool = True
     manage: BotManage = BotManage()
+    init: bool = False
 
     def __message_append(self, msg):
         if len(self.message) >= self.message_size:
