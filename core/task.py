@@ -489,19 +489,18 @@ class Task(Bot):
 
                     elif task.call in self.extern_action.actions:
                         try:
-                            yield f"**Ability to try:** * {action_description} *\n"
-                    
-                            req = task.request if not task.request else ""
-                            req_format = json.dumps(req, indent=4, ensure_ascii=False)
-
-                            yield f"**Request:** \n```javastript\n{req_format}\n```\n"
-                            log_info(f"call: {task.call} req: {req_format}")
-
                             action_call = self.extern_action.actions[task.call]
                             chat_from = action_call.chat_from
                             action_description = action_call.action.description
 
+                            yield f"**Ability to try:** * {action_description} *\n"
+
+                            req = task.request if not task.request else ""
+                            req_format = json.dumps(req, indent=4, ensure_ascii=False)
                             
+                            yield f"**Request:** \n```javastript\n{req_format}\n```\n"
+                            log_info(f"call: {task.call} req: {req_format}")
+
                             if chat_from:
                                 response = ""
 
