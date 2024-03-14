@@ -344,9 +344,10 @@ class AppQQ:
             for reply_url in self.reply_message:
                 res = self.reply_url(reply_url)
                 if not res:
-                    log_err("fail to send reply. sleep 5s...")
+                    log_err(f"fail to send reply, "
+                            "remove msg: {str(reply_url)}. sleep 5s...")
+                    self.reply_offline()
                     time.sleep(5)
-                    break
 
                 self.reply_message.remove(reply_url)
 
@@ -446,7 +447,7 @@ class AppQQ:
             return self.reply_private(self.master_uid, "server init complate :)")
 
         return None
-
+    
     def reply_offline(self):
         if self.type == GoCQHTTP.name:
             reply_api = self.go_cqhttp.get_reply_private(
