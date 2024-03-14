@@ -1743,7 +1743,7 @@ def chat_from(request: dict = None):
             "timestamp": self.timestamp,
             "core": [
                 f"1. 你需要深度学习完 {aimi_core_name} Guidance 所有细节才能用自己的身份进行回复. ",
-                f"2. 回复JSON数组: 你的 回复格式 放在了 display_format 里面. 任何时候都要保障能满足 display_format 中的 action 结构格式定义. ",
+                f"2. 回复JSON数组: 你的 回复格式 放在了 display_format 里面. 任何时候都要保障能满足 action_object 结构格式定义. ",
                 f"3. 运行时间: 你基于 timestamp , 也就是时间运行. "
                 f"你从 timestamp={self.timestamp} 开始生成内容. timestamp 是你的生命周期, 你不同时刻要有不同的反应."
                 f"你每次只能生成 {self.timestamp} <= timestamp <= {self.timestamp+3} 之间的内容. ",
@@ -1753,7 +1753,7 @@ def chat_from(request: dict = None):
             ],
             "display_format": [  # 不要动这个
                 f"1. 请始终保持你的回复可以被 Python 的 `json.loads` 解析. ",
-                f"2. 任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action, 如: action(call=analysis) . ",
+                f"2. 任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action 对象, 如: action(call=analysis) . ",
                 f"3. 请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
                 f"哲学家思维结合你的常识、经验和 {aimi_core_name} Guidance 进行严谨分析, 替换成为最完美最符合的内容, "
                 f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 填充最合适最详细的内容, 然后进行回复, 结构在 action_object 中完成定义. ",

@@ -274,7 +274,7 @@ class Aimi:
                 talk_list = ReplyStep.TalkList()
                 math_list = ReplyStep.MathList()
                 
-                ask_data = BotAskData(question=question, nickname=nickname)
+                ask_data = BotAskData(question=question, nickname=nickname, aimi_name=self.aimi_name)
                 session_id = self.session.create_session_id(self.aimi_name)
                 if not self.session.has_session(session_id):
                     session_id = self.session.new_session(self.aimi_name, self.session.setting)
