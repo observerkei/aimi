@@ -347,7 +347,6 @@ class AppQQ:
                     log_err(f"fail to send reply, "
                             "remove msg: {str(reply_url)}. sleep 5s...")
                     self.reply_offline()
-                    time.sleep(5)
 
                 self.reply_message.remove(reply_url)
 

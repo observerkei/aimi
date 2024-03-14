@@ -141,6 +141,7 @@ class Aimi:
     app_qq: AppQQ
     __session: Session
     __session_setting: Dict
+    previous_api_type: str
 
     @property
     def session(self):
@@ -207,7 +208,7 @@ class Aimi:
         chatbot = self.session.get_chatbot(session_id)
         if not chatbot:
             log_err(f"Session id failed: {session_id}")
-            return f"Session id failed: {session_id}"
+            return ""
         
         for bot_type, bot in chatbot.each_bot():
             if not bot.init:
@@ -217,10 +218,15 @@ class Aimi:
             if bot.is_call(chatbot.bot_caller, ask_data):
                 return bot_type
 
+        # 一个都找不到，用之前的
+        previous_api_type = self.session.get_previous_api_type(session_id)
+        if previous_api_type and len(previous_api_type):
+            return previous_api_type
+        
+        # 之前没有, 随机取一个, 优先取 task
         if chatbot.has_bot_init(ChatBotType.Task):
             return ChatBotType.Task
-
-        # 一个都找不到，随机取一个.
+        
         for bot_type, bot in chatbot.each_bot():
             if not bot.init:
                 continue
@@ -277,6 +283,7 @@ class Aimi:
                 log_dbg(f"sesion_id: {session_id}")
 
                 api_type = self.__get_api_type_by_question(session_id, question)
+                self.session.set_previous_api_type(api_type)
 
                 code = 0
                 for answer in self.ask(session_id, ask_data):
@@ -425,6 +432,7 @@ class Aimi:
         try:
             question = ask_data.question
             api_type = self.__get_api_type_by_question(session_id, question)
+            self.session.set_previous_api_type(api_type)
             preset = ask_data.preset
             
             if preset.isspace():
