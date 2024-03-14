@@ -283,7 +283,7 @@ class Aimi:
                 log_dbg(f"sesion_id: {session_id}")
 
                 api_type = self.__get_api_type_by_question(session_id, question)
-                self.session.set_previous_api_type(api_type)
+                self.session.set_previous_api_type(session_id, api_type)
 
                 code = 0
                 for answer in self.ask(session_id, ask_data):
@@ -432,7 +432,7 @@ class Aimi:
         try:
             question = ask_data.question
             api_type = self.__get_api_type_by_question(session_id, question)
-            self.session.set_previous_api_type(api_type)
+            self.session.set_previous_api_type(session_id, api_type)
             preset = ask_data.preset
             
             if preset.isspace():
