@@ -38,10 +38,8 @@ class GoCQHTTP:
             post_port = setting["post_port"]
             self.post_port = int(post_port)
 
-
         except Exception as e:
             log_err("fail to get go-cqhttp config: " + str(e))
-  
 
     def is_message(self, msg) -> bool:
         try:
@@ -157,7 +155,7 @@ class GoCQHTTP:
                 self.post_host, self.post_port, user_id, reply_quote
             )
         )
-        reply = RequestData(method='GET', url=api_private_reply)
+        reply = RequestData(method="GET", url=api_private_reply)
 
         return reply
 
@@ -174,21 +172,21 @@ class GoCQHTTP:
         api_group_reply = "http://{}:{}/send_group_msg?group_id={}&message={}".format(
             self.post_host, self.post_port, group_id, at_reply_quote
         )
-        
-        reply = RequestData(method='GET', url=api_group_reply)
+
+        reply = RequestData(method="GET", url=api_group_reply)
         return reply
 
 
 class Shamrock(GoCQHTTP):
-    name: str = 'shamrock'
-    
+    name: str = "shamrock"
+
     def get_reply_private(self, user_id: int, reply: str) -> RequestData:
         url = f"http://{self.post_host}:{self.post_port}/send_private_msg"
         data = {
             "user_id": int(user_id),
             "message": reply,
         }
-        reply = RequestData(method='POST', url=url, data=data)
+        reply = RequestData(method="POST", url=url, data=data)
 
         return reply
 
@@ -203,8 +201,8 @@ class Shamrock(GoCQHTTP):
             "group_id": int(group_id),
             "message": at_reply,
         }
-        
-        reply = RequestData(method='POST', url=url, data=data)
+
+        reply = RequestData(method="POST", url=url, data=data)
         return reply
 
 
@@ -316,7 +314,7 @@ class AppQQ:
         self.__load_setting()
         self.__init_onebot()
         self.__init_listen()
-    
+
     def __init_onebot(self):
         if self.type == GoCQHTTP.name:
             self.onebot = GoCQHTTP(self.setting)
@@ -325,7 +323,7 @@ class AppQQ:
         else:
             log_err(f"fail to init: {self.type}")
             return
-        
+
         log_dbg(f"use type: {self.type}")
 
     def __message_append(self, msg):
@@ -346,7 +344,7 @@ class AppQQ:
         else:
             return self.message.pop()
 
-    def  __reply_append(self, reply: RequestData):
+    def __reply_append(self, reply: RequestData):
         if len(self.reply_message) >= self.reply_message_size:
             log_err(
                 "reply full: {}. bypass: {}".format(
@@ -364,11 +362,13 @@ class AppQQ:
     def reply_data(self, req: RequestData) -> bool:
         try:
             log_dbg("send get: " + str(req.url))
-            response = requests.request(method=req.method, 
-                                    url=req.url, 
-                                    headers=req.headers, 
-                                    json=req.data, 
-                                    proxies={})
+            response = requests.request(
+                method=req.method,
+                url=req.url,
+                headers=req.headers,
+                json=req.data,
+                proxies={},
+            )
             log_dbg("res code: {} data: {}".format(str(response), str(response.text)))
             if response.status_code != 200:
                 log_err("code: {}. fail to reply, sleep.".format(response.status_code))
@@ -394,7 +394,6 @@ class AppQQ:
                     self.reply_offline()
 
                 self.reply_message.remove(reply_req)
-
 
     def is_message(self, msg) -> bool:
         return self.onebot.is_message(msg)
@@ -461,13 +460,13 @@ class AppQQ:
 
     def is_online(self) -> bool:
         qq_info_url = self.onebot.make_url_get_qq_info()
-        reply = RequestData(method='GET', url=qq_info_url)
+        reply = RequestData(method="GET", url=qq_info_url)
 
         return self.reply_data(reply)
 
     def reply_online(self):
         return self.reply_private(self.master_uid, "server init complate :)")
-    
+
     def reply_offline(self):
         reply = self.onebot.get_reply_private(
             self.master_uid, "server unknown error :("
@@ -595,7 +594,7 @@ class AppQQ:
                 log_info("no need reply")
 
             return make_response("ok", 200)
-        
+
     def server(self):
         # 开启回复线程
         threading.Thread(target=self.reply).start()
@@ -613,7 +612,7 @@ class AppQQ:
         try:
             self.http_server.stop()
         except Exception as e:
-            log_dbg(f"Exit raise: {e}") 
+            log_dbg(f"Exit raise: {e}")
 
     def __load_setting(self):
         setting = {}
@@ -641,19 +640,19 @@ class AppQQ:
         except Exception as e:
             log_err(f"fail to load qq: {e}")
             self.response_group_ids = set()
-        
+
         try:
-            port = setting['port']
+            port = setting["port"]
             self.port = int(port)
         except Exception as e:
             log_err(f"fail to load port: {e}")
             self.port = 5701
-            
+
         try:
-            self.type = setting['type']
+            self.type = setting["type"]
         except Exception as e:
             log_err(f"fail to load port: {e}")
             self.type = self.models[0]
-        
+
         if self.type not in self.models:
             raise Exception(f"no support type: {self.type}, please use: {self.models}")
