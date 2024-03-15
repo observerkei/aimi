@@ -40,6 +40,7 @@ google:
   api_key:
   max_requestion: 1024
   max_repeat_times: 2
+  default_model: 'models/gemini-pro' # 未设置模型进行使用的时候, 默认用这个模型, 如果这个模型不存在, 会任选一个其他模型. 
   trigger:
     - '#google'
     - '#gemini'
