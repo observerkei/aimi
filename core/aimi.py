@@ -281,7 +281,7 @@ class Aimi:
                     session_id = self.session.new_session(self.aimi_name, self.session.setting)
                     if not session_id:
                         log_err(f"fail to get new session_id.")
-                        break
+                        continue
                 log_dbg(f"sesion_id: {session_id}")
 
                 api_type = self.__get_api_type_by_question(session_id, question)
@@ -451,10 +451,11 @@ class Aimi:
             self.session.set_previous_api_type(session_id, api_type)
             preset = ask_data.preset
             
-            if preset.isspace():
+            if not preset or not len(preset) or preset.isspace():
                 with suppress(KeyError):
                     preset = self.preset_facts[api_type]
                     ask_data.preset = preset
+                    log_dbg(f"use type: {api_type} preset")
 
             talk_history = self.memory.search(question, self.max_link_think)
             ask_data.messages = make_context_messages(question, preset, talk_history)
