@@ -454,6 +454,7 @@ class Aimi:
             if preset.isspace():
                 with suppress(KeyError):
                     preset = self.preset_facts[api_type]
+                    ask_data.preset = preset
 
             talk_history = self.memory.search(question, self.max_link_think)
             ask_data.messages = make_context_messages(question, preset, talk_history)
