@@ -390,8 +390,7 @@ class AppQQ:
 
                 res = self.reply_data(reply_req)
                 if not res:
-                    log_err(f"fail to send reply, "
-                            "remove msg: {str(reply_url)}. sleep 5s...")
+                    log_err(f"fail to send reply, remove msg: {str(res)}. sleep 5s...")
                     self.reply_offline()
 
                 self.reply_message.remove(reply_req)
@@ -462,7 +461,9 @@ class AppQQ:
 
     def is_online(self) -> bool:
         qq_info_url = self.onebot.make_url_get_qq_info()
-        return self.reply_url(qq_info_url)
+        reply = RequestData(method='GET', url=qq_info_url)
+
+        return self.reply_data(reply)
 
     def reply_online(self):
         return self.reply_private(self.master_uid, "server init complate :)")
