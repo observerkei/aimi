@@ -71,8 +71,8 @@ class Md:
 
     out_prefix: str = "./run/md/"
 
-    def __init__(self):
-        self.out_prefix = os.path.abspath(self.out_prefix) + "/"
+    def __init__(self, run_path):
+        self.out_prefix = os.path.abspath(run_path) + "/md/"
 
     def has_md(self, text) -> bool:
         pattern = r"```[\s\S]*?```"

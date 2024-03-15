@@ -143,6 +143,7 @@ class Aimi:
     __session: Session
     __session_setting: Dict
     previous_api_type: str
+    run_path: str
 
     @property
     def session(self):
@@ -151,7 +152,7 @@ class Aimi:
     def __init__(self):
         self.__load_setting()
         self.config = Config()
-        self.md = Md()
+        self.md = Md(self.run_path)
         self.memory = Memory()
 
         self.__session = Session(self.__session_setting)
@@ -586,8 +587,14 @@ class Aimi:
         try:
             self.bot_path = setting["bot_path"]
         except Exception as e:
-            log_err(f"fail to load aimi bot_path: " + str(e))
-            self.bot_path = []
+            log_err(f"fail to load aimi bot_path: {str(e)}")
+            self.bot_path = './aimi_plugin/bot'
+
+        try:
+            self.run_path = setting["run_path"]
+        except Exception as e:
+            log_err(f"fail to load aimi run_path: {str(e)}")
+            self.run_path = "./run"
 
         try:
             self.preset_facts = {}
