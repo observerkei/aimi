@@ -1,13 +1,22 @@
 import requests
+
 import re
 import time
 import threading
 from typing import Set, Any, Dict, List
 from flask import Flask, request, make_response
+from pydantic import BaseModel
 from urllib import parse
 
 from tool.util import log_dbg, log_err, log_info, read_yaml
 from tool.config import Config
+
+
+class RequestData(BaseModel):
+    method: str
+    url: str
+    headers: dict = None
+    data: dict = None
 
 
 class GoCQHTTP:
@@ -16,17 +25,10 @@ class GoCQHTTP:
     post_port: int = 5700
     account_uid: int = 0
 
-    def __init__(self):
-        self.__load_go_cqhttp_config()
+    def __init__(self, setting):
+        self.__load_go_cqhttp_config(setting)
 
-    def __load_go_cqhttp_config(self):
-        setting = {}
-        try:
-            setting = Config.load_setting("qq")
-        except Exception as e:
-            log_err(f"failt to load qq config: {e}")
-            return
-        
+    def __load_go_cqhttp_config(self, setting: Dict):
         try:
             self.account_uid = setting["uid"]
 
@@ -147,7 +149,7 @@ class GoCQHTTP:
     def make_url_get_qq_info(self) -> str:
         return f"http://{self.post_host}:{self.post_port}/get_login_info"
 
-    def get_reply_private(self, user_id: int, reply: str) -> str:
+    def get_reply_private(self, user_id: int, reply: str) -> RequestData:
         reply_quote = parse.quote(reply)
 
         api_private_reply = (
@@ -155,10 +157,11 @@ class GoCQHTTP:
                 self.post_host, self.post_port, user_id, reply_quote
             )
         )
+        reply = RequestData(method='GET', url=api_private_reply)
 
-        return api_private_reply
+        return reply
 
-    def get_reply_group(self, group_id: int, user_id: int, reply) -> str:
+    def get_reply_group(self, group_id: int, user_id: int, reply) -> RequestData:
         at_user = ""
         if user_id:
             at_user = self.make_at(user_id) + "\n"
@@ -171,12 +174,38 @@ class GoCQHTTP:
         api_group_reply = "http://{}:{}/send_group_msg?group_id={}&message={}".format(
             self.post_host, self.post_port, group_id, at_reply_quote
         )
-
-        return api_group_reply
+        
+        reply = RequestData(method='GET', url=api_group_reply)
+        return reply
 
 
 class Shamrock(GoCQHTTP):
-    pass
+    name: str = 'shamrock'
+    
+    def get_reply_private(self, user_id: int, reply: str) -> RequestData:
+        url = f"http://{self.post_host}:{self.post_port}/send_private_msg"
+        data = {
+            "user_id": int(user_id),
+            "message": reply,
+        }
+        reply = RequestData(method='POST', url=url, data=data)
+
+        return reply
+
+    def get_reply_group(self, group_id: int, user_id: int, reply) -> RequestData:
+        at_user = ""
+        if user_id:
+            at_user = self.make_at(user_id) + "\n"
+        at_reply = at_user + reply
+
+        url = f"http://{self.post_host}:{self.post_port}/send_group_msg"
+        data = {
+            "group_id": int(group_id),
+            "message": at_reply,
+        }
+        
+        reply = RequestData(method='POST', url=url, data=data)
+        return reply
 
 
 class BotManage:
@@ -273,19 +302,31 @@ class AppQQ:
     http_server: Any
     message: Set[dict] = []
     message_size: int = 1024
-    reply_message: Set[str] = []
+    reply_message: Set[RequestData] = []
     reply_message_size: int = 1024
     running: bool = True
     manage: BotManage = BotManage()
     init: bool = False
     type: str = GoCQHTTP.name
+    onebot: GoCQHTTP
+    setting: Dict = {}
+    models: List[str] = [GoCQHTTP.name, Shamrock.name]
 
     def __init__(self):
         self.__load_setting()
-
-        self.go_cqhttp = GoCQHTTP()
-
-        self.__listen_init()
+        self.__init_onebot()
+        self.__init_listen()
+    
+    def __init_onebot(self):
+        if self.type == GoCQHTTP.name:
+            self.onebot = GoCQHTTP(self.setting)
+        elif self.type == Shamrock.name:
+            self.onebot = Shamrock(self.setting)
+        else:
+            log_err(f"fail to init: {self.type}")
+            return
+        
+        log_dbg(f"use type: {self.type}")
 
     def __message_append(self, msg):
         if len(self.message) >= self.message_size:
@@ -305,7 +346,7 @@ class AppQQ:
         else:
             return self.message.pop()
 
-    def __reply_append(self, reply: str):
+    def  __reply_append(self, reply: RequestData):
         if len(self.reply_message) >= self.reply_message_size:
             log_err(
                 "reply full: {}. bypass: {}".format(
@@ -320,10 +361,14 @@ class AppQQ:
 
         return True
 
-    def reply_url(self, reply_url: str) -> bool:
+    def reply_data(self, req: RequestData) -> bool:
         try:
-            log_dbg("send get: " + str(reply_url))
-            response = requests.get(reply_url, proxies={})
+            log_dbg("send get: " + str(req.url))
+            response = requests.request(method=req.method, 
+                                    url=req.url, 
+                                    headers=req.headers, 
+                                    json=req.data, 
+                                    proxies={})
             log_dbg("res code: {} data: {}".format(str(response), str(response.text)))
             if response.status_code != 200:
                 log_err("code: {}. fail to reply, sleep.".format(response.status_code))
@@ -341,73 +386,51 @@ class AppQQ:
 
             log_info("recv reply. try send qq server")
 
-            for reply_url in self.reply_message:
-                res = self.reply_url(reply_url)
+            for reply_req in self.reply_message:
+
+                res = self.reply_data(reply_req)
                 if not res:
                     log_err(f"fail to send reply, "
                             "remove msg: {str(reply_url)}. sleep 5s...")
                     self.reply_offline()
 
-                self.reply_message.remove(reply_url)
+                self.reply_message.remove(reply_req)
+
 
     def is_message(self, msg) -> bool:
-        if self.type == GoCQHTTP.name:
-            return self.go_cqhttp.is_message(msg)
-        return False
+        return self.onebot.is_message(msg)
 
     def is_private(self, msg) -> bool:
-        if self.type == GoCQHTTP.name:
-            return self.go_cqhttp.is_private(msg)
-        return False
+        return self.onebot.is_private(msg)
 
     def is_group(self, msg) -> bool:
-        if self.type == GoCQHTTP.name:
-            return self.go_cqhttp.is_group(msg)
-        return False
+        return self.onebot.is_group(msg)
 
     def get_name(self, msg):
-        if self.type == GoCQHTTP.name:
-            return self.go_cqhttp.get_name(msg)
-        return ""
+        return self.onebot.get_name(msg)
 
     def get_question(self, msg):
-        if self.type == GoCQHTTP.name:
-            return self.go_cqhttp.get_question(msg)
-        return ""
+        return self.onebot.get_question(msg)
 
     def get_user_id(self, msg):
-        if self.type == GoCQHTTP.name:
-            return self.go_cqhttp.get_user_id(msg)
-        return ""
+        return self.onebot.get_user_id(msg)
 
     def get_group_id(self, msg):
-        if self.type == GoCQHTTP.name:
-            return self.go_cqhttp.get_group_id(msg)
-        return ""
+        return self.onebot.get_group_id(msg)
 
     def get_message(self, msg):
-        if self.type == GoCQHTTP.name:
-            return self.go_cqhttp.get_message(msg)
-        return ""
+        return self.onebot.get_message(msg)
 
     def reply_private(self, user_id: int, reply: str):
-        if self.type == GoCQHTTP.name:
-            reply_url = self.go_cqhttp.get_reply_private(user_id, reply)
-            return self.__reply_append(reply_url)
-
-        return None
+        reply = self.onebot.get_reply_private(user_id, reply)
+        return self.__reply_append(reply)
 
     def reply_group(self, group_id: int, user_id: int, reply):
-        if self.type == GoCQHTTP.name:
-            reply_url = self.go_cqhttp.get_reply_group(group_id, user_id, reply)
-            return self.__reply_append(reply_url)
-
-        return None
+        reply = self.onebot.get_reply_group(group_id, user_id, reply)
+        return self.__reply_append(reply)
 
     def get_image_message(self, file) -> str:
-        if self.type == GoCQHTTP.name:
-            return self.go_cqhttp.get_image_cq(file)
-        return ""
+        return self.onebot.get_image_cq(file)
 
     def reply_question(self, msg, reply):
         if not len(reply):
@@ -438,23 +461,17 @@ class AppQQ:
         self.reply_question(msg, img_meme_com)
 
     def is_online(self) -> bool:
-        qq_info_url = self.go_cqhttp.make_url_get_qq_info()
+        qq_info_url = self.onebot.make_url_get_qq_info()
         return self.reply_url(qq_info_url)
 
     def reply_online(self):
-        if self.type == GoCQHTTP.name:
-            return self.reply_private(self.master_uid, "server init complate :)")
-
-        return None
+        return self.reply_private(self.master_uid, "server init complate :)")
     
     def reply_offline(self):
-        if self.type == GoCQHTTP.name:
-            reply_api = self.go_cqhttp.get_reply_private(
-                self.master_uid, "server unknown error :("
-            )
-            return self.reply_url(reply_api)
-
-        return None
+        reply = self.onebot.get_reply_private(
+            self.master_uid, "server unknown error :("
+        )
+        return self.reply_data(reply)
 
     # notify permission denied
     def is_permission_denied(self, msg) -> bool:
@@ -470,7 +487,7 @@ class AppQQ:
         elif self.is_group(msg):
             # only use at on group.
             message = self.get_message(msg)
-            if not self.go_cqhttp.is_at_self(message):
+            if not self.onebot.is_at_self(message):
                 return False
 
             uid = self.get_user_id(msg)
@@ -480,9 +497,6 @@ class AppQQ:
                 return False
 
             return True
-
-        else:
-            return False
 
         return False
 
@@ -496,7 +510,7 @@ class AppQQ:
         elif self.is_group(msg):
             # only use at on group.
             message = self.get_message(msg)
-            if not self.go_cqhttp.is_at_self(message):
+            if not self.onebot.is_at_self(message):
                 return False
 
             gid = self.get_group_id(msg)
@@ -511,8 +525,6 @@ class AppQQ:
 
             if uid in self.response_user_ids:
                 return True
-        else:
-            return False
 
         return False
 
@@ -555,16 +567,14 @@ class AppQQ:
 
         self.reply_group(group_id, self.master_uid, f" {notify_msg}")
         self.manage.reply_cur_cnt = 0
-        # ban_api = self.go_cqhttp.get_group_ban(group_id, user_id, self.manage.reply_time_limit_s)
-        # return self.reply_url(ban_api)
 
-    def __listen_init(self):
+    def __init_listen(self):
         self.app = Flask(__name__)
 
         @self.app.route("/", methods=["POST"])
         def listen():
             if not request.is_json:
-                return make_response("error", 400)
+                return make_response("failed", 400)
             msg = request.get_json()
             log_dbg(f"recv: {msg}")
             if not self.is_message(msg):
@@ -605,12 +615,14 @@ class AppQQ:
             log_dbg(f"Exit raise: {e}") 
 
     def __load_setting(self):
+        setting = {}
         try:
             setting = Config.load_setting("qq")
         except Exception as e:
             log_err(f"fail to load {self.type}: {e}")
             setting = {}
             return
+        self.setting = setting
 
         try:
             self.master_uid = setting["master_uid"]
@@ -635,3 +647,12 @@ class AppQQ:
         except Exception as e:
             log_err(f"fail to load port: {e}")
             self.port = 5701
+            
+        try:
+            self.type = setting['type']
+        except Exception as e:
+            log_err(f"fail to load port: {e}")
+            self.type = self.models[0]
+        
+        if self.type not in self.models:
+            raise Exception(f"no support type: {self.type}, please use: {self.models}")

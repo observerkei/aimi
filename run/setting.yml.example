@@ -132,7 +132,7 @@ chatanywhere:
 
 
 qq:
-  type: chatbot_cq
+  type: shamrock
   port: '5701' # 本机监听端口 
   post_host: 'localhost' # QQ消息解析HTTP服务器的 IP/域名 
   post_port: '5700' # QQ消息解析服务器的端口 

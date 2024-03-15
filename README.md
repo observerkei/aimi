@@ -78,7 +78,7 @@ set setting:
 
 ```yaml
 qq:
-  type: chatbot_cq
+  type: go-cqhttp
   port: '5701' # Local listening port
   post_host: 'localhost' # IP/domain of the QQ message parsing HTTP server
   post_port: '5700' # Port of the QQ message parsing server
