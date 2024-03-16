@@ -67,7 +67,10 @@ class Session:
             return False
 
         chatbot: ChatBot = self.__data[session_id].chatbot
-
+        if not chatbot.has_type(ChatBotType.OpenAI):
+            log_dbg(f"not have type: {ChatBotType.OpenAI}")
+            # 没有这个类型返回成功. 
+            return True
         bot_setting = chatbot.get_bot_setting(ChatBotType.OpenAI)
         bot_setting["api_key"] = api_key
 
@@ -105,7 +108,8 @@ class Session:
 
         api_key = ""
         try:
-            api_key = chatbot.setting[ChatBotType.OpenAI]["api_key"]
+            if ChatBotType.OpenAI in chatbot.setting:
+                api_key = chatbot.setting[ChatBotType.OpenAI]["api_key"]
         except Exception as e:
             log_err(f"fail to get api_key, session_id({session_id})")
             api_key = ""

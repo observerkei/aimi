@@ -1027,9 +1027,9 @@ s_action = ActionToolItem(
 
     @property
     def init(self):
-        if not self.chatbot.has_bot_init("openai"):
+        if not self.chatbot.has_bot_init(ChatBotType.OpenAI):
             return False
-        openai_models = self.chatbot.get_bot_models("openai")
+        openai_models = self.chatbot.get_bot_models(ChatBotType.OpenAI)
         for model in self.models:
             op_model = self.get_openai_model(model)
             if op_model in openai_models:

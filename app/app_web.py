@@ -374,7 +374,7 @@ class AppWEB:
             if session_api_key != api_key:
                 # 如果 key 发生了变更, 需要更新 key, 但是不替换 sesion id.
                 done = self.session.update_session_by_api_key(session_id, api_key)
-                if done:
+                if not done:
                     err = "Cannot update session data."
                     log_err(f"Error: {err}")
                     return make_response(err)
