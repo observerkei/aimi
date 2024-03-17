@@ -222,7 +222,7 @@ class AppWEB:
 
             if need_update_cookie:
                 log_dbg(f"Update Browser cookie of session_id.")
-                resp.set_cookie("session_id", session_id)
+                resp.set_cookie("session_id", session_id, samesite='None', secure=True)
 
             session_api_key = self.session.get_chatbot_setting_api_key(session_id)
             if session_api_key != api_key:
@@ -411,7 +411,7 @@ class AppWEB:
 
             if need_update_cookie:
                 log_dbg(f"Update Browser cookie of session_id.")
-                resp.set_cookie("session_id", session_id)
+                resp.set_cookie("session_id", session_id, samesite='None', secure=True)
 
             return resp
 

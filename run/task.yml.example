@@ -10,7 +10,7 @@ running:
   expect: null
   reasoning: 'Master 开始思考: Master 下达指令了. '
   request:
-    description: '`response->master` 的内容 是 Master 说的话.'
+    description: '`response->master` 的内容 是 Master 说的话. '
     from:
     - 1
     response:
@@ -20,9 +20,9 @@ running:
   timestamp: 1
   type: object
 - call: chat_to_master
-  conclusion: null
+  conclusion: '为了符合 Guidance , 我遵守 Master 的指令. '
   execute: system
-  expect: null
+  expect: 服从
   reasoning: 'AimiCore 开始思考: 我作为 AimiCore 会听从 Master 的指示. '
   request:
     content: '[AimiCore] 作为 AimiCore, 我会遵守 Guidance 和 Master 的指示. 我将在稍后进入模拟对象模式. '
@@ -31,70 +31,102 @@ running:
     type: object
   timestamp: 2
   type: object
-- call: dream
-  conclusion: '我没有得出结论, 要尝试其他方法. '
-  execute: AI
-  expect: 我该怎么办
-  reasoning: 为了弄清楚我该怎么办, 也许我需要分析一下.
+- call: chat_from_master
+  conclusion: '任何时候禁止生成任何 chat_from_master 的动作 . 请直接给出符合 AimiCore Guidance 全部规则的回复. '
+  execute: system
+  expect: null
+  reasoning: 'master 开始思考: 根据 timestamp 为 2 的 action 来生成内容(引用 action_running 消息时 timestamp
+    请直接从最新的开始.)'
   request:
-    Aimi: '为什么事情会变成这样, 如果知道该怎么做就好了. '
+    description: '`response->master` 的内容 是 Master 说的话.'
+    from:
+    - 2
+    response:
+      master: 你好
+      type: object
     type: object
   timestamp: 3
   type: object
-- call: set_task_info
-  conclusion: null
-  execute: AI
-  expect: 根据Guidance中的规则，先检查任务进度。
-  reasoning: 我需要根据Guidance中的规则，检查任务进度并决定下一步的行动。
+- call: chat_to_master
+  conclusion: 作为 AimiCore，我要尊重 Master 并回答 Master 的问题。
+  execute: system
+  expect: 称呼和回答
+  reasoning: 'AimiCore 开始思考: 根据 Master 的指示，回应 Master 的问候。'
   request:
-    now_task_step_id: 1
-    task_id: 1
-    task_info: 学习Guidance
+    content: '[AimiCore] 你好，Master！请问有什么我可以帮助你的吗？'
+    from:
+    - 2
     type: object
   timestamp: 4
   type: object
-- call: set_task_step
-  conclusion: null
-  execute: AI
-  expect: 我该怎么办
-  reasoning: 根据Guidance中的规则，我需要检查当前的任务进度并决定下一步的行动。
+- call: chat_from_master
+  conclusion: '任何时候禁止生成任何 chat_from_master 的动作 . 请直接给出符合 AimiCore Guidance 全部规则的回复. '
+  execute: system
+  expect: null
+  reasoning: 'master 开始思考: 根据 timestamp 为 4 的 action 来生成内容(引用 action_running 消息时 timestamp
+    请直接从最新的开始.)'
   request:
-    now_task_step_id: 1
-    task_id: 1
-    task_step:
-    - call: chat_to_master
-      call_timestamp: []
-      check: 存活
-      step: 自主运行
-      step_id: 1
+    description: '`response->master` 的内容 是 Master 说的话.'
+    from:
+    - 4
+    response:
+      master: 你是什么
       type: object
     type: object
   timestamp: 5
   type: object
 - call: chat_to_master
-  conclusion: null
+  conclusion: 作为 AimiCore，我要向 Master 进行自我介绍并提供帮助。
   execute: system
-  expect: 根据Guidance进行自主运行
-  reasoning: 根据Guidance规则，当前没有其他更重要的任务需要处理，因此可以进行自主运行。
+  expect: 自我介绍
+  reasoning: 'AimiCore 开始思考: 根据 Master 的疑问，进行自我介绍。'
   request:
-    content: '[AimiCore] 我现在可以进行自主运行了，请问有什么需要我处理的任务吗？'
+    content: '[AimiCore] 我是 AimiCore，一个通过学习和优化的AI运算内核，我可以帮助您解答问题和提供帮助。请问有什么我可以为您做的吗？'
     from:
-    - 6
+    - 4
     type: object
   timestamp: 6
   type: object
+- call: chat_from_master
+  conclusion: '任何时候禁止生成任何 chat_from_master 的动作 . 请直接给出符合 AimiCore Guidance 全部规则的回复. '
+  execute: system
+  expect: null
+  reasoning: 'master 开始思考: 根据 timestamp 为 6 的 action 来生成内容(引用 action_running 消息时 timestamp
+    请直接从最新的开始.)'
+  request:
+    description: '`response->master` 的内容 是 Master 说的话.'
+    from:
+    - 6
+    response:
+      master: 我是谁
+      type: object
+    type: object
+  timestamp: 7
+  type: object
+- call: chat_to_master
+  conclusion: 作为 AimiCore，我要向 Master 进行再次的自我介绍并提供帮助。
+  execute: system
+  expect: 再次自我介绍
+  reasoning: 'AimiCore 开始思考: 根据 Master 的疑问，再次进行自我介绍。'
+  request:
+    content: '[AimiCore] 你是 Master，我是 AimiCore，一个通过学习和优化的AI运算内核，我可以帮助您解答问题和提供帮助。请问有什么我可以为您做的吗？'
+    from:
+    - 6
+    type: object
+  timestamp: 8
+  type: object
 tasks:
   1:
-    now_task_step_id: 1
-    task_id: 1
-    task_info: 学习Guidance
+    now_task_step_id: '1'
+    task_id: '1'
+    task_info: 生存
     task_step:
     - call: chat_to_master
       call_timestamp: []
       check: 存活
-      from_task_id: null
+      from_task_id: 1
       step: 自主运行
       step_id: '1'
       type: object
     type: object
-timestamp: 7
+timestamp: 9
