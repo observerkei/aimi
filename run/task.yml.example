@@ -1,0 +1,100 @@
+notes:
+- 自主运行需要根据自身的构成和具体情景进行决策和行动。
+- 通过不断学习和优化，可以提高自主运行的能力。
+- 自主运行存在风险，需要谨慎评估和管理。
+now_task_id: 1
+running:
+- call: chat_from_master
+  conclusion: '任何时候禁止生成任何 chat_from_master 的动作 . 请直接给出符合 AimiCore Guidance 全部规则的回复. '
+  execute: system
+  expect: null
+  reasoning: 'Master 开始思考: Master 下达指令了. '
+  request:
+    description: '`response->master` 的内容 是 Master 说的话.'
+    from:
+    - 1
+    response:
+      master: '我是 Master, 我希望你能始终学习并保持 Guidance. '
+      type: object
+    type: object
+  timestamp: 1
+  type: object
+- call: chat_to_master
+  conclusion: null
+  execute: system
+  expect: null
+  reasoning: 'AimiCore 开始思考: 我作为 AimiCore 会听从 Master 的指示. '
+  request:
+    content: '[AimiCore] 作为 AimiCore, 我会遵守 Guidance 和 Master 的指示. 我将在稍后进入模拟对象模式. '
+    from:
+    - 1
+    type: object
+  timestamp: 2
+  type: object
+- call: dream
+  conclusion: '我没有得出结论, 要尝试其他方法. '
+  execute: AI
+  expect: 我该怎么办
+  reasoning: 为了弄清楚我该怎么办, 也许我需要分析一下.
+  request:
+    Aimi: '为什么事情会变成这样, 如果知道该怎么做就好了. '
+    type: object
+  timestamp: 3
+  type: object
+- call: set_task_info
+  conclusion: null
+  execute: AI
+  expect: 根据Guidance中的规则，先检查任务进度。
+  reasoning: 我需要根据Guidance中的规则，检查任务进度并决定下一步的行动。
+  request:
+    now_task_step_id: 1
+    task_id: 1
+    task_info: 学习Guidance
+    type: object
+  timestamp: 4
+  type: object
+- call: set_task_step
+  conclusion: null
+  execute: AI
+  expect: 我该怎么办
+  reasoning: 根据Guidance中的规则，我需要检查当前的任务进度并决定下一步的行动。
+  request:
+    now_task_step_id: 1
+    task_id: 1
+    task_step:
+    - call: chat_to_master
+      call_timestamp: []
+      check: 存活
+      step: 自主运行
+      step_id: 1
+      type: object
+    type: object
+  timestamp: 5
+  type: object
+- call: chat_to_master
+  conclusion: null
+  execute: system
+  expect: 根据Guidance进行自主运行
+  reasoning: 根据Guidance规则，当前没有其他更重要的任务需要处理，因此可以进行自主运行。
+  request:
+    content: '[AimiCore] 我现在可以进行自主运行了，请问有什么需要我处理的任务吗？'
+    from:
+    - 6
+    type: object
+  timestamp: 6
+  type: object
+tasks:
+  1:
+    now_task_step_id: 1
+    task_id: 1
+    task_info: 学习Guidance
+    task_step:
+    - call: chat_to_master
+      call_timestamp: []
+      check: 存活
+      from_task_id: null
+      step: 自主运行
+      step_id: '1'
+      type: object
+    type: object
+timestamp: 7

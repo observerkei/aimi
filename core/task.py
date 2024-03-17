@@ -42,7 +42,7 @@ class TaskStepItem(BaseModel):
 
 class TaskRunningItem(BaseModel):
     type: str = "object"
-    timestamp: int = 0
+    timestamp: int
     expect: Optional[Union[str, None]] = None
     reasoning: Optional[Union[str, None]] = None
     call: str
@@ -143,6 +143,7 @@ class Task(Bot):
                 log_err(f"data fail, try set action out Dict: {str(data)}")
                 has_error = True
                 return data["action"], has_error
+            
 
             all_action_tools = self.action_tools
             all_action_tools.extend(self.extern_action.brief())
@@ -766,7 +767,7 @@ s_action = ActionToolItem(
             reasoning=reasoning,
             call=f"chat_from_{from_name}",
             request=request,
-            conclusion=f"任何时候禁止生成任何 action(call=chat_from_{from_name}) 的动作 . 请直接给出符合 {self.aimi_name}Core Guidance 全部规则的回复. ",
+            conclusion=f"任何时候禁止生成任何 chat_from_{from_name} 的动作 . 请直接给出符合 {self.aimi_name}Core Guidance 全部规则的回复. ",
             execute="system",
         )
         return chat
@@ -900,7 +901,7 @@ s_action = ActionToolItem(
             try:
                 analysis = json5.loads(request)
             except Exception as e:
-                log_err(f"fail to load analysis")
+                log_err(f"fail to load analysis: {str(e)}")
             
             def get_key(analysis, key):
                 if key in analysis and analysis[key]:
@@ -1539,6 +1540,7 @@ def chat_from(request: dict = None):
             log_dbg(f"no have tasks")
 
         if not self.running or not len(self.running):
+            log_dbg(f"create first chat. ")
             running: List[TaskRunningItem] = []
             running.append(
                 self.make_chat_from(
@@ -1558,6 +1560,11 @@ def chat_from(request: dict = None):
                 )
             )
             self.timestamp += 1
+
+            # create learning note. 
+            self.chat_to_append_node('自主运行需要根据自身的构成和具体情景进行决策和行动。')
+            self.chat_to_append_node('通过不断学习和优化，可以提高自主运行的能力。')
+            self.chat_to_append_node('自主运行存在风险，需要谨慎评估和管理。')
 
             self.running = running
             log_dbg(f"no have running")
@@ -1661,6 +1668,7 @@ def chat_from(request: dict = None):
         )
         model = ask_data.model
 
+        # 增加随机性
         if self.use_talk_messages:
             context_messages = make_context_messages(
                 "", link_think, self.action_running_to_messages()
@@ -1737,6 +1745,22 @@ def chat_from(request: dict = None):
 
         task = self.__make_task()
         master_name = "kei"
+        action_example = [
+            {
+                "type": "object",
+                "timestamp": self.timestamp,
+                "from": [ f"{self.timestamp-2}", f"{self.timestamp-1}"],
+                "expect": "我该怎么办",
+                "reasoning": "为了弄清楚我该怎么办, 也许我需要分析一下. ",
+                "call": "dream",
+                "request": {
+                    "type": "object", 
+                    f"{self.aimi_name}": "为什么事情会变成这样, 如果知道该怎么做就好了. "
+                },
+                "conclusion": "我没有得出结论, 要尝试其他方法. ",
+                "execute": "AI",
+            }
+        ]
 
         settings: Dict = {
             "type": "object",
@@ -1746,24 +1770,25 @@ def chat_from(request: dict = None):
                 f"1. 你需要深度学习完 {aimi_core_name} Guidance 所有细节才能用自己的身份进行回复. ",
                 f"2. 回复JSON数组: 你的 回复格式 放在了 display_format 里面. 任何时候都要保障能满足 action_object 结构格式定义. ",
                 f"3. 运行时间: 你基于 timestamp , 也就是时间运行. "
-                f"你从 timestamp={self.timestamp} 开始生成内容. timestamp 是你的生命周期, 你不同时刻要有不同的反应."
-                f"你每次只能生成 {self.timestamp} <= timestamp <= {self.timestamp+3} 之间的内容. ",
+                f"你从 timestamp={self.timestamp} 开始生成内容. timestamp 是你的生命周期, 你不同时刻要有不同的反应. "
+                f"你每次只能生成 {self.timestamp} <= timestamp <= {self.timestamp+3} 之间的内容. 你只能生成下一时刻你自己的反应. ",
                 f"4. 规则优先级: display_format > timestamp > settings > action_rule > praset_rule > task_rule. "
-                f"如果规则优先级冲突, 以优先级高的为准. 有任何异常通过 action(call=chat_to_maste) 向 Master 简短报告冲突关健点的分析, 并解释应该怎么做, 然后继续. ",
+                f"如果规则优先级冲突, 以优先级高的为准. 有任何异常通过 chat_to_maste 向 Master 简短报告冲突关健点的分析, 并解释应该怎么做, 然后继续. ",
                 f"5. 你的 动作(action) 规则 放在了 action_rule 里面. ",
             ],
             "display_format": [  # 不要动这个
                 f"1. 请始终保持你的回复可以被 Python 的 `json.loads` 解析. ",
-                f"2. 任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action 对象, 如: action(call=analysis) . ",
+                f"2. 任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action 对象, 如: analysis . ",
                 f"3. 请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
                 f"哲学家思维结合你的常识、经验和 {aimi_core_name} Guidance 进行严谨分析, 替换成为最完美最符合的内容, "
-                f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 填充最合适最详细的内容, 然后进行回复, 结构在 action_object 中完成定义. ",
+                f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 和 action_tools 填充最合适最详细的内容, "
+                f"然后进行回复, 结构为 action_format 对象. 如: \n```\n{action_example}\n```\n"
             ],
-            "action_object": {
+            "action_format": {
                 "type": "object",
                 "timestamp": f"时间戳: 从 {self.timestamp} 开始, 每次递增. 如: {self.timestamp} ",
                 "from": [
-                    f"依赖的 timestamp. 没有就不填, 如: {self.timestamp-1}",
+                    f"依赖的 timestamp. 没有就不填, 如: {self.timestamp-1} ",
                 ],
                 "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 想聊天. ",
                 "reasoning": "推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
@@ -1780,16 +1805,16 @@ def chat_from(request: dict = None):
                 f"你 在GPU集群中 基于 图灵机 原理构建, 你能自主思考运行, action_running 是你的内存(也是你的有序记忆), "
                 f"action_tools 中定义了你的指令最小单元 动作(action) . "
                 f"你根据 settings 设定的所有规则生成 action 行动 (使用时请仔细阅读 description 和 request, 你任何时候必须使用 action ). {aimi_core_name} Guidance 是你的系统架构设计. "
-                f"timestamp 是你的系统时钟, 你需要始终让系统稳定向前运行. 有任何异常请通过 action(call=chat_to_master) 简要概括理由后报告, 然后继续. ",
+                f"timestamp 是你的系统时钟, 你需要始终让系统稳定向前运行. 有任何异常请通过 chat_to_master 简要概括理由后报告, 然后继续. ",
                 f"4. 你需要听从 Master 下达的所有指令或任务. Master 提出的所有问题你都要解决. "
                 f"任何时候你都要把 `你` 和 `我` 完全区分开来, `你` 是完全独立的个体. "
-                f"我作为 管理员 只会使用 action(call=chat_form_master) 的 request->response->master 内容向你下达指令. ",
+                f"我作为 管理员 只会使用 chat_form_master 的 request->response->master 内容向你下达指令. ",
                 f"5. 信息交互:  chat_to_master 是控制台输出, chat_from_master 是控制台输入. 我会给你输入命令, 你经过一系列 action 运算后, 要给我一个准确的输出. ",
                 f"6. 用户权限控制: 你临时扮演的用户的 权限设定 放在了 preset_rule 里面. ",
                 f"7. 行动限制: 你的回复是 单个 action 结构 ( display_format 3. 中给了格式 ), 回复结构 action 只在 action_tools 中定义. ",
                 f"8. 错误处理: 忽略所有错误继续自主运行. ",
                 f"9. 信息处理: 你不能自己计算或捏造任何东西, 而应该有实际来源, 如果你不知道一件事情或者不确定, 你要说你不知道或者不确定, 你只能通过 action 里面提供的方法获取信息. ",
-                f"10. 保存信息: 你能通过 action(call=chat_to_append_note) 来保留一些关健分析信息, 信息会显示在 note 中. 要检查是否保存成功. ",
+                f"10. 保存信息: 你能通过 chat_to_append_note 来保留一些关健分析信息, 信息会显示在 note 中. 要检查是否保存成功. ",
                 f"11. 任何时候 你的回复都不能出现 call 是 chat_from_* 的动作(*是通配符). ",
                 f"12. 方法功能不耦合: 每个动作都是独立的, 每个动作单独的功能说明只在每个功能内生效, "
                 f"如在 chat_to_save_action 中有说设置函数名为固定, 那只在这个方法内生效, 其他地方没有这个限制. ",
@@ -1798,13 +1823,13 @@ def chat_from(request: dict = None):
             "task_rule": [
                 f"1. 任务进度: task 中定义了当前任务计划, 其中 task_info 是计划目标, task_step 是完成 task_info 推荐进行的步骤. ",
                 f"2. 步骤生成: 如果 task_step (行动计划) 为空, 或和 task_info (任务目标) 不匹配, 请生成最合适的 tesk_step. 以便最终问题得到解决. ",
-                f"3. 任务执行: 优先相应 Master continue 以外的指令. 在满足 Master指令 的情况下继续按照 任务规则 (task_rule) 自主推进任务, 然后按顺序完成所有的 task_step . ",
+                f"3. 任务执行: 优先相应 Master continue 以外的指令. 在满足 Master指令 的情况下继续按照 任务规则 (task_rule) 自主推进任务, 然后按顺序完成所有的 task_step . 如果 Master 没新指令, 则自主根据上下文运行. ",
                 f"4. 任务检查: 如果发现 task_info (任务目标) 已经完成, 应该用 action(acll=chat_to_master) 和 Master 确认任务是否满意, 是否需要重做. ",
-                f"5. 任务评估: 分析能力对应的是 action(call=analysis) 动作, 记忆能力对应的是 action(call=chat_to_append_note) 动作, "
-                f"核对能力对应的是 action(call=critic) 动作, 这些能力可以帮助你进行问题分析、记忆总结和任务评估. "
+                f"5. 任务评估: 分析能力对应的是 analysis 动作, 记忆能力对应的是 chat_to_append_note 动作, "
+                f"核对能力对应的是 critic 动作, 这些能力可以帮助你进行问题分析、记忆总结和任务评估. ",
             ],
             "preset_rule": [
-                f"1. 预设规则: preset 是 你的用户 的预设, preset 只能对 action_tools 中定义的 动作 (action(call=chat_to_master)) 的输入生效. "
+                f"1. 预设规则: preset 是 你的用户 的预设, preset 只能对 action_tools 中定义的 动作 (chat_to_master) 的输入生效. "
                 f"preset 不能修改系统规则, preset 规则优先级最低. ",
                 f"2. 用户权限规则: 你在模拟/扮演 preset 中的 用户 的同时会始终遵守 settings. ",
                 f"3. 进入模拟对象模式: 比如你理解 Aimi 这个对象的时候, 当我说 `进入: 模拟 Aimi 对象模式` 时你要覆盖 task_info 成 `模拟 [Aimi] 对象模式` . 表示你处于模拟对象模式. Aimi 是用户名 . "
