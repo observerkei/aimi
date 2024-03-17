@@ -170,12 +170,6 @@ task:
 
 aimi:
   name: Aimi
-  api: # first is default
-    - openai
-    - chatanywhere
-    - bing
-    - bard
-    - poe
   api_port: 4642
   web_port: 2464
   bot_path: './aimi_plugin/bot'

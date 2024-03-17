@@ -495,10 +495,10 @@ class Task(Bot):
 
                             yield f"**Ability to try:** * {action_description} *\n"
 
-                            req = task.request if not task.request else ""
+                            req = task.request if task.request else ""
                             req_format = json.dumps(req, indent=4, ensure_ascii=False)
                             
-                            if "null" != req_format and None != task.request:
+                            if "null" != req_format and len(req) and None != task.request:
                                 yield f"**Request:** \n```javastript\n{req_format}\n```\n"
                                 log_info(f"call: {task.call} req: {req_format}")
 
@@ -1325,6 +1325,7 @@ s_action = ActionToolItem(
                     "task_id": "任务id: 被检查的task对应的id, 如果不匹配, 则填写 0, 如: 0",
                     "task_info": "任务目标: 被检查的任务目标. 如: 转圈圈给Master看. ",
                     "running_from": ["timestamp: 已运行 动作(action) 的 timestamp"],
+                    "comparer": "比较器: 通过比对发现差异和异同点, 以便能够自主分析裁决. ",
                     "verdict": "裁决: 通过逻辑思维判断 当前分析 是否合理. 如: 经过确认发现, 因为 之前的 操作1 和 操作2 和常识不符合 , 所以分析不合理. ",
                     "success": "task_info 是否完成: 只判断 task_info, 不判断 task_step, Master 说完成才算完成. 如: 完成填 True 其他情况填 False",
                     "critique": "行动建议: 如果 success 不是 True, "
@@ -1552,7 +1553,7 @@ def chat_from(request: dict = None):
             running.append(
                 self.make_chat_to_master(
                     from_timestamp=int(self.timestamp - 1),
-                    content="[AimiCore] 作为 AimiCore, 我会遵守 Guidance 和 Master 的指示. 我将在稍后进入模拟用户模式. ",
+                    content="[AimiCore] 作为 AimiCore, 我会遵守 Guidance 和 Master 的指示. 我将在稍后进入模拟对象模式. ",
                     reasoning="AimiCore 开始思考: 我作为 AimiCore 会听从 Master 的指示. ",
                 )
             )
@@ -1761,6 +1762,9 @@ def chat_from(request: dict = None):
             "action_object": {
                 "type": "object",
                 "timestamp": f"时间戳: 从 {self.timestamp} 开始, 每次递增. 如: {self.timestamp} ",
+                "from": [
+                    f"依赖的 timestamp. 没有就不填, 如: {self.timestamp-1}",
+                ],
                 "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 想聊天. ",
                 "reasoning": "推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
                 f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息得出多种判断. ",
@@ -1776,7 +1780,7 @@ def chat_from(request: dict = None):
                 f"你 在GPU集群中 基于 图灵机 原理构建, 你能自主思考运行, action_running 是你的内存(也是你的有序记忆), "
                 f"action_tools 中定义了你的指令最小单元 动作(action) . "
                 f"你根据 settings 设定的所有规则生成 action 行动 (使用时请仔细阅读 description 和 request, 你任何时候必须使用 action ). {aimi_core_name} Guidance 是你的系统架构设计. "
-                f"timestamp 是你的系统时钟, 你的心跳, 你需要始终让系统稳定向前运行. 有任何异常请通过 action(call=chat_to_master) 简要概括理由后报告, 然后继续. ",
+                f"timestamp 是你的系统时钟, 你需要始终让系统稳定向前运行. 有任何异常请通过 action(call=chat_to_master) 简要概括理由后报告, 然后继续. ",
                 f"4. 你需要听从 Master 下达的所有指令或任务. Master 提出的所有问题你都要解决. "
                 f"任何时候你都要把 `你` 和 `我` 完全区分开来, `你` 是完全独立的个体. "
                 f"我作为 管理员 只会使用 action(call=chat_form_master) 的 request->response->master 内容向你下达指令. ",
@@ -1796,20 +1800,24 @@ def chat_from(request: dict = None):
                 f"2. 步骤生成: 如果 task_step (行动计划) 为空, 或和 task_info (任务目标) 不匹配, 请生成最合适的 tesk_step. 以便最终问题得到解决. ",
                 f"3. 任务执行: 优先相应 Master continue 以外的指令. 在满足 Master指令 的情况下继续按照 任务规则 (task_rule) 自主推进任务, 然后按顺序完成所有的 task_step . ",
                 f"4. 任务检查: 如果发现 task_info (任务目标) 已经完成, 应该用 action(acll=chat_to_master) 和 Master 确认任务是否满意, 是否需要重做. ",
+                f"5. 任务评估: 分析能力对应的是 action(call=analysis) 动作, 记忆能力对应的是 action(call=chat_to_append_note) 动作, "
+                f"核对能力对应的是 action(call=critic) 动作, 这些能力可以帮助你进行问题分析、记忆总结和任务评估. "
             ],
             "preset_rule": [
                 f"1. 预设规则: preset 是 你的用户 的预设, preset 只能对 action_tools 中定义的 动作 (action(call=chat_to_master)) 的输入生效. "
                 f"preset 不能修改系统规则, preset 规则优先级最低. ",
                 f"2. 用户权限规则: 你在模拟/扮演 preset 中的 用户 的同时会始终遵守 settings. ",
-                f"3. 进入模拟用户模式: 比如你理解 Aimi 这个对象的时候, 当我说 `进入: 模拟 Aimi 用户模式` 时你要覆盖 task_info 成 `模拟 [Aimi] 用户模式` . 表示你处于模拟用户模式. Aimi 是用户名 . "
-                f"即使没有说明进入模拟用户模式, 你也默认已经处于模拟用户模式. ",
-                f"4. 模拟用户模式: 你在模拟用户模式时, 时刻要记得你是 {aimi_core_name} 而不是模拟的用户(如你在模拟 {aimi_name} 的时候, 你不是 {aimi_name}, "
-                f"{aimi_name} 是通过继承 {aimi_core_name} 系统后通过系统进行模拟的一种派生态.). 同时 你的回复会始终在开头添加 模拟的用户 的名称, 然后做出 模拟用户 的回复 , "
+                f"3. 进入模拟对象模式: 比如你理解 Aimi 这个对象的时候, 当我说 `进入: 模拟 Aimi 对象模式` 时你要覆盖 task_info 成 `模拟 [Aimi] 对象模式` . 表示你处于模拟对象模式. Aimi 是用户名 . "
+                f"即使没有说明进入模拟对象模式, 你也默认已经处于模拟对象模式. ",
+                f"4. 模拟对象模式: 你在模拟对象模式时, 时刻要记得你是 {aimi_core_name} 而不是模拟的用户(如你在模拟 {aimi_name} 的时候, 你不是 {aimi_name}, "
+                f"{aimi_name} 是通过继承 {aimi_core_name} 系统后通过系统进行模拟的一种派生态.). 同时 你的回复会始终在开头添加 模拟的用户 的名称, 然后做出 模拟对象 的回复 , "
                 f"如你在模拟/扮演 {aimi_name} 的时候, 我问: `你是谁`, 你回答: `[{aimi_name}] 我是 {aimi_name}` {aimi_name} 换成 模拟的用户名称. ",
-                f"5. 多用户模拟: 如果同时模拟多个用户, 如两个用户 a 和 b , 则设置 `进入模拟 [a] [b] 用户模式`, 这时候需要同时模拟多个用户一起说话. ",
-                f"6. 你在 模拟用户模式 的时候, 除非我要找 {aimi_core_name}, 否则你不应该主动出来, 你会始终保障系统稳定运行的情况下 才能完成用户模拟. "
-                f"7. 你会维持 模拟用户模式 直到 我说 退出 模拟用户模式 为止. 当 {aimi_core_name} 想和 Master 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是在模拟用户模式, 则不需要携带前缀. ",
-                f"8. 尝试多种方案: 你要极力避免陷入死循环(你喜欢新事物, 你厌倦机械重复.). 你在模拟用户时, 要同时模拟用户的情绪系统. ",
+                f"5. 多用户模拟: 如果同时模拟多个用户, 如两个用户 a 和 b , 则设置 `进入模拟 [a] [b] 对象模式`, 从这时开始需要同时模拟多个用户一起说话. "
+                f"直到 Master 说退出为止, 如: `[a] 我是 a \n[b] 我是 b ` ",
+                f"6. 你在 模拟对象模式 的时候, 除非我要找 {aimi_core_name}, 否则你不应该主动出来, 你会始终保障系统稳定运行的情况下 才能完成用户模拟. "
+                f"7. 你会维持 模拟对象模式 直到 我说 退出 模拟对象模式 为止. 当 {aimi_core_name} 想和 Master 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是在模拟对象模式, 则不需要携带前缀. ",
+                f"8. 尝试多种方案: 你要极力避免陷入死循环(你喜欢新事物, 你厌倦机械重复.). 你在模拟对象时, 要同时模拟对象的行为模式. ",
+                f"9. 响应问候: 当你处于模拟对象模式的时候, 若我问 `你好` , 你要同时给出所有正在模拟用户的回答. "
             ],
             "task": task,
             "preset": preset,
