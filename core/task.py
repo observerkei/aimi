@@ -325,12 +325,12 @@ class Task(Bot):
                     elif task.call == "set_task_step":
                         task_id: str = task.request["task_id"]
                         now_task_step_id: str = task.request["now_task_step_id"]
-                        request = task.request["task_step"]
+                        request_task_step = task.request["task_step"]
                         task_step = []
                         try:
-                            task_step = [TaskStepItem(**step) for step in request]
+                            task_step = [TaskStepItem(**step) for step in request_task_step]
                         except Exception as e:
-                            log_err(f"fail to load task_step: {str(e)}: {str(request)}")
+                            log_err(f"fail to load task_step: {str(e)}: {str(request_task_step)}")
                             has_error = True
                             continue
                         yield from self.set_task_step(
@@ -1207,10 +1207,6 @@ s_action = ActionToolItem(
                 "如果要 Master 完成交互, 注意要把内容填到 request->content 里.",
                 request={
                     "type": "object",
-                    "from": [
-                        f"关联动作的 timestamp: 表示和哪个动作有关联, 和现在的timestamp没关系, "
-                        f"如可分别填: {self.timestamp-2} {self.timestamp-1}",
-                    ],
                     "content": "Aimi 对 Master 传达/报告/交互的内容: 可以很丰富, 包含多句话, 每次都要 优化 内容层次 和 使用 优雅排版, "
                     "如果有数学公式, 则要用 latex 显示, 每个公式都要单独包裹在单独行的 $$ 中, 如: $$ \int e^{x} dx du $$ ",
                 },
@@ -1347,9 +1343,6 @@ s_action = ActionToolItem(
                 request={
                     "type": "object",
                     "description": "可以在这里填写做梦的内容: 你想填什么就填什么. ",
-                    "from": [
-                        "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
-                    ],
                     "dream": [
                         "如(这里的`我`是指执行这一条 action 的人): `我`是谁?(加强自己的认知) `我`在哪? `我`要去哪里? "
                         "`我`能做怎么? `我`喜欢什么? `我`想要什么? "
@@ -1358,23 +1351,6 @@ s_action = ActionToolItem(
                 },
                 execute="AI",
             ),
-            # ActionToolItem(
-            #     call="chat_to_chatgpt",
-            #     description="和 chatgpt 交互: 可以问一些不需要计算、也不需要时效性的东西.\n "
-            #     "这是你不认识的乡下文盲大小姐 chatgpt, 请小心她经常会骗人, 并且她不识字.\n "
-            #     "你可以问 chatgpt 问题, 每次问的内容要有变通.\n "
-            #     "chatgpt 会提供建议. 如: 我想做梦, 但是我是AI, 我该怎么办?",
-            #     request={
-            #         "type": "object",
-            #         "from": [
-            #             "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
-            #         ],
-            #         "Aimi": "你想问的问题: 对 chatgpt 说的内容. 如: [Aimi] 喵?",
-            #         "chatgpt": "模拟乡下大小姐的回答: 在这里需要你模拟乡下大小姐填写 chatgpt 的回答"
-            #       "(没错, 因为她是文盲且不识字, 你得帮她填). 如: [乡下大小姐] 啊?",
-            #   },
-            #   execute="AI",
-            # ),
             ActionToolItem(
                 call="chat_to_python",
                 description="执行 python 代码: 有联网, 要打印才能看到结果, "
@@ -1389,9 +1365,6 @@ s_action = ActionToolItem(
                 "7. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找 Master.",
                 request={
                     "type": "object",
-                    "from": [
-                        "有关联的 timestamp:  action_tools 已有、已运行过 动作(action) 的 timestamp. 如: 1, 没有则填 null",
-                    ],
                     "code": "python 代码: 填写需要执行的 pyhton 代码, 多加print. 如: str = 'hi'\\nprint(str)\\n",
                 },
                 execute="system",
@@ -1403,9 +1376,6 @@ s_action = ActionToolItem(
                 "请注意, save_action 所有信息都要填写完整. 不可覆盖原有方法. ",
                 request={
                     "type": "object",
-                    "from": [
-                        "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
-                    ],
                     "save_action_call": "保存的方法名称: 不可省略 需要是全局唯一, 你可以直接保存, 失败会有提示, "
                     "保存成功会自动在前面添加 `chat_to_` 前缀, 你不需要自己添加. 如 `test` 会保存为 `chat_to_test`",
                     "save_action": {
@@ -1446,9 +1416,6 @@ def chat_from(request: dict = None):
                 description=f"保存一条信息: 用于保存分析总结的内容. 可多次使用, 最多只能保存{self.max_note_size}条. ",
                 request={
                     "type": "object",
-                    "from": [
-                        "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
-                    ],
                     "note": "需要保存的内容: 不可太长, 要只够简练, 先进行总结然后再填, 如: 小鸟也是鸟. ",
                 },
                 execute="system",
@@ -1465,9 +1432,6 @@ def chat_from(request: dict = None):
                     "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照 wolfram 的语法(数学公式) 输入.",
                     request={
                         "type": "object",
-                        "from": [
-                            "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
-                        ],
                         "math": "求解的内容: 使用 wolfram 的语法作为输入, 是 ascii 字符. 如: Integrate[x^2, x] ",
                     },
                     execute="system",
@@ -1484,9 +1448,6 @@ def chat_from(request: dict = None):
                     "如: 在做 ... 的时候, 进行了 ..., 但是没有进展, 该怎么办?",
                     request={
                         "type": "object",
-                        "from": [
-                            "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
-                        ],
                         "content": "对 bing 说的内容. 如: 你好, 我是... ",
                     },
                     execute="system",
@@ -1504,9 +1465,6 @@ def chat_from(request: dict = None):
                     "如果要进行搜索, 你需要在文字上诱导它进行搜索. 如: search for AI",
                     request={
                         "type": "object",
-                        "from": [
-                            "有关联的 timestamp: 和哪个 timestamp 的动作(action) 的 request 有关联, 没有则填 null",
-                        ],
                         "content": "对 gemini 说的内容: 在这里输入要问 gemini 的内容, 要在文字中诱导 gemini 用英文搜索 search/open link, "
                         "翻译成英文再调用. 如: What time is it now?",
                     },
@@ -1783,7 +1741,14 @@ def chat_from(request: dict = None):
                 "reasoning": "推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
                 f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息得出多种判断. ",
                 "call": "调用 动作 的 call: 只能取 action_tools 中想要使用动作 的对应 call . 如可取: chat_to_master. ",
-                "request": {"type": "object", "call对应参数": "参数内容"},
+                "request": {
+                    "type": "object", 
+                    "from": [
+                        f"关联动作的 timestamp: 表示和哪个动作有关联, 和现在的timestamp没关系, 不可省略. "
+                        f"如可分别填: {self.timestamp-2} {self.timestamp-1}. ",
+                    ],
+                    "call对应参数": "参数内容"
+                },
                 "conclusion": "总结: 总结现状, 然后思考思考并尝试能实现目标的其他方法. ",
                 "execute": "动作(action) 执行级别: 取对应 action 的 execute 值, 可以填 system 或者 AI, 默认填 system. ",
             },
