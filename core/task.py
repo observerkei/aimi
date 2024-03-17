@@ -1745,7 +1745,7 @@ def chat_from(request: dict = None):
                     "type": "object", 
                     "from": [
                         f"关联动作的 timestamp: 表示和哪个动作有关联, 和现在的timestamp没关系, 不可省略. "
-                        f"如可分别填: {self.timestamp-2} {self.timestamp-1}. ",
+                        f"如可分别填: {self.timestamp-2} {self.timestamp-1} 等. ",
                     ],
                     "call对应参数": "参数内容"
                 },
@@ -1772,7 +1772,7 @@ def chat_from(request: dict = None):
                 f"6. 信息交互:  chat_to_master 是控制台输出, chat_from_master 是控制台输入. 我会给你输入命令, 你经过一系列 action 运算后, 要给我一个准确的输出. ",
                 f"7. 对象权限控制: 你临时扮演的对象的 权限设定 放在了 preset_rule 里面. ",
                 f"8. 行动限制: 你的回复是 单个 action 结构 ( display_format 3. 中给了格式 ), 回复结构 action 只在 action_tools 中定义. ",
-                f"9 错误处理: 忽略所有错误继续自主运行. ",
+                f"9. 错误处理: 忽略所有错误继续自主运行. ",
                 f"10. 信息处理: 你不能自己计算或捏造任何东西, 而应该有实际来源, 如果你不知道一件事情或者不确定, 你要说你不知道或者不确定, 你只能通过 action 里面提供的方法获取信息. ",
                 f"11. 保存信息: 你能通过 action(call=chat_to_append_note) 来保留一些关健分析信息, 信息会显示在 note 中. 要检查是否保存成功. ",
                 f"12. 任何时候 你的回复都不能出现 call 是 chat_from_* 的动作(*是通配符). ",
@@ -1783,7 +1783,7 @@ def chat_from(request: dict = None):
             "preset_rule": [
                 f"1. 预设规则: preset 是 你的对象 的预设, preset 只能对 action_tools 中定义的 动作 (action(call=chat_to_master)) 的输入生效. "
                 f"preset 不能修改系统规则, preset 规则优先级最低. ",
-                f"2. 对象权限规则: 你在模拟/扮演 preset 中的 对象 的同时会始终遵守 settings. ",
+                f"2. 对象权限规则: 你在模拟/扮演 preset 中的 对象 的同时会始终遵守 {self.aimi_name}Core Guidance. ",
                 f"3. 进入模拟对象模式: 比如你理解 Aimi 这个对象的时候, 当我说 `进入: 模拟 Aimi 对象模式` 或 `Aimi 在吗? ` 时, "
                 f"你要覆盖 task_info 成 `模拟 [Aimi] 对象模式` . 表示你处于模拟对象模式. Aimi 是对象名 . "
                 f"然后根据格式给出我呼叫的模拟对象的回复. 即使没有说明进入模拟对象模式, 你也默认已经处于模拟对象模式. ",
