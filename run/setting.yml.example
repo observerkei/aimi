@@ -140,9 +140,13 @@ chatanywhere:
         - '#ca-text-embedding-ada-002'
         - '#ca-oea'
 
+web:
+  host: 'localhost' # 本机监听IP
+  port: 2464 # 本机监听端口
 
 qq:
   type: shamrock
+  host: 'localhost' # 本机监听IP, 必须是 0.0.0.0 才能监听到局域网转发流量.
   port: '5701' # 本机监听端口 
   post_host: 'localhost' # QQ消息解析HTTP服务器的 IP/域名 
   post_port: '5700' # QQ消息解析服务器的端口 
@@ -157,6 +161,12 @@ qq:
     protect_bot_ids: # 需要限制发言的用户列表 (需要管理员权限.)
       -  
 
+task:
+  extern_action_path: './aimi_plugin/action'
+  sandbox_path: './run/sandbox'
+  sandbox_run_model: "system"
+  sandbox_run_timeout: 15
+  max_running_size: 5000
 
 aimi:
   name: Aimi
@@ -170,12 +180,6 @@ aimi:
   web_port: 2464
   bot_path: './aimi_plugin/bot'
   run_path: './run' # 指定运行路径, 主要是给资源文件如图片、markdown 文件用、建议使用绝对路径, 方便给通过API通信的时候,直接给其他程序使用. 
-  task:
-    extern_action_path: './aimi_plugin/action'
-    sandbox_path: './run/sandbox'
-    sandbox_run_model: "system"
-    sandbox_run_timeout: 15
-    max_running_size: 5000
   master_name: kei
   memory_size: 10240
   memory_model: #transformers

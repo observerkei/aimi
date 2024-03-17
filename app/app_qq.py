@@ -601,9 +601,8 @@ class AppQQ:
 
         from gevent import pywsgi
 
-        # flask 框架的限制, 必须是 0.0.0.0 才能监听到转发流量.
         self.http_server = pywsgi.WSGIServer(
-            listener=("0.0.0.0", self.port), application=self.app
+            listener=(self.host, self.port), application=self.app
         )
         self.http_server.serve_forever()
 
@@ -641,6 +640,12 @@ class AppQQ:
             log_err(f"fail to load qq: {e}")
             self.response_group_ids = set()
 
+        try:
+            self.host = setting["host"]
+        except Exception as e:
+            log_err(f"fail to load host: {e}")
+            self.port = '0.0.0.0'
+        
         try:
             port = setting["port"]
             self.port = int(port)

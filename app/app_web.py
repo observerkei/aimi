@@ -81,21 +81,39 @@ class Models(BaseModel):
 
 
 class AppWEB:
-    api_host: str = "localhost"
-    api_port: int = 4642
+    api_host: str
+    api_port: int
     app: Any
     http_server: Any
     ask_hook: Any
     models: Dict
     session: Session
     get_all_models_hook: Any
+    setting: Dict = {}
 
-    def __init__(self, session, ask, get_all_models):
+    def __init__(self, setting, session, ask, get_all_models):
+        self.__load_setting(setting)
+        
         self.session = session
         self.ask_hook = ask
         self.get_all_models_hook = get_all_models
         self.__listen_init()
         log_dbg("web init done")
+
+    def __load_setting(self, setting):
+        self.setting = setting
+        
+        try:
+            self.host = setting['host']
+        except Exception as e:
+            self.host = 'localhost'
+            log_dbg(f'fail to load setting: {e}')
+
+        try:
+            self.port = setting['port']
+        except Exception as e:
+            self.port = setting['port']
+            log_dbg(f"fail to load setting: {e}")
 
     def __make_model_info(self, model, owned_by) -> ModelInfo:
         def __make_model_info_permission() -> ModelInfoPermission:
@@ -426,7 +444,7 @@ class AppWEB:
         from gevent import pywsgi
 
         self.http_server = pywsgi.WSGIServer(
-            listener=(self.api_host, self.api_port), application=self.app, log=None
+            listener=(self.host, self.port), application=self.app, log=None
         )
 
         log_info("web start")

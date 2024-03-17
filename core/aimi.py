@@ -138,6 +138,7 @@ class Aimi:
     md: Md
     memory: Memory
     task_setting: Dict = {}
+    web_setting: Dict = {}
     app_web: AppWEB
     app_qq: AppQQ
     __session: Session
@@ -158,6 +159,7 @@ class Aimi:
         self.__session = Session(self.__session_setting)
 
         self.app_web = AppWEB(
+            setting=self.web_setting,
             session=self.session, 
             ask=self.web_ask, 
             get_all_models=self.get_all_models)
@@ -575,10 +577,17 @@ class Aimi:
             self.aimi_name = "Aimi"
 
         try:
-            self.task_setting = setting["task"]
+            self.task_setting = Config.load_setting(ChatBotType.Task)
         except Exception as e:
             log_err(f"fail to load aimi: {e}")
             self.task_setting = {}
+        
+        
+        try:
+            self.web_setting = Config.load_setting("web")
+        except Exception as e:
+            log_err(f"fail to load aimi: {e}")
+            self.web_setting = {}
 
         try:
             self.master_name = setting["master_name"]
