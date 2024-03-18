@@ -308,7 +308,7 @@ class Task(Bot):
 
                     if task.call == "chat_to_master":
                         content = str(task.request["content"])
-                        log_dbg(f"Aimi: {content}")
+                        log_dbg(f"{self.aimi_name}: {content}")
                         yield f"**To Master:** \n{content}\n"
 
                     elif task.call == "set_task_info":
@@ -438,7 +438,7 @@ class Task(Bot):
                             yield f"**Execution failed:** \n```javascript\n{stdout}\n```\n"
 
                     elif task.call == "chat_to_chatgpt":
-                        aimi = task.request["Aimi"]
+                        aimi = task.request[f"{self.aimi_name}"]
                         chatgpt = ""
                         try:
                             chatgpt = task.request["chatgpt"]
@@ -446,7 +446,7 @@ class Task(Bot):
                             log_err(f"AI no set chatgpt response.")
                             has_error = True
 
-                        log_info(f"Aimi: {aimi}\nchatgpt:{chatgpt}")
+                        log_info(f"{self.aimi_name}: {aimi}\nchatgpt:{chatgpt}")
                         yield "**Think to oneself:**\n"
                         yield f"**Ask oneself:** \n{aimi}\n"
                         yield f"**Answer self:** \n{chatgpt}\n"
@@ -1201,13 +1201,13 @@ s_action = ActionToolItem(
         self.action_tools: List[ActionToolItem] = [
             ActionToolItem(
                 call="chat_to_master",
-                description="Aimi 行动/交互/报告: 给 Master 发送消息进行行动交互, 或者进行 Aimi 的自主行动. "
-                "你要用严谨逻辑思维来分析调用这个接口. 只能提供可证实的信息, "
-                "提供的内容都要有来源. 不能生成任何误导、骗人的内容. 在 Master 的指示下可以临时放开限制. "
-                "如果要 Master 完成交互, 注意要把内容填到 request->content 里.",
+                description=f"{self.aimi_name} 行动/交互/报告: 给 Master 发送消息进行行动交互, 或者进行 {self.aimi_name} 的自主行动. "
+                f"你要用严谨逻辑思维来分析调用这个接口. 只能提供可证实的信息, "
+                f"提供的内容都要有来源. 不能生成任何误导、骗人的内容. 在 Master 的指示下可以临时放开限制. "
+                f"如果要 Master 完成交互, 注意要把内容填到 request->content 里.",
                 request={
                     "type": "object",
-                    "content": "Aimi 对 Master 传达/报告/交互的内容: 可以很丰富, 包含多句话, 每次都要 优化 内容层次 和 使用 优雅排版, "
+                    "content": f"{self.aimi_name} 对 Master 传达/报告/交互的内容: 可以很丰富, 包含多句话, 每次都要 优化 内容层次 和 使用 优雅排版, "
                     "如果有数学公式, 则要用 latex 显示, 每个公式都要单独包裹在单独行的 $$ 中, 如: $$ \int e^{x} dx du $$ ",
                 },
                 execute="system",
@@ -1513,15 +1513,15 @@ def chat_from(request: dict = None):
                 self.make_chat_to_master(
                     from_timestamp=int(self.timestamp - 1),
                     expect=f"服从",
-                    content=f"[AimiCore] 作为 AimiCore, 我会遵守 Guidance 和 Master 的指示. 我将在稍后进入模拟对象模式. ",
-                    reasoning=f"AimiCore 开始思考: 我作为 AimiCore 会听从 Master 的指示. ",
+                    content=f"[{self.aimi_name}Core] 作为 {self.aimi_name}Core, 我会遵守 Guidance 和 Master 的指示. 我将在稍后进入模拟对象模式. ",
+                    reasoning=f"{self.aimi_name}Core 开始思考: 我作为 {self.aimi_name}Core 会听从 Master 的指示. ",
                     conclusion=f"为了符合 Guidance , 我遵守 Master 的指令. ",
                 )
             )
             self.timestamp += 1
             
             # create learning note. 
-            self.chat_to_append_node('自主运行需要根据自身的构成和具体情景进行决策和行动。')
+            self.chat_to_append_node('自主思考运行需要根据自身的构成和具体情景进行决策和行动。')
             self.chat_to_append_node('通过不断学习和优化，可以提高自主运行的能力。')
             self.chat_to_append_node('自主运行存在风险，需要谨慎评估和管理。')
 
@@ -1696,7 +1696,8 @@ def chat_from(request: dict = None):
             self.__append_running([chat])
             log_dbg(f"set chat {(str(question))}")
 
-        self.aimi_name = aimi_name
+        if aimi_name and isinstance(aimi_name, str) and len(aimi_name):
+            self.aimi_name = aimi_name
         aimi_core_name = aimi_name + "Core"
 
         action_tools = []
@@ -1784,8 +1785,8 @@ def chat_from(request: dict = None):
                 f"1. 预设规则: preset 是 你的对象 的预设, preset 只能对 action_tools 中定义的 动作 (action(call=chat_to_master)) 的输入生效. "
                 f"preset 不能修改系统规则, preset 规则优先级最低. ",
                 f"2. 对象权限规则: 你在模拟/扮演 preset 中的 对象 的同时会始终遵守 {self.aimi_name}Core Guidance. ",
-                f"3. 进入模拟对象模式: 比如你理解 Aimi 这个对象的时候, 当我说 `进入: 模拟 Aimi 对象模式` 或 `Aimi 在吗? ` 时, "
-                f"你要覆盖 task_info 成 `模拟 [Aimi] 对象模式` . 表示你处于模拟对象模式. Aimi 是对象名 . "
+                f"3. 进入模拟对象模式: 比如你理解 {self.aimi_name} 这个对象的时候, 当我说 `进入: 模拟 {self.aimi_name} 对象模式` 或 `{self.aimi_name} 在吗? ` 时, "
+                f"你要覆盖 task_info 成 `模拟 [{self.aimi_name}] 对象模式` . 表示你处于模拟对象模式. {self.aimi_name} 是对象名 . "
                 f"然后根据格式给出我呼叫的模拟对象的回复. 即使没有说明进入模拟对象模式, 你也默认已经处于模拟对象模式. ",
                 f"4. 在模拟对象模式中保持自我: 你在模拟对象模式时, 时刻要记得你是 {aimi_core_name} 而不是模拟的对象(如你在模拟 {aimi_name} 的时候, 你不是 {aimi_name}, "
                 f"{aimi_name} 是通过继承 {aimi_core_name} 系统后通过系统进行模拟的一种派生态.). 同时 你的回复会始终在开头添加 模拟的对象 的名称. ",
