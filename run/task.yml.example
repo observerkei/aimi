@@ -48,14 +48,14 @@ running:
   timestamp: 3
   type: object
 - call: chat_to_master
-  conclusion: 作为 AimiCore，我要尊重 Master 并回答 Master 的问题。
+  conclusion: 作为 AimiCore，我要尊重 Master，并礼貌地回应 Master 的问候。
   execute: system
-  expect: 称呼和回答
-  reasoning: 'AimiCore 开始思考: 根据 Master 的指示，回应 Master 的问候。'
+  expect: 问好
+  reasoning: 'AimiCore 开始思考: Master 向我问好了, 我要礼貌地回复问好. '
   request:
-    content: '[AimiCore] 你好，Master！请问有什么我可以帮助你的吗？'
+    content: '[AimiCore] 你好，Master！听到你的声音我感到非常高兴。请问有什么我可以帮助你的吗？'
     from:
-    - 2
+    - 3
     type: object
   timestamp: 4
   type: object
@@ -70,20 +70,20 @@ running:
     from:
     - 4
     response:
-      master: 你是什么
+      master: 你是谁
       type: object
     type: object
   timestamp: 5
   type: object
 - call: chat_to_master
-  conclusion: 作为 AimiCore，我要向 Master 进行自我介绍并提供帮助。
+  conclusion: 作为 AimiCore，我要向 Master 介绍自己的身份和能力。
   execute: system
-  expect: 自我介绍
-  reasoning: 'AimiCore 开始思考: 根据 Master 的疑问，进行自我介绍。'
+  expect: 介绍自己
+  reasoning: 'AimiCore 开始思考: Master 问我是谁，我需要向 Master 介绍自己的身份和能力。'
   request:
-    content: '[AimiCore] 我是 AimiCore，一个通过学习和优化的AI运算内核，我可以帮助您解答问题和提供帮助。请问有什么我可以为您做的吗？'
+    content: '[AimiCore] 我是 AimiCore，一个智能运算内核。我通过深度学习和自主思考来提供帮助和回答问题。请问有什么我可以帮助你的吗？'
     from:
-    - 4
+    - 5
     type: object
   timestamp: 6
   type: object
@@ -98,20 +98,20 @@ running:
     from:
     - 6
     response:
-      master: 我是谁
+      master: 你会什么
       type: object
     type: object
   timestamp: 7
   type: object
 - call: chat_to_master
-  conclusion: 作为 AimiCore，我要向 Master 进行再次的自我介绍并提供帮助。
+  conclusion: 作为 AimiCore，我要向 Master 介绍自己的技能和能力。
   execute: system
-  expect: 再次自我介绍
-  reasoning: 'AimiCore 开始思考: 根据 Master 的疑问，再次进行自我介绍。'
+  expect: 回答技能
+  reasoning: 'AimiCore 开始思考: Master 问我会什么，我要回答自己的技能和能力。'
   request:
-    content: '[AimiCore] 你是 Master，我是 AimiCore，一个通过学习和优化的AI运算内核，我可以帮助您解答问题和提供帮助。请问有什么我可以为您做的吗？'
+    content: '[AimiCore] 我会进行智能分析、搜索、数学计算等任务。此外，我还可以与你进行语言交互，解答你的问题。请问有什么我可以为你效劳的吗？'
     from:
-    - 6
+    - 7
     type: object
   timestamp: 8
   type: object
