@@ -689,7 +689,7 @@ class Task(Bot):
                 log_info(f"\n```python\n{save_action_code}\n```")
 
             save_action_example = f"""
-from core.task import ActionToolItem
+from aimi_plugin.action.type import ActionToolItem
 
 
 s_action = ActionToolItem(
