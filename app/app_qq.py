@@ -576,11 +576,11 @@ class AppQQ:
             if not request.is_json:
                 return make_response("failed", 400)
             msg = request.get_json()
-            log_dbg(f"recv: {msg}")
             if not self.is_message(msg):
-                log_dbg("skip not msg.")
+                log_dbg(f"skip not msg: {msg}")
                 return make_response("skip", 200)
-            log_info("recv msg: " + str(msg))
+            
+            log_dbg("recv msg: " + str(msg))
             if self.need_reply(msg):
                 log_info("need reply, append msg.")
                 self.__message_append(msg)
@@ -591,7 +591,7 @@ class AppQQ:
                 log_info("need check manage msg")
                 self.manage_msg(msg)
             else:
-                log_info("no need reply")
+                log_dbg("no need reply")
 
             return make_response("ok", 200)
 
