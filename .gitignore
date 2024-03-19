@@ -151,6 +151,7 @@ qq_server_data/
 /run/clash
 run/bing_*.json
 run/google_*.json
+run/*cookies.json
 run/setting.yml
 run/memory.yml
 
