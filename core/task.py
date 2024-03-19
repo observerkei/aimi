@@ -1658,9 +1658,7 @@ def chat_from(request: dict = None):
         )
         model = ask_data.model
 
-        # 需要异常调试的时候, 交替两种上下文运行模式以便获取异常信息. 
-        use_debug = False
-        if not use_debug or self.use_talk_messages:
+        if self.use_talk_messages:
             running_messages = self.action_running_to_messages()
             context_messages = make_context_messages("", link_think, running_messages)
 
