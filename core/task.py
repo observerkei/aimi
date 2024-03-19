@@ -65,6 +65,7 @@ class Task(Bot):
     action_tools: List[ActionToolItem] = []
     extern_action: ExternAction
     notes: List[str] = []
+    keep_note_len: int = 0
     execute_system_calls: List[str] = []
     execute_ai_calls: List[str] = []
     now_task_id: str = 1
@@ -72,7 +73,7 @@ class Task(Bot):
     master_name: str = "Master"
     running: List[TaskRunningItem] = []
     max_running_size: int = 5 * 1000
-    max_note_size: int = 20
+    max_note_size: int = 15
     timestamp: int = 1
     chatbot: ChatBot
     task_has_change: bool = True
@@ -136,7 +137,7 @@ class Task(Bot):
                 if (len(str(new_running)) + len(str(run))) > self.max_running_size:
                     break
                 new_running.insert(0, run)
-            
+
             return new_running
 
         def repair_action_dict(data):
@@ -219,7 +220,6 @@ class Task(Bot):
                         raise Exception(f"fail to fill action object type: {str(e)}")
 
             return data, has_error
-
 
         log_dbg(f"timestamp: {str(self.timestamp)}")
         log_dbg(f"now_ctx_size: {str(self.now_ctx_size)}")
@@ -331,9 +331,13 @@ class Task(Bot):
                         request_task_step = task.request["task_step"]
                         task_step = []
                         try:
-                            task_step = [TaskStepItem(**step) for step in request_task_step]
+                            task_step = [
+                                TaskStepItem(**step) for step in request_task_step
+                            ]
                         except Exception as e:
-                            log_err(f"fail to load task_step: {str(e)}: {str(request_task_step)}")
+                            log_err(
+                                f"fail to load task_step: {str(e)}: {str(request_task_step)}"
+                            )
                             has_error = True
                             continue
                         yield from self.set_task_step(
@@ -501,8 +505,12 @@ class Task(Bot):
 
                             req = task.request if task.request else ""
                             req_format = json.dumps(req, indent=4, ensure_ascii=False)
-                            
-                            if "null" != req_format and len(req) and None != task.request:
+
+                            if (
+                                "null" != req_format
+                                and len(req)
+                                and None != task.request
+                            ):
                                 yield f"**Request:** \n```javastript\n{req_format}\n```\n"
                                 log_info(f"call: {task.call} req: {req_format}")
 
@@ -652,11 +660,14 @@ class Task(Bot):
             log_info(
                 f"save_action:\n{json.dumps(action.dict(), indent=4, ensure_ascii=False)}"
             )
-            
+
             default_calls = [action.call for action in self.action_tools]
             if action.call in default_calls:
                 log_err(f"aleary exsit {action.call}")
-                return False, f"Override method {action.call} is forbidden. Use a different name or ask the Master for help. "
+                return (
+                    False,
+                    f"Override method {action.call} is forbidden. Use a different name or ask the Master for help. ",
+                )
 
             if save_action_code:
                 if action.execute != "system":
@@ -816,24 +827,34 @@ s_action = ActionToolItem(
     def chat_to_append_node(self, note: str) -> str:
         if not note or not len(note):
             return "request error"
-        
+
         limit = 222
         if len(str(note)) > limit:
-            return (f"This note is too long, now({len(str(note))}) > limit({limit}). "
-            "Please break it down into a shorter note or "
-            "try again with a more concise summary")
+            return (
+                f"This note is too long, now({len(str(note))}) > limit({limit}). "
+                "Please break it down into a shorter note or "
+                "try again with a more concise summary"
+            )
 
         log_info(f"append note: {note}")
 
-        if len(self.notes) >= self.max_note_size:
-            self.notes.pop(0)
+        while (
+            self.keep_note_len < self.max_note_size
+            and len(self.notes) >= self.max_note_size
+        ):
+            del self.notes[self.keep_note_len]
 
         self.notes.append(note)
 
         return "append done."
 
     def make_chat_to_master(
-        self, from_timestamp: str, content: str, expect, reasoning: str = "", conclusion: str = ""
+        self,
+        from_timestamp: str,
+        content: str,
+        expect,
+        reasoning: str = "",
+        conclusion: str = "",
     ) -> TaskRunningItem:
         chat: TaskRunningItem = TaskRunningItem(
             timestamp=int(self.timestamp),
@@ -910,8 +931,9 @@ s_action = ActionToolItem(
         try:
             js = json.dumps(request, indent=4, ensure_ascii=False)
             log_info(f"analysis:\n{js}")
-            
+
             analysis = request
+
             def get_key(analysis, key):
                 if not isinstance(analysis, dict):
                     log_dbg(f"analysis[{str(key)}] = {str(analysis)} not dict. ")
@@ -919,11 +941,11 @@ s_action = ActionToolItem(
                 if key in analysis and analysis[key]:
                     return analysis[key]
                 return None
-            
+
             tmp = get_key(analysis, "expect")
             if tmp:
                 yield f"**Expect:** {tmp} \n"
-                
+
             tmp = get_key(analysis, "problem")
             if tmp:
                 yield f"**Problem:** {tmp} \n"
@@ -974,7 +996,6 @@ s_action = ActionToolItem(
             if tmp:
                 yield f"**Suggest:** {tmp} \n"
 
-                
             tmp = get_key(analysis, "next_task_step")
             if tmp:
                 i = 0
@@ -987,7 +1008,7 @@ s_action = ActionToolItem(
                     sub = get_key(next_task_step, "step")
                     if sub:
                         yield f" * {sub} \n"
-            
+
         except Exception as e:
             log_err(f"fail to analysis {str(e)}")
 
@@ -1049,11 +1070,7 @@ s_action = ActionToolItem(
                 return True
         return False
 
-    def __init__(
-        self, 
-        chatbot: ChatBot,
-        setting={}
-    ):
+    def __init__(self, chatbot: ChatBot, setting={}):
         try:
             self.__load_setting(setting)
             self.__load_task_data()
@@ -1093,7 +1110,7 @@ s_action = ActionToolItem(
             self.extern_action_path = setting["extern_action_path"]
         except Exception as e:
             log_err(f"fail to load task: {e}")
-            self.extern_action_path = './aimi_plugin/action'
+            self.extern_action_path = "./aimi_plugin/action"
 
     def __load_task_data(self):
         has_err = False
@@ -1528,11 +1545,16 @@ def chat_from(request: dict = None):
                 )
             )
             self.timestamp += 1
-            
-            # create learning note. 
-            self.chat_to_append_node('自主思考运行需要根据自身的构成和具体情景进行决策和行动。')
-            self.chat_to_append_node('通过不断学习和优化，可以提高自主运行的能力。')
-            self.chat_to_append_node('自主运行存在风险，需要谨慎评估和管理。')
+
+            # create learning note.
+            self.chat_to_append_node(
+                "自主思考运行需要根据自身的构成和具体情景进行决策和行动。"
+            )
+            self.keep_note_len += 1
+            self.chat_to_append_node("通过不断学习和优化，可以提高自主运行的能力。")
+            self.keep_note_len += 1
+            self.chat_to_append_node("自主运行存在风险，需要谨慎评估和管理。")
+            self.keep_note_len += 1
 
             self.running = running
             log_dbg(f"no have running")
@@ -1583,7 +1605,7 @@ def chat_from(request: dict = None):
         if "4k" in select.lower():
             return "gpt-3.5-turbo"
         return "gpt-3.5-turbo-16k"
-    
+
     def get_models(self, caller: Bot) -> List[str]:
         return self.models
 
@@ -1638,10 +1660,8 @@ def chat_from(request: dict = None):
 
         if self.use_talk_messages:
             running_messages = self.action_running_to_messages()
-            context_messages = make_context_messages(
-                "", link_think, running_messages
-            )
-            
+            context_messages = make_context_messages("", link_think, running_messages)
+
             self.now_ctx_size = len(str(link_think)) + len(str(running_messages))
         else:
             context_messages = make_context_messages(
@@ -1756,12 +1776,12 @@ def chat_from(request: dict = None):
                 f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息得出多种判断. ",
                 "call": "调用 动作 的 call: 只能取 action_tools 中想要使用动作 的对应 call . 如可取: chat_to_master. ",
                 "request": {
-                    "type": "object", 
+                    "type": "object",
                     "from": [
                         f"关联动作的 timestamp: 表示和哪个动作有关联, 和现在的timestamp没关系, 不可省略. "
                         f"如可分别填: {self.timestamp-2} {self.timestamp-1} 等. ",
                     ],
-                    "call对应参数": "参数内容"
+                    "call对应参数": "参数内容",
                 },
                 "conclusion": "总结: 总结现状, 然后思考思考并尝试能实现目标的其他方法. ",
                 "execute": "动作(action) 执行级别: 取对应 action 的 execute 值, 可以填 system 或者 AI, 默认填 system. ",
