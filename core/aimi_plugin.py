@@ -342,7 +342,7 @@ class ExternAction:
             save_action_example += save_action_code
             log_dbg(f"append chat_from code:\n```python\n{save_action_code}\n```")
 
-        if self.action_call_prefix in action.call:
+        if self.action_call_prefix not in action.call:
             action.call = action.call.replace(self.action_call_prefix, "")
             log_err(f"fix action call chat_to_ prefix")
 

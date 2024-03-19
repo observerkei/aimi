@@ -593,7 +593,7 @@ class Aimi:
             self.master_name = setting["master_name"]
         except Exception as e:
             log_err(f"fail to load aimi: {e}")
-            self.master_name = ""
+            self.master_name = "Master"
 
         try:
             self.bot_path = setting["bot_path"]

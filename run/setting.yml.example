@@ -174,7 +174,7 @@ aimi:
   web_port: 2464
   bot_path: './aimi_plugin/bot'
   run_path: './run' # 指定运行路径, 主要是给资源文件如图片、markdown 文件用、建议使用绝对路径, 方便给通过API通信的时候,直接给其他程序使用. 
-  master_name: kei
+  master_name: Master
   memory_size: 10240
   memory_model: #transformers
   memory_model_depth: 20

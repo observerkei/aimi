@@ -69,6 +69,7 @@ class Task(Bot):
     execute_ai_calls: List[str] = []
     now_task_id: str = 1
     aimi_name: str = "Aimi"
+    master_name: str = "Master"
     running: List[TaskRunningItem] = []
     max_running_size: int = 5 * 1000
     max_note_size: int = 20
@@ -652,6 +653,11 @@ class Task(Bot):
             log_info(
                 f"save_action:\n{json.dumps(action.dict(), indent=4, ensure_ascii=False)}"
             )
+            
+            default_calls = [action.call for action in self.action_tools]
+            if action.call in default_calls:
+                log_err(f"aleary exsit {action.call}")
+                return False, f"Override method {action.call} is forbidden. Use a different name or ask the Master for help. "
 
             if save_action_code:
                 if action.execute != "system":
