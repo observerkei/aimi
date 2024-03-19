@@ -80,6 +80,7 @@ class Task(Bot):
     run_timeout: int = 15
     use_talk_messages: bool = True
     models: List[str] = []
+    now_ctx_size: int = 0
 
     def task_dispatch(self, res: str) -> Generator[str, None, None]:
         def get_json_content(answer: str):
@@ -221,6 +222,7 @@ class Task(Bot):
 
 
         log_dbg(f"timestamp: {str(self.timestamp)}")
+        log_dbg(f"now_ctx_size: {str(self.now_ctx_size)}")
         log_dbg(f"now task: {str(self.tasks[int(self.now_task_id)].task_info)}")
 
         response = ""
@@ -1635,14 +1637,18 @@ def chat_from(request: dict = None):
         model = ask_data.model
 
         if self.use_talk_messages:
+            running_messages = self.action_running_to_messages()
             context_messages = make_context_messages(
-                "", link_think, self.action_running_to_messages()
+                "", link_think, running_messages
             )
+            
+            self.now_ctx_size = len(str(link_think)) + len(str(running_messages))
         else:
             context_messages = make_context_messages(
                 "",
                 link_think,
             )
+            self.now_ctx_size = len(str(link_think))
 
         ask_data = BotAskData(
             question=link_think,
