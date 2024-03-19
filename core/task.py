@@ -530,9 +530,6 @@ class Task(Bot):
                                     response = str(e)
                                     has_error = True
                                     yield f"**Self-improvement is blocked:**\n{str(e)}"
-                                    raise Exception(
-                                        f"fail to run call: {task.call} chat_from : {str(e)}"
-                                    )
 
                                 from_name = task.call.replace(
                                     self.extern_action.action_call_prefix, ""
