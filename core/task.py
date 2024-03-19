@@ -814,6 +814,12 @@ s_action = ActionToolItem(
     def chat_to_append_node(self, note: str) -> str:
         if not note or not len(note):
             return "request error"
+        
+        limit = 222
+        if len(str(note)) > limit:
+            return (f"This note is too long, now({len(str(note))}) > limit({limit}). "
+            "Please break it down into a shorter note or "
+            "try again with a more concise summary")
 
         log_info(f"append note: {note}")
 
@@ -903,13 +909,11 @@ s_action = ActionToolItem(
             js = json.dumps(request, indent=4, ensure_ascii=False)
             log_info(f"analysis:\n{js}")
             
-            analysis = {}
-            try:
-                analysis = json5.loads(request)
-            except Exception as e:
-                log_err(f"fail to load analysis: {str(e)}")
-            
+            analysis = request
             def get_key(analysis, key):
+                if not isinstance(analysis, dict):
+                    log_dbg(f"analysis[{str(key)}] = {str(analysis)} not dict. ")
+                    return None
                 if key in analysis and analysis[key]:
                     return analysis[key]
                 return None
