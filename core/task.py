@@ -1,6 +1,7 @@
 import json5
 import json
 import os
+import re
 from typing import Dict, Any, List, Generator, Optional, Union, Set
 from pydantic import BaseModel, constr
 
@@ -645,6 +646,10 @@ class Task(Bot):
     def chat_to_save_action(
         self, save_action_call: str, save_action: Dict, save_action_code: str = None
     ) -> tuple[bool, str]:
+        def remove_prefix_if_exists(input_string, prefix):
+            if input_string.startswith(prefix):
+                return input_string[len(prefix):]
+            return input_string
         if not save_action_call or not len(save_action_call):
             log_err(f"chat_to_save_action: save_action_call is None")
             return False, "save_action_call is None, need set save_action_call."
@@ -660,6 +665,9 @@ class Task(Bot):
             log_info(
                 f"save_action:\n{json.dumps(action.dict(), indent=4, ensure_ascii=False)}"
             )
+            if ExternAction.action_call_prefix in action.call:
+                action.call = remove_prefix_if_exists(action.call, ExternAction.action_call_prefix)
+                log_dbg(f"del ai function prefix to: {action.call}")
 
             default_calls = [action.call for action in self.action_tools]
             if action.call in default_calls:
@@ -684,6 +692,17 @@ class Task(Bot):
                 ):
                     python_code = python_code[10:-4]
                     log_dbg(f"del code cover: ```python ...")
+                
+                log_info(f"\n```python\n{save_action_code}\n```")
+                
+                if (
+                    "def" in python_code
+                    and "chat_from" not in python_code
+                ):
+                    python_code = re.sub(r"def \w+\(", "def chat_form(", python_code.rsplit('def', 1)[1])
+                    log_dbg(f"AI not create chat_from function, try fix action:\n```python\n"
+                            f"{python_code}\n```\n")
+
                 save_action_code = python_code
 
                 log_info(f"\n```python\n{save_action_code}\n```")

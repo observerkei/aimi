@@ -344,7 +344,7 @@ class ExternAction:
 
         if self.action_call_prefix not in action.call:
             action.call = action.call.replace(self.action_call_prefix, "")
-            log_err(f"fix action call chat_to_ prefix")
+            log_dbg(f"save call name: {action.call}")
 
         action.call = f"{self.action_call_prefix}{action.call}"
 
