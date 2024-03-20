@@ -170,6 +170,7 @@ class Aimi:
         atexit.register(self.__when_exit)
         signal.signal(signal.SIGTERM, self.__signal_exit)
         signal.signal(signal.SIGINT, self.__signal_exit)
+        signal.signal(signal.SIGQUIT, self.__signal_exit)
 
     def run(self):
         self.notify_online()
