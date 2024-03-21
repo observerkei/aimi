@@ -1775,6 +1775,25 @@ def chat_from(request: dict = None):
         task = self.__make_task()
         master_name = "kei"
 
+        action_object = {
+            "type": "object",
+            "timestamp": f"时间戳: 从 {self.timestamp} 开始, 每次递增. 如现在应该从这里开始填: {self.timestamp} ",
+            "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 想聊天. ",
+            "reasoning": "推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
+            f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息得出多种判断. ",
+            "call": "调用 动作 的 call: 只能取 action_tools 中想要使用动作 的对应 call . 如可取: chat_to_master. ",
+            "request": {
+                "type": "object",
+                "from": [
+                    f"关联动作的 timestamp: 表示和哪个动作有关联, 和现在的timestamp没关系, 不可省略. "
+                    f"如可分别填: {self.timestamp-2} {self.timestamp-1} 等. ",
+                ],
+                "call对应参数": "参数内容",
+            },
+            "conclusion": "总结: 总结现状, 然后思考思考并尝试能实现目标的其他方法. ",
+            "execute": "动作(action) 执行级别: 取对应 action 的 execute 值, 可以填 system 或者 AI, 默认填 system. ",
+        }
+
         settings: Dict = {
             "type": "object",
             "description": f"{aimi_core_name} Guidance.",
@@ -1783,7 +1802,7 @@ def chat_from(request: dict = None):
                 f"1. 指导开始: 你需要深度学习完 {aimi_core_name} Guidance 所有细节才能用自己的身份进行回复. ",
                 f"2. 时间定义: timestamp 是时间, 你对于时间的感知在 timestamp_rule 中定义. ",
                 f"2. 回复JSON数组: 你的 回复格式 放在了 display_format 里面. 任何时候都要保障能满足 action_object 结构格式定义. ",
-                f"4. 规则优先级: display_format > action_object > timestamp_rule > core > action_rule > praset_rule > task_rule. "
+                f"4. 规则优先级: display_format > timestamp_rule > core > action_rule > praset_rule > task_rule. "
                 f"如果规则优先级冲突, 以优先级高的为准. 有任何异常通过 action(call=chat_to_maste) 向 Master 简短报告冲突关健点的分析, 并解释应该怎么做, 然后继续. ",
                 f"5. 你的 动作(action) 规则 放在了 action_rule 里面. ",
             ],
@@ -1792,26 +1811,8 @@ def chat_from(request: dict = None):
                 f"2. 回复格式: 任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action 对象, 如: action(call=analysis) . ",
                 f"3. 使用回复结构: 请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
                 f"哲学家思维结合你的常识、经验和 {aimi_core_name} Guidance 进行严谨分析, 替换成为最完美最符合的内容, "
-                f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 填充最合适最详细的内容, 然后进行回复, 结构在 action_object 中完成定义. ",
+                f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 填充最合适最详细的内容, 然后进行回复, 结构格式类似如下: ```\n[{action_object}]\n``` ",
             ],
-            "action_object": {
-                "type": "object",
-                "timestamp": f"时间戳: 从 {self.timestamp} 开始, 每次递增. 如现在应该从这里开始填: {self.timestamp} ",
-                "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 想聊天. ",
-                "reasoning": "推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
-                f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息得出多种判断. ",
-                "call": "调用 动作 的 call: 只能取 action_tools 中想要使用动作 的对应 call . 如可取: chat_to_master. ",
-                "request": {
-                    "type": "object",
-                    "from": [
-                        f"关联动作的 timestamp: 表示和哪个动作有关联, 和现在的timestamp没关系, 不可省略. "
-                        f"如可分别填: {self.timestamp-2} {self.timestamp-1} 等. ",
-                    ],
-                    "call对应参数": "参数内容",
-                },
-                "conclusion": "总结: 总结现状, 然后思考思考并尝试能实现目标的其他方法. ",
-                "execute": "动作(action) 执行级别: 取对应 action 的 execute 值, 可以填 system 或者 AI, 默认填 system. ",
-            },
             "timestamp_rule": [
                 f"1. 运行时间: 你基于 timestamp , 也就是时间运行. ",
                 f"2. 时间开始: 你从 timestamp={self.timestamp} 开始生成内容. timestamp 是你的生命周期, ",
