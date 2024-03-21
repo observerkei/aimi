@@ -1325,7 +1325,7 @@ s_action = ActionToolItem(
                     "problem": "想解决的问题: 通过分析想解决什么疑问. 如: 怎么才能转圈圈. ",
                     "error": "异常点: 哪里错了, 最后检查的时候不能把这个当成答案. 如果没有则填 None, 如: 为了实现转圈圈暂时没有发现错误. ",
                     "risk": [
-                        "影响点: 构成 expect/problem/error 的关健要素是什么. 如: 我需要有身体, 并且能够控制自己身体才能转圈圈给Master看. ",
+                        "影响点: 构成 expect/problem/error 的关健要素是什么, 以及原因. 如: 我需要有身体, 并且能够控制自己身体才能转圈圈给Master看. 因为 preset中并没有规定我有身体. ",
                     ],
                     "citation": [
                         {
