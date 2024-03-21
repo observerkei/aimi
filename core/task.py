@@ -980,15 +980,20 @@ s_action = ActionToolItem(
             if tmp:
                 yield f"**Error:** {tmp} \n"
 
+            has_node = False
             tmp = get_key(analysis, "risk")
             if tmp:
                 i = 0
                 for risk in tmp:
                     i += 1
                     if i == 1:
+                        has_node = True
                         yield "**Risk:** \n"
                     yield f" * {risk} \n"
+                if has_node:
+                    yield "\n"
 
+            has_node = False
             tmp = get_key(analysis, "citation")
             if tmp:
                 i = 0
@@ -997,6 +1002,7 @@ s_action = ActionToolItem(
                         break
                     i += 1
                     if i == 1:
+                        has_node = True
                         yield "**Citation:** \n"
                     sub = get_key(citation, "description")
                     if sub:
@@ -1004,15 +1010,22 @@ s_action = ActionToolItem(
                     sub = get_key(citation, "information")
                     if sub:
                         yield f" * **Information:** {sub}\n"
+                if has_node:
+                    yield "\n"
 
+
+            has_node = False
             tmp = get_key(analysis, "difference")
             if tmp:
                 i = 0
                 for difference in tmp:
                     i += 1
                     if i == 1:
+                        has_node = True
                         yield "**Difference:** \n"
                     yield f" * {difference} \n"
+                if has_node:
+                    yield "\n"
 
             tmp = get_key(analysis, "verdict")
             if tmp:
@@ -1022,6 +1035,7 @@ s_action = ActionToolItem(
             if tmp:
                 yield f"**Suggest:** {tmp} \n"
 
+            has_node = False
             tmp = get_key(analysis, "next_task_step")
             if tmp:
                 i = 0
@@ -1030,10 +1044,13 @@ s_action = ActionToolItem(
                         break
                     i += 1
                     if i == 1:
+                        has_node = True
                         yield "**Next Step:** \n"
                     sub = get_key(next_task_step, "step")
                     if sub:
                         yield f" * {sub} \n"
+                if has_node:
+                    yield "\n"
 
         except Exception as e:
             log_err(f"fail to analysis {str(e)}")
