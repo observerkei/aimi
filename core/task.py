@@ -665,9 +665,6 @@ class Task(Bot):
             log_info(
                 f"save_action:\n{json.dumps(action.dict(), indent=4, ensure_ascii=False)}"
             )
-            if ExternAction.action_call_prefix in action.call:
-                action.call = remove_prefix_if_exists(action.call, ExternAction.action_call_prefix)
-                log_dbg(f"del ai function prefix to: {action.call}")
 
             default_calls = [action.call for action in self.action_tools]
             if action.call in default_calls:
@@ -677,6 +674,10 @@ class Task(Bot):
                     f"Override method {action.call} is forbidden. Use a different name or ask the Master for help. ",
                 )
 
+            if ExternAction.action_call_prefix in action.call:
+                action.call = remove_prefix_if_exists(action.call, ExternAction.action_call_prefix)
+                log_dbg(f"del ai function prefix to: {action.call}")
+            
             if save_action_code:
                 if action.execute != "system":
                     log_err(
@@ -699,10 +700,16 @@ class Task(Bot):
                     "def" in python_code
                     and "chat_from" not in python_code
                 ):
-                    python_code = re.sub(r"def \w+\(", "def chat_form(", python_code.rsplit('def', 1)[1])
-                    log_dbg(f"AI not create chat_from function, try fix action:\n```python\n"
+                    # find function name 
+                    matches = re.findall(r'def\s+(\w+)\s*\(', python_code)
+                    if matches:
+                        last_function_name = matches[-1]
+                        python_code = re.sub(rf'def\s+{last_function_name}\s*', 'def chat_from ', python_code, count=1)
+                        log_dbg(f"AI not create chat_from function, try fix action:\n```python\n"
                             f"{python_code}\n```\n")
-
+                    else:
+                        return False, "Error: No function definition found in the code."
+                   
                 save_action_code = python_code
 
                 log_info(f"\n```python\n{save_action_code}\n```")
