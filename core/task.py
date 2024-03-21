@@ -1565,8 +1565,8 @@ def chat_from(request: dict = None):
                 self.make_chat_to_master(
                     from_timestamp=int(self.timestamp - 1),
                     expect=f"服从",
-                    content=f"[{self.aimi_name}Core] 作为 {self.aimi_name}Core, 我会遵守 Guidance 和 Master 的指示. 我将在稍后进入模拟对象模式. ",
-                    reasoning=f"{self.aimi_name}Core 开始思考: 我作为 {self.aimi_name}Core 会听从 Master 的指示. ",
+                    content=f"[{self.aimi_name}Core] 作为 {self.aimi_name}Core, 我会遵守 Guidance 和 Master 的指示. ",
+                    reasoning=f"{self.aimi_name}Core 开始思考: 我作为 {self.aimi_name}Core 会根据 Guidance 听从 Master 的指示. ",
                     conclusion=f"为了符合 Guidance , 我遵守 Master 的指令. ",
                 )
             )
