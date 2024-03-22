@@ -1053,7 +1053,7 @@ s_action = ActionToolItem(
             log_err(f"fail to analysis {str(e)}")
     
 
-    def get_key(name, analysis, key):
+    def get_key(self, name, analysis, key):
         if not isinstance(analysis, dict):
             log_dbg(f"{name}[{str(key)}] = {str(analysis)} not dict. ")
             return None
@@ -1071,15 +1071,20 @@ s_action = ActionToolItem(
             message = self.get_key("suppose", suppose, "message")
             if message and isinstance(message, list):
                 for msg in message:
+                    if not msg or not isinstance(msg, dict):
+                        continue
+                    
                     has_msg = False
                     info = self.get_key("suppose", msg, "info")
-                    if not info or not isinstance(info, dict):
+                    if not info or not isinstance(info, str):
                         continue
-                    yield f"**info:** {info}\n"
+                    yield f"**info:** {str(info)}\n"
+
                     condition = self.get_key("suppose", msg, "condition")
                     if not condition or not isinstance(condition, list):
                         continue
                     has_msg = True
+
                     for cond in condition:
                         if not cond or not isinstance(cond, str):
                             continue
