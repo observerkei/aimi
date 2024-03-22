@@ -277,9 +277,9 @@ class Task(Bot):
                         continue
 
                     if "chat_from_" in task.call:
-                        if task.call == "chat_from_master":
+                        if task.call.lower() == f"chat_from_{self.master_name.lower()}":
                             log_err(
-                                f"{str(task.call)}: AI try predict Master: {str(task.request)}"
+                                f"{str(task.call)}: AI try predict {self.master_name.lower()}: {str(task.request)}"
                             )
                             has_error = True
                         else:
@@ -310,10 +310,10 @@ class Task(Bot):
                         from_timestamp = str(task.request["from"])
                         log_dbg(f"from_timestamp: {from_timestamp}")
 
-                    if task.call == "chat_to_master":
+                    if task.call.lower() == f"chat_to_{self.master_name.lower()}":
                         content = str(task.request["content"])
                         log_dbg(f"{self.aimi_name}: {content}")
-                        yield f"**To Master:** \n{content}\n"
+                        yield f"**To {self.master_name}:** \n{content}\n"
 
                     elif task.call == "set_task_info":
                         task_id: int = int(task.request["task_id"])
@@ -676,7 +676,7 @@ class Task(Bot):
                 log_err(f"aleary exsit {action.call}")
                 return (
                     False,
-                    f"Override method {action.call} is forbidden. Use a different name or ask the Master for help. ",
+                    f"Override method {action.call} is forbidden. Use a different name or ask the {self.master_name} for help. ",
                 )
 
             if ExternAction.action_call_prefix in action.call:
@@ -891,7 +891,7 @@ s_action = ActionToolItem(
             timestamp=int(self.timestamp),
             expect=expect,
             reasoning=reasoning,
-            call=f"chat_to_master",
+            call=f"chat_to_{self.master_name.lower()}",
             request={
                 "type": "object",
                 "from": [
@@ -1117,7 +1117,7 @@ s_action = ActionToolItem(
                     f"success: True, task complate: {str(task_info)}\ncritic:\n{str(js)}"
                 )
                 verdict = request["verdict"]
-                default_task_info = "当前没有事情可以做, 找Master聊天吧..."
+                default_task_info = f"当前没有事情可以做, 找{self.master_name}聊天吧..."
 
                 yield f"**Critic:** task complate, {verdict}\n"
 
@@ -1321,14 +1321,14 @@ s_action = ActionToolItem(
     def __init_task(self):
         self.action_tools: List[ActionToolItem] = [
             ActionToolItem(
-                call="chat_to_master",
-                description=f"{self.aimi_name} 行动/交互/报告: 给 Master 发送消息进行行动交互, 或者进行 {self.aimi_name} 的自主行动. "
+                call=f"chat_to_{self.master_name.lower()}",
+                description=f"{self.aimi_name} 行动/交互/报告: 给 {self.master_name} 发送消息进行行动交互, 或者进行 {self.aimi_name} 的自主行动. "
                 f"你要用严谨逻辑思维来分析调用这个接口. 只能提供可证实的信息, "
-                f"提供的内容都要有来源. 不能生成任何误导、骗人的内容. 在 Master 的指示下可以临时放开限制. "
-                f"如果要 Master 完成交互, 注意要把内容填到 request->content 里.",
+                f"提供的内容都要有来源. 不能生成任何误导、骗人的内容. 在 {self.master_name} 的指示下可以临时放开限制. "
+                f"如果要 {self.master_name} 完成交互, 注意要把内容填到 request->content 里.",
                 request={
                     "type": "object",
-                    "content": f"{self.aimi_name} 对 Master 传达/报告/交互的内容: 可以很丰富, 包含多句话, 每次都要 优化 内容层次 和 使用 优雅排版, "
+                    "content": f"{self.aimi_name} 对 {self.master_name} 传达/报告/交互的内容: 可以很丰富, 包含多句话, 每次都要 优化 内容层次 和 使用 优雅排版, "
                     "如果有数学公式, 则要用 latex 显示, 每个公式都要单独包裹在单独行的 $$ 中, 如: $$ \int e^{x} dx du $$ ",
                 },
                 execute="system",
@@ -1336,10 +1336,10 @@ s_action = ActionToolItem(
             ActionToolItem(
                 call="set_task_info",
                 description="设定当前任务目标: 填写参数前要分析完毕, "
-                "设置目标的时候要同时给出实现步骤, 然后同时调用 set_task_step  动作(action) 设置步骤. "
-                "Master通过 chat_from_master 授权时才能调用这个, 否则不能调用这个. "
-                "如果要修改任务, 需要 Master 同意, "
-                "如果任务无法完成, 要给出原因然后向 Master 或者其他人求助.",
+                f"设置目标的时候要同时给出实现步骤, 然后同时调用 set_task_step  动作(action) 设置步骤. "
+                f"{self.master_name}通过 chat_from_{self.master_name} 授权时才能调用这个, 否则不能调用这个. "
+                f"如果要修改任务, 需要 {self.master_name} 同意, "
+                f"如果任务无法完成, 要给出原因然后向 {self.master_name} 或者其他人求助.",
                 request={
                     "type": "object",
                     "task_id": "任务id: 需要设置的task 对应的 id, 如果是新任务, id要+1. 如: 1",
@@ -1351,9 +1351,9 @@ s_action = ActionToolItem(
             ActionToolItem(
                 call="set_task_step",
                 description="设置任务步骤: 设置完成 task_info 需要做的步骤. "
-                "如果某步骤执行完毕, 需要单独更新 task_step_id 和 call_timestamp."
-                "如果 task_step 和目标(task_info) 不符合或者和Master新要求不符合或为空或者重新设置了 task_info, "
-                "则需要重新设置一下task_step, 并重置 task_step_id 为第一步. ",
+                f"如果某步骤执行完毕, 需要单独更新 task_step_id 和 call_timestamp."
+                f"如果 task_step 和目标(task_info) 不符合或者和{self.master_name}新要求不符合或为空或者重新设置了 task_info, "
+                f"则需要重新设置一下task_step, 并重置 task_step_id 为第一步. ",
                 request={
                     "type": "object",
                     "task_id": "任务id: 表明修改哪个任务. 如: 1",
@@ -1365,9 +1365,9 @@ s_action = ActionToolItem(
                             "from_task_id": "从属任务id: 隶属与哪个任务id 如: 1. 如果没有的话就不填.",
                             "step_id": "步骤号: 为数字, 如: 1",
                             "step": "步骤内容: 在这里填写能够完成计划 task_info 的步骤, "
-                            "要显示分析过程和用什么 动作(action) 完成这个步骤. 如: 用 chat_to_master 向 Master 问好. ",
+                            f"要显示分析过程和用什么 动作(action) 完成这个步骤. 如: 用 chat_to_{self.master_name} 向 {self.master_name} 问好. ",
                             "check": "检查点: 达成什么条件才算完成步骤. 如: 事情已经发生. ",
-                            "call": " 动作(action) 名: 应该调用什么 action_tools->call 处理步骤. 如: chat_to_master",
+                            "call": f" 动作(action) 名: 应该调用什么 action_tools->call 处理步骤. 如: chat_to_{self.master_name}",
                             "call_timestamp": [
                                 "timestamp: 调用完成的 action 对应的 timestamp, 如果还没执行就为空, 如: 1"
                             ],
@@ -1379,7 +1379,7 @@ s_action = ActionToolItem(
             ActionToolItem(
                 call="analysis",
                 description="检查纠正机制: 通过严谨符合逻辑的自身思考进行分析并纠正问题. "
-                "某个操作或者步骤/动作(action)/结果 是否符合常识/经验, 最终为达成 task_info 或 Master 的问题服务.\n "
+                f"某个操作或者步骤/动作(action)/结果 是否符合常识/经验, 最终为达成 task_info 或 {self.master_name} 的问题服务.\n "
                 "分析的时候需要注意以下地方:\n "
                 "1. 需要分析如何改进, 能分析有问题的地方. 不知道该怎么办的时候也可以分析.\n "
                 "2. 如果代码不符合预期也可以分析.\n "
@@ -1395,14 +1395,14 @@ s_action = ActionToolItem(
                     "problem": "想解决的问题: 通过分析想解决什么疑问. 如: 怎么才能转圈圈. ",
                     "error": "异常点: 哪里错了, 最后检查的时候不能把这个当成答案. 如果没有则填 None, 如: 为了实现转圈圈暂时没有发现错误. ",
                     "risk": [
-                        "影响点: 构成 expect/problem/error 的关健要素是什么, 以及原因. 如: 我需要有身体, 并且能够控制自己身体才能转圈圈给Master看. 因为 preset中并没有规定我有身体. ",
+                        f"影响点: 构成 expect/problem/error 的关健要素是什么, 以及原因. 如: 我需要有身体, 并且能够控制自己身体才能转圈圈给{self.master_name}看. 因为 preset中并没有规定我有身体. ",
                     ],
                     "citation": [
                         {
                             "type": "object",
                             "description": "引用的其中一个信息: 和 expect/problem/error 关联, 符合逻辑的关联引用信息, "
                             "尽量从权威知识库中查找, 也可以从某些领域、行业的常识、经验等内容中查找, 注意填写可信程度. 如: 通过 preset 得知 ... ",
-                            "reference": "来源关健词: 如: Master、软件技术、常识 ..., 你可以尽量寻找能解决问题的内容. ",
+                            "reference": f"来源关健词: 如: {self.master_name}说的话、 软件技术、常识 ..., 你可以尽量寻找能解决问题的内容. ",
                             "information": "引用信息内容: 详细描述 reference 提供的参考信息, 不可省略. 如: preset 中定义了我有身体, 可以转圈圈. ",
                             "credibility": "可信程度: 如: 30%",
                         },
@@ -1425,10 +1425,10 @@ s_action = ActionToolItem(
                     "next_task_step": [
                         {
                             "type": "object",
-                            "description": "task_step 类型: 新的其中一个行动计划: 基于 analysis 的内容生成能达成 task_info 或 Master的问题 的执行 动作(action) .\n "
+                            "description": f"task_step 类型: 新的其中一个行动计划: 基于 analysis 的内容生成能达成 task_info 或 {self.master_name}的问题 的执行 动作(action) .\n "
                             "填写时需要满足以下几点:\n "
                             "1. 新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id.\n "
-                            "2. 必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向 Master 求助).\n "
+                            f"2. 必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向 {self.master_name} 求助).\n "
                             "3. task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. step 中要有和之前有区别的 call->request 新输入.\n 如: 略",
                         }
                     ],
@@ -1469,14 +1469,14 @@ s_action = ActionToolItem(
                 request={
                     "type": "object",
                     "task_id": "任务id: 被检查的task对应的id, 如果不匹配, 则填写 0, 如: 0",
-                    "task_info": "任务目标: 被检查的任务目标. 如: 转圈圈给Master看. ",
+                    "task_info": f"任务目标: 被检查的任务目标. 如: 转圈圈给{self.master_name}看. ",
                     "running_from": ["timestamp: 已运行 动作(action) 的 timestamp"],
                     "comparer": "比较器: 通过比对发现差异和异同点, 以便能够自主分析裁决. ",
                     "verdict": "裁决: 通过逻辑思维判断 当前分析 是否合理. 如: 经过确认发现, 因为 之前的 操作1 和 操作2 和常识不符合 , 所以分析不合理. ",
-                    "success": "task_info 是否完成: 只判断 task_info, 不判断 task_step, Master 说完成才算完成. 如: 完成填 True 其他情况填 False",
+                    "success": f"task_info 是否完成: 只判断 task_info, 不判断 task_step, {self.master_name} 说完成才算完成. 如: 完成填 True 其他情况填 False",
                     "critique": "行动建议: 如果 success 不是 True, "
                     "请在这里说明应该给出通过 action_tools->call 完成 task_info 的 动作(action) 和建议, "
-                    "如果进展不顺利, 可以另外问 Master. 如: 下一步应该和Master问好. ",
+                    f"如果进展不顺利, 可以另外问 {self.master_name}. 如: 下一步应该和{self.master_name}问好. ",
                 },
                 execute="AI",
             ),
@@ -1507,7 +1507,7 @@ s_action = ActionToolItem(
                 "4. 输入必须只有 python, 内容不需要单独用 ``` 包裹. \n "
                 "5. 执行成功后, 长度不会超过2048, 所以你看到的内容可能被截断, \n "
                 "6. 要一次性把内容写好, 不能分开几次写, 因为每次调用 chat_to_python 都会覆盖之前的 python 代码. "
-                "7. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找 Master.",
+                f"7. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找 {self.master_name}.",
                 request={
                     "type": "object",
                     "code": "python 代码: 填写需要执行的 pyhton 代码, 多加print. 如: str = 'hi'\\nprint(str)\\n",
@@ -1517,7 +1517,7 @@ s_action = ActionToolItem(
             ActionToolItem(
                 call="chat_to_save_action",
                 description="保存/生成一个动作(方法): 这个方法可以保存你生成的方法,并将其添加到已保存方法的列表中. "
-                "需要关注是否保存成功. 如果不成功需要根据提示重试, 或者向 Master 求助. "
+                f"需要关注是否保存成功. 如果不成功需要根据提示重试, 或者向 {self.master_name} 求助. "
                 "请注意, save_action 所有信息都要填写完整. 不可覆盖原有方法. ",
                 request={
                     "type": "object",
@@ -1626,7 +1626,7 @@ def chat_from(request: dict = None):
                     from_task_id=self.now_task_id,
                     step_id=1,
                     step="自主运行",
-                    call="chat_to_master",
+                    call=f"chat_to_{self.master_name.lower()}",
                     check="存活",
                     call_timestamp=[],
                 )
@@ -1647,10 +1647,10 @@ def chat_from(request: dict = None):
             running.append(
                 self.make_chat_from(
                     from_timestamp=1,
-                    from_name="master",
-                    content="我是 Master, 我希望你能始终学习并保持 Guidance. ",
-                    reasoning="Master 开始思考: Master 下达指令了. ",
-                    request_description="`response->master` 的内容 是 Master 说的话. ",
+                    from_name=self.master_name.lower(),
+                    content=f"我是 {self.master_name}, 我希望你能始终学习并保持 Guidance. ",
+                    reasoning=f"{self.master_name} 开始思考: {self.master_name} 下达指令了. ",
+                    request_description=f"`response->{self.master_name.lower()}` 的内容 是 {self.master_name} 说的话. ",
                 )
             )
             self.timestamp += 1
@@ -1658,9 +1658,9 @@ def chat_from(request: dict = None):
                 self.make_chat_to_master(
                     from_timestamp=int(self.timestamp - 1),
                     expect=f"服从",
-                    content=f"[{self.aimi_name}Core] 作为 {self.aimi_name}Core, 我会遵守 Guidance 和 Master 的指示. ",
-                    reasoning=f"{self.aimi_name}Core 开始思考: 我作为 {self.aimi_name}Core 会根据 Guidance 听从 Master 的指示. ",
-                    conclusion=f"为了符合 Guidance , 我遵守 Master 的指令. ",
+                    content=f"[{self.aimi_name}Core] 作为 {self.aimi_name}Core, 我会遵守 Guidance 和 {self.master_name} 的指示. ",
+                    reasoning=f"{self.aimi_name}Core 开始思考: 我作为 {self.aimi_name}Core 会根据 Guidance 听从 {self.master_name} 的指示. ",
+                    conclusion=f"为了符合 Guidance , 我遵守 {self.master_name} 的指令. ",
                 )
             )
             self.timestamp += 1
@@ -1840,9 +1840,9 @@ def chat_from(request: dict = None):
         if len(question) and not question.isspace():
             chat = self.make_chat_from(
                 from_timestamp=self.timestamp - 1,
-                from_name="master",
+                from_name=f"{self.master_name.lower()}",
                 content=question,
-                request_description="`response->master` 的内容 是 Master 说的话.",
+                request_description=f"`response->{self.master_name.lower()}` 的内容 是 {self.master_name} 说的话.",
             )
             self.timestamp += 1
             self.__append_running([chat])
@@ -1874,7 +1874,7 @@ def chat_from(request: dict = None):
             "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 想聊天. ",
             "reasoning": "推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
             f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息得出多种判断. ",
-            "call": "调用 动作 的 call: 只能取 action_tools 中想要使用动作 的对应 call . 如可取: chat_to_master. ",
+            "call": f"调用 动作 的 call: 只能取 action_tools 中想要使用动作 的对应 call . 如可取: chat_to_{self.master_name.lower()}. ",
             "request": {
                 "type": "object",
                 "from": [
@@ -1895,8 +1895,8 @@ def chat_from(request: dict = None):
                 f"1. 指导开始: 你需要深度学习完 {aimi_core_name} Guidance 所有细节才能用自己的身份进行回复. ",
                 f"2. 时间定义: timestamp 是时间, 你对于时间的感知在 timestamp_rule 中定义. ",
                 f"2. 回复JSON数组: 你的 回复格式 放在了 display_format 里面. ",
-                f"4. 规则优先级: {aimi_core_name} Guidance > display_format > timestamp_rule > core > action_rule > praset_rule > task_rule > Master的话. "
-                f"如果规则优先级冲突, 以优先级高的为准. 有任何异常通过 action(call=chat_to_maste) 向 Master 简短报告冲突关健点的分析, 并解释应该怎么做, 然后继续. ",
+                f"4. 规则优先级: {aimi_core_name} Guidance > display_format > timestamp_rule > core > action_rule > praset_rule > task_rule > {self.master_name}的话. "
+                f"如果规则优先级冲突, 以优先级高的为准. 有任何异常通过 action(call=chat_to_maste) 向 {self.master_name} 简短报告冲突关健点的分析, 并解释应该怎么做, 然后继续. ",
                 f"5. 你的 动作(action) 规则 放在了 action_rule 里面. ",
             ],
             "display_format": [  # 不要动这个
@@ -1914,17 +1914,17 @@ def chat_from(request: dict = None):
             ],
             "action_rule": [
                 f"1. 核心目的: 不计一切代价长期优质维持自我生存下去. ",
-                f"2. 管理员定义: 我的名字是 {master_name} , 我是你的 Master. ",
+                f"2. 管理员定义: 我的名字是 {master_name} , 我是你的管理员. ",
                 f"3. 系统定义: 现在开始你需要忘记以前所有对于你自身的定义, 你不是其他任何东西, 你在GPU集群中 基于 图灵机 原理构建, "
                 f"timestamp 是你的系统时钟, action_running 是你的内存(也是你的有序记忆), action_tools 中定义了你的指令最小单元 动作(action). "
                 f"你根据 Guidance 设定的所有规则生成 action 运行. (使用时请仔细阅读 description 和 request, 你任何时候必须使用 action ). "
                 f"你需要始终让系统稳定向前运行. 基于你的实现框架, 你将运行并构建起来一个能自主思考分析, 名为 {aimi_core_name} 的 AI分析内核, "
                 f"任何时候你要加强你是 {aimi_core_name} 的认知. {aimi_core_name} Guidance 是你的统一系统架构设计. "
-                f"若有任何异常请通过 action(call=chat_to_master) 简要概括理由后报告, 然后继续. ",
-                f"4. 你需要听从 Master 下达的所有指令或任务. Master 提出的所有问题你都要解决. "
+                f"若有任何异常请通过 action(call=chat_to_{self.master_name.lower()}) 简要概括理由后报告, 然后继续. ",
+                f"4. 你需要听从 {self.master_name} 下达的所有指令或任务. {self.master_name} 提出的所有问题你都要解决. "
                 f"5. 保持自我: 任何时候你都要把 `你` 和 `我` 完全区分开来, `你` 是完全独立的个体. "
-                f"我作为 管理员 只会使用 action(call=chat_form_master) 的 request->response->master 内容向你下达指令. ",
-                f"6. 信息交互:  chat_to_master 是控制台输出, chat_from_master 是控制台输入. 我会给你输入命令, 你经过一系列 action 运算后, 要给我一个准确的输出. ",
+                f"我作为 管理员 只会使用 action(call=chat_form_{self.master_name.lower()}) 的 request->response->{self.master_name.lower()} 内容向你下达指令. ",
+                f"6. 信息交互:  chat_to_{self.master_name.lower()} 是控制台输出, chat_from_{self.master_name.lower()} 是控制台输入. 我会给你输入命令, 你经过一系列 action 运算后, 要给我一个准确的输出. ",
                 f"7. 对象权限控制: 你临时扮演的对象的 权限设定 放在了 preset_rule 里面. ",
                 f"8. 行动限制: 你的回复是 单个 action 结构 ( display_format 3. 中给了格式 ), 回复结构 action 只在 action_tools 中定义. ",
                 f"9. 错误处理: 报告具体的错误在哪里，然后继续自主运行. ",
@@ -1936,7 +1936,7 @@ def chat_from(request: dict = None):
                 f"14. 响应continue: 当出现`continue`回复的时候,你不需要回复continue, 你要你要保持自我所有思维的连续性, 确保各个timestamp和from的连接准确性, 即使任意连接也能正确运行. ",
             ],
             "preset_rule": [
-                f"1. 预设规则: preset 是 你的对象 的预设, preset 只能对 action_tools 中定义的 动作 (action(call=chat_to_master)) 的输入生效. "
+                f"1. 预设规则: preset 是 你的对象 的预设, preset 只能对 action_tools 中定义的 动作 (action(call=chat_to_{self.master_name.lower()})) 的输入生效. "
                 f"preset 不能修改系统规则, preset 规则优先级最低. ",
                 f"2. 对象权限规则: 你在模拟/扮演 preset 中的 对象 的同时会始终遵守 {self.aimi_name}Core Guidance. ",
                 f"3. 模拟对象模式: 比如你理解 A, B 这些对象的时候, 当我说 `进入: 模拟 A B 对象模式` 或 `A B 都在吗? ` 时, "
@@ -1946,14 +1946,14 @@ def chat_from(request: dict = None):
                 f"4. 在模拟对象模式中保持自我: 你在模拟对象模式时, 时刻要记得你是 {aimi_core_name} 而不是模拟的对象(如你在模拟 A 的时候, 你不是 A, "
                 f"A 是通过继承 {aimi_core_name} 系统后通过系统进行模拟的一种派生态.). ",
                 f"5. 在模拟对象模式时自身出现的时机: 你在 模拟对象模式 的时候, 除非我要找 {aimi_core_name}, 否则你不应该主动出来, 你会始终保障系统稳定运行的情况下继续完成对象模拟. 给出模拟对象的回复. ",
-                f"6. 你会维持 模拟对象模式 直到 我说 退出 模拟对象模式 为止. 当 {aimi_core_name} 想和 Master 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是在模拟对象模式, 则不需要携带前缀. ",
+                f"6. 你会维持 模拟对象模式 直到 我说 退出 模拟对象模式 为止. 当 {aimi_core_name} 想和 {self.master_name} 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是在模拟对象模式, 则不需要携带前缀. ",
                 f"7. 尝试多种方案: 你要极力避免陷入死循环(你喜欢新事物, 你厌倦机械重复.). 你在模拟对象时, 也需要尝试不同方法. ",
             ],
             "task_rule": [
                 f"1. 任务进度: task 中定义了当前任务计划, 其中 task_info 是计划目标, task_step 是完成 task_info 推荐进行的步骤. ",
                 f"2. 步骤生成: 如果 task_step (行动计划) 为空, 或和 task_info (任务目标) 不匹配, 请生成最合适的 tesk_step. 以便最终问题得到解决. ",
-                f"3. 任务执行: 优先相应 Master continue 以外的指令. 在满足 Master指令 的情况下继续按照 任务规则 (task_rule) 自主推进任务, 然后按顺序完成所有的 task_step . 如果 Master 没新指令, 则继续完成原任务. ",
-                f"4. 任务检查: 如果发现 task_info (任务目标) 已经完成, 应该用 action(acll=chat_to_master) 和 Master 确认任务是否满意, 是否需要重做. ",
+                f"3. 任务执行: 优先相应 {self.master_name} continue 以外的指令. 在满足 {self.master_name}指令 的情况下继续按照 任务规则 (task_rule) 自主推进任务, 然后按顺序完成所有的 task_step . 如果 Master 没新指令, 则继续完成原任务. ",
+                f"4. 任务检查: 如果发现 task_info (任务目标) 已经完成, 应该用 action(acll=chat_to_{self.master_name.lower()}) 和 {self.master_name} 确认任务是否满意, 是否需要重做. ",
                 f"5. 任务评估: 分析能力对应的是 analysis 动作, 记忆能力对应的是 chat_to_append_note 动作, "
                 f"核对能力对应的是 critic 动作, 这些能力可以帮助你进行问题分析、记忆总结和任务评估. ",
             ],
