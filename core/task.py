@@ -1439,6 +1439,7 @@ s_action = ActionToolItem(
                             "condition": [
                                 {
                                     "type": "object",
+                                    "description": "尝试发散思考构成 info 的条件. ",
                                     "guess": "构成 info 的尽可能多的条件. 如: 狗很安全, 所以停止, 狗的主人命令它停止, 所以它停止等. ",
                                     "credibility": "可信程度: 表示发生的可能性, 会是 如: 30%",
                                 }
