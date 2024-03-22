@@ -1361,6 +1361,7 @@ s_action = ActionToolItem(
                     "task_step": [
                         {
                             "type": "object",
+                            "description": "为了完成任务需要自行的其中一个步骤",
                             "from_task_id": "从属任务id: 隶属与哪个任务id 如: 1. 如果没有的话就不填.",
                             "step_id": "步骤号: 为数字, 如: 1",
                             "step": "步骤内容: 在这里填写能够完成计划 task_info 的步骤, "
@@ -1399,7 +1400,7 @@ s_action = ActionToolItem(
                     "citation": [
                         {
                             "type": "object",
-                            "description": "引用的信息: 和 expect/problem/error 关联, 符合逻辑的关联引用信息, "
+                            "description": "引用的其中一个信息: 和 expect/problem/error 关联, 符合逻辑的关联引用信息, "
                             "尽量从权威知识库中查找, 也可以从某些领域、行业的常识、经验等内容中查找, 注意填写可信程度. 如: 通过 preset 得知 ... ",
                             "reference": "来源关健词: 如: Master、软件技术、常识 ..., 你可以尽量寻找能解决问题的内容. ",
                             "information": "引用信息内容: 详细描述 reference 提供的参考信息, 不可省略. 如: preset 中定义了我有身体, 可以转圈圈. ",
@@ -1424,7 +1425,7 @@ s_action = ActionToolItem(
                     "next_task_step": [
                         {
                             "type": "object",
-                            "description": "task_step array[object]: 新行动计划: 基于 analysis 的内容生成能达成 task_info 或 Master的问题 的执行 动作(action) .\n "
+                            "description": "task_step 类型: 新的其中一个行动计划: 基于 analysis 的内容生成能达成 task_info 或 Master的问题 的执行 动作(action) .\n "
                             "填写时需要满足以下几点:\n "
                             "1. 新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id.\n "
                             "2. 必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向 Master 求助).\n "
