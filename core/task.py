@@ -1439,8 +1439,8 @@ s_action = ActionToolItem(
                             "condition": [
                                 {
                                     "type": "object",
-                                    "description": "构成 info 的尽可能多的条件, 是个数组, 每个条件单独一个结构. ",
-                                    "guess": "其中一个推测: 如: 狗很安全, 所以停止 或者 狗的主人命令它停止, 所以它停止等. ",
+                                    "description": "尝试发散思考: 构成 info 的尽可能多的条件. ",
+                                    "guess": "推测: 如: 狗的主人命令它停止, 所以它停止. ",
                                     "credibility": "可信程度: 表示发生 guess 的可能性, 如: 30%",
                                 }
                             ],
