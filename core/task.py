@@ -352,6 +352,11 @@ class Task(Bot):
                         yield "**Think...**\n"
 
                         yield from self.analysis(task.request)
+                        
+                    elif task.call == "suppose":
+                        yield "**Comprehend...**\n"
+
+                        yield from self.suppose(task.request)
 
                     elif task.call == "dream":
                         dream = self.dream(task.request)
@@ -960,28 +965,20 @@ s_action = ActionToolItem(
 
             analysis = request
 
-            def get_key(analysis, key):
-                if not isinstance(analysis, dict):
-                    log_dbg(f"analysis[{str(key)}] = {str(analysis)} not dict. ")
-                    return None
-                if key in analysis and analysis[key]:
-                    return analysis[key]
-                return None
-
-            tmp = get_key(analysis, "expect")
+            tmp = self.get_key("analysis", analysis, "expect")
             if tmp:
                 yield f"**Expect:** {tmp} \n"
 
-            tmp = get_key(analysis, "problem")
+            tmp = self.get_key("analysis", analysis, "problem")
             if tmp:
                 yield f"**Problem:** {tmp} \n"
 
-            tmp = get_key(analysis, "error")
+            tmp = self.get_key("analysis", analysis, "error")
             if tmp:
                 yield f"**Error:** {tmp} \n"
 
             has_node = False
-            tmp = get_key(analysis, "risk")
+            tmp = self.get_key("analysis", analysis, "risk")
             if tmp:
                 i = 0
                 for risk in tmp:
@@ -994,7 +991,7 @@ s_action = ActionToolItem(
                     yield "\n"
 
             has_node = False
-            tmp = get_key(analysis, "citation")
+            tmp = self.get_key("analysis", analysis, "citation")
             if tmp:
                 i = 0
                 for citation in tmp:
@@ -1004,10 +1001,10 @@ s_action = ActionToolItem(
                     if i == 1:
                         has_node = True
                         yield "**Citation:** \n"
-                    sub = get_key(citation, "description")
+                    sub = self.get_key("analysis", citation, "description")
                     if sub:
                         yield f" * ***Description:** {sub} * \n"
-                    sub = get_key(citation, "information")
+                    sub = self.get_key("analysis", citation, "information")
                     if sub:
                         yield f" * **Information:** {sub}\n"
                 if has_node:
@@ -1015,7 +1012,7 @@ s_action = ActionToolItem(
 
 
             has_node = False
-            tmp = get_key(analysis, "difference")
+            tmp = self.get_key("analysis", analysis, "difference")
             if tmp:
                 i = 0
                 for difference in tmp:
@@ -1027,16 +1024,16 @@ s_action = ActionToolItem(
                 if has_node:
                     yield "\n"
 
-            tmp = get_key(analysis, "verdict")
+            tmp = self.get_key("analysis", analysis, "verdict")
             if tmp:
                 yield f"**Verdict:** {tmp} \n"
 
-            tmp = get_key(analysis, "suggest")
+            tmp = self.get_key("analysis", analysis, "suggest")
             if tmp:
                 yield f"**Suggest:** {tmp} \n"
 
             has_node = False
-            tmp = get_key(analysis, "next_task_step")
+            tmp = self.get_key("analysis", analysis, "next_task_step")
             if tmp:
                 i = 0
                 for next_task_step in tmp:
@@ -1046,7 +1043,7 @@ s_action = ActionToolItem(
                     if i == 1:
                         has_node = True
                         yield "**Next Step:** \n"
-                    sub = get_key(next_task_step, "step")
+                    sub = self.get_key("analysis", next_task_step, "step")
                     if sub:
                         yield f" * {sub} \n"
                 if has_node:
@@ -1054,6 +1051,44 @@ s_action = ActionToolItem(
 
         except Exception as e:
             log_err(f"fail to analysis {str(e)}")
+    
+
+    def get_key(name, analysis, key):
+        if not isinstance(analysis, dict):
+            log_dbg(f"{name}[{str(key)}] = {str(analysis)} not dict. ")
+            return None
+        if key in analysis and analysis[key]:
+            return analysis[key]
+        return None
+    
+    def suppose(self, request) -> Generator[str, None, None]:
+        try:
+            js = json.dumps(request, indent=4, ensure_ascii=False)
+            log_info(f"suppose:\n{js}")
+
+            suppose = request
+
+            message = self.get_key("suppose", suppose, "message")
+            if message and isinstance(message, list):
+                for msg in message:
+                    has_msg = False
+                    info = self.get_key("suppose", msg, "info")
+                    if not info or not isinstance(info, dict):
+                        continue
+                    yield f"**info:** {info}\n"
+                    condition = self.get_key("suppose", msg, "condition")
+                    if not condition or not isinstance(condition, list):
+                        continue
+                    has_msg = True
+                    for cond in condition:
+                        if not cond or not isinstance(cond, str):
+                            continue
+                        yield f" * {cond} \n"
+                    if has_msg:
+                        yield "\n"
+
+        except Exception as e:
+            log_err(f"fial to suppose: {str(e)}")
 
     def critic(self, request) -> Generator[str, None, None]:
         try:
@@ -1377,6 +1412,24 @@ s_action = ActionToolItem(
                             "1. 新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id.\n "
                             "2. 必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向 Master 求助).\n "
                             "3. task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. step 中要有和之前有区别的 call->request 新输入.\n 如: 略",
+                        }
+                    ],
+                },
+                execute="AI",
+            ),
+            ActionToolItem(
+                call="suppose",
+                description="信息条件依赖: 通过已知信息判断可能附加的其他信息. ",
+                request={
+                    "type": "object",
+                    "message": [
+                        {
+                            "type": "object",
+                            "description": "尝试理解被分析的某些主体. ",
+                            "info": "要判断的条件主体: 如: 停止的狗. ",
+                            "condition": [
+                                "构成 info 的尽可能多的条件. 如: 狗很安全, 所以停止, 狗的主人命令它停止, 所以它停止等. ",
+                            ],
                         }
                     ],
                 },
