@@ -1088,11 +1088,19 @@ s_action = ActionToolItem(
                     for cond in condition:
                         if not cond or not isinstance(cond, dict):
                             continue
+
+                        has_gess = False
                         guess = self.get_key("suppose", cond, "guess")
+                        if guess:
+                            has_gess = True
+                            yield f" * {guess} "
+                        
                         credibility = self.get_key("suppose", cond, "credibility")
-                        if not guess or not credibility:
-                            continue
-                        yield f" * {guess} --- {credibility}\n"
+                        if guess and credibility:
+                            yield f"--- {credibility}"
+                        
+                        if has_gess:
+                            yield "\n"
                     if has_msg:
                         yield "\n"
 
