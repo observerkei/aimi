@@ -1440,7 +1440,7 @@ s_action = ActionToolItem(
                                 {
                                     "type": "object",
                                     "description": "尝试发散思考: 构成 info 其中一种可能的条件. ",
-                                    "guess": "推测: 如: 狗的主人命令它停止, 所以它停止. ",
+                                    "guess": "推测: 如: 狗的主人命令它停止, 因为狗必须服从主人才能被饲养, 所以它听从命令停止. ",
                                     "credibility": "可信程度: 表示发生 guess 的可能性, 如: 30%",
                                 }
                             ],
