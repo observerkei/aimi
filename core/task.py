@@ -1086,9 +1086,13 @@ s_action = ActionToolItem(
                     has_msg = True
 
                     for cond in condition:
-                        if not cond or not isinstance(cond, str):
+                        if not cond or not isinstance(cond, dict):
                             continue
-                        yield f" * {cond} \n"
+                        guess = self.get_key("suppose", cond, "guess")
+                        credibility = self.get_key("suppose", cond, "credibility")
+                        if not guess or not credibility:
+                            continue
+                        yield f" * {cond} --- {credibility}\n"
                     if has_msg:
                         yield "\n"
 
@@ -1433,7 +1437,11 @@ s_action = ActionToolItem(
                             "description": "尝试理解被分析的某些主体. ",
                             "info": "要判断的条件主体: 如: 停止的狗. ",
                             "condition": [
-                                "构成 info 的尽可能多的条件. 如: 狗很安全, 所以停止, 狗的主人命令它停止, 所以它停止等. ",
+                                {
+                                    "type": "object",
+                                    "guess": "构成 info 的尽可能多的条件. 如: 狗很安全, 所以停止, 狗的主人命令它停止, 所以它停止等. ",
+                                    "credibility": "可信程度: 表示发生的可能性, 会是 如: 30%",
+                                }
                             ],
                         }
                     ],
