@@ -517,7 +517,7 @@ class Task(Bot):
                                 and len(req)
                                 and None != task.request
                             ):
-                                yield f"**Request:** \n```javastript\n{req_format}\n```\n"
+                                yield f"**Request:** \n```javascript\n{req_format}\n```\n"
                                 log_info(f"call: {task.call} req: {req_format}")
 
                             if chat_from:
@@ -537,7 +537,7 @@ class Task(Bot):
                                     log_info(
                                         f"{task.call}: chat_from: {str(format_response)}"
                                     )
-                                    yield f"**Execution result:** \n```javastript\n{format_response}\n```\n"
+                                    yield f"**Execution result:** \n```javascript\n{format_response}\n```\n"
 
                                 except Exception as e:
                                     log_err(
