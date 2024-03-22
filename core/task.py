@@ -1428,7 +1428,7 @@ s_action = ActionToolItem(
             ),
             ActionToolItem(
                 call="suppose",
-                description="信息条件依赖: 通过已知信息判断可能附加的其他信息. ",
+                description="信息条件依赖|判断可能性|猜测|信息推测: 通过已知信息判断可能附加的其他信息. ",
                 request={
                     "type": "object",
                     "message": [
