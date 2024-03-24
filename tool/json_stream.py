@@ -133,7 +133,7 @@ class JsonStream:
         self.stream_map = {}
         stream = JsonStreamData(JsonStreamDataType.UND, self.path)
         stream.parent = stream
-        self.append_stream(JsonStreamRoot.Root, stream)
+        self.stream_map[JsonStreamRoot.Root] = stream
 
     def is_path(self, path=""):
         if self.path == path:
@@ -317,7 +317,7 @@ class JsonStream:
     def get_stream(self, path) -> JsonStreamData:
         if path not in self.stream_map:
             stream = JsonStreamData(JsonStreamDataType.UND, path)
-            self.append_stream(path, stream)
+            self.stream_map[path] = stream
         
         return self.stream_map[path]
 
@@ -666,7 +666,7 @@ if __name__ == "__main__":
     },
     """
     rsp_data_4 = """
-{"type": "object", "timestamp": 28, "expect": "Questions and Answers", "reasoning": "AimiCore started thinking: The Master wanted to know how to display the running time in the process of running the program using the subprocess call, and needed to be in milliseconds. I should answer his question." , "call": "chat_to_master", "request": {"type": "object", "content":  "To display a running time when you run a program using a subprocess call, you can get a timestamp at the start and end of the program and calculate the time difference. You can use the time module's time() function to get a timestamp in seconds and multiply it by 1,000 to convert it to milliseconds. The following code is an example: \n\n```python\nimport subprocess\nimport time\n\nstart_time = int(time.time() *  1000)\nsubprocess.run(['your_program'])\nend_time = int(time.time() * 1000)\n\nelapsed_time = end_time -  start_time\nprint(' elapsed time of the program in milliseconds: ', elapsed_time)\n ' '\n\n This will display the elapsed time in milliseconds when the program is run." ", "from": [0]}, "conclusion": "According to the Master's problem, this paper gives the solution of how to display the running time when using the subprocess call to run the program.", "execute": "system"}]
+{"type": "object", "timestamp": 28, "expect": "Questions and Answers", "reasoning": "AimiCore started thinking: The Master wanted to know how to display the running time in the process of running the program using the subprocess call, and needed to be in milliseconds. I should answer his question." , "call": "chat_to_master", "request": {"type": "object", "content":  "To display a running time when you run a program using a subprocess call, you can get a timestamp at the start and end of the program and calculate the time difference. You can use the time module's time() function to get a timestamp in seconds and multiply it by 1,000 to convert it to milliseconds. The following code is an example: \n\n```python\nimport subprocess\nimport time\n\nstart_time = int(time.time() *  1000)\nsubprocess.run(['your_program'])\nend_time = int(time.time() * 1000)\n\nelapsed_time = end_time -  start_time\nprint(' elapsed time of the program in milliseconds: ', elapsed_time)\n ```\n\n This will display the elapsed time in milliseconds when the program is run.", "from": [0]}, "conclusion": "According to the Master's problem, this paper gives the solution of how to display the running time when using the subprocess call to run the program.", "execute": "system"}]
     """
     rsp_data_arr = [rsp_data_0, rsp_data_1, rsp_data_2, rsp_data_3, rsp_data_4]
     # ```
@@ -715,7 +715,10 @@ if __name__ == "__main__":
     root = json_stream.get_stream(JsonStreamRoot.Root)
 
     print(f"output({json_stream.done}) type:{root.type}:\n```json\n{json_stream.data}\n```\n")
-    print(f'root: {root.data}')
+    
+    import json
+    js = json.dumps(root.data, indent=4, ensure_ascii=False)
+    print(f'root:\n```json\n{js}\n```\n')
 
     # for k, v in json_stream.stream_map.items():
     #     print(f"jss. type: {v.type} k: {k} v: {v.str()} stream: {v}")
