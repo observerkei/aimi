@@ -2044,7 +2044,6 @@ def chat_from(request: dict = None):
 
             if tsc.need_wait():
                 try:
-                    log_dbg(f"input {len(res['message'])} {piece}")
                     for talk in self.task_dispatch_stream(tsc, piece):
                         if isinstance(talk, str):
                             talk_cache += talk
@@ -2066,30 +2065,28 @@ def chat_from(request: dict = None):
                     log_dbg(f"fail to parser stream: {e}")
                     talk_cache = ""
                     continue
+            if res["code"] != 0:
+                log_dbg(f"input {len(res['message'])} {piece}")
+                if len(str(res["message"])) > 500:
+                    log_dbg(f"msg: {str(res['message'])}")
+                continue
 
-            else:
-                if res["code"] != 0:
-                    log_dbg(f"skip len: {len(str(res['message']))}")
-                    if len(str(res["message"])) > 500:
-                        log_dbg(f"msg: {str(res['message'])}")
-                    continue
+            talk_cache = ""
+            if not tsc.done:  # 如果解析完成了, 则说明不需要再继续处理.
 
-                talk_cache = ""
-                if not tsc.done:  # 如果解析完成了, 则说明不需要再继续处理.
+                for talk in self.task_dispatch(res["message"]):
+                    if isinstance(talk, str):
+                        talk_cache += talk
+                    else:
+                        log_err(
+                            f"task_response not str: {str(type(talk))}: {str(talk)}\n"
+                        )
 
-                    for talk in self.task_dispatch(res["message"]):
-                        if isinstance(talk, str):
-                            talk_cache += talk
-                        else:
-                            log_err(
-                                f"task_response not str: {str(type(talk))}: {str(talk)}\n"
-                            )
+                    answer["message"] = talk_cache
+                    yield answer
 
-                        answer["message"] = talk_cache
-                        yield answer
-
-                msg = res["message"]
-                log_dbg(f"res: {msg}")
+            msg = res["message"]
+            log_dbg(f"res: {msg}")
 
             prev_text = res["message"]
 
