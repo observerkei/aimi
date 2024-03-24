@@ -70,7 +70,6 @@ class JsonStreamData:
             for item in self.__data:
                 item: 'JsonStreamData'
                 arr.append(item.data)
-            print(f"is arr")
             return arr
         elif self.type == JsonStreamDataType.OBJ:
             dict = {}
