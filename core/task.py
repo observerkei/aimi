@@ -18,6 +18,8 @@ from tool.util import (
     is_json,
 )
 
+from tool.json_stream import JsonStream, JsonStreamData
+
 from core.aimi_plugin import (
     ChatBot,
     ChatBotType,
@@ -52,6 +54,111 @@ class TaskRunningItem(BaseModel):
     execute: constr(regex="system|AI")
 
 
+class TaskRunningItemStreamType:
+    Type = 'json.arr[0]["type"]'
+    Timestamp = 'json.arr[0]["timestamp"]'
+    Expect = 'json.arr[0]["expect"]'
+    Reasoning = 'json.arr[0]["reasoning"]'
+    Call = 'json.arr[0]["call"]'
+    Request = 'json.arr[0]["request"]'
+    RequestContent = 'json.arr[0]["request"]["content"]'
+    Conclusion = 'json.arr[0]["request"]["conclusion"]'
+    Execute = 'json.arr[0]["request"]["execute"]'
+
+
+class TaskStreamContext:
+    jss: JsonStream
+    check: Dict = {}
+    data: List[TaskRunningItem] = []
+    listen_calls: List[str]
+    error: str = ""
+
+    def need_wait(self) -> bool:
+        if len(self.error):
+            return False
+        # 没有解析到动作的时候进行等待
+        if not len(self.data[0].call):
+            return True
+        if self.action_start():
+            return True
+        return False
+
+    def get_task_stream(self) -> TaskRunningItem:
+        return self.data[0]
+
+    def get_action_key_by_stream_key(self, stream_type: TaskRunningItemStreamType):
+        map_list = {
+            TaskRunningItemStreamType.Type: "type",
+            TaskRunningItemStreamType.Timestamp: "timestamp",
+            TaskRunningItemStreamType.Reasoning: "reasoning",
+            TaskRunningItemStreamType.Expect: "expect",
+            TaskRunningItemStreamType.Call: "call",
+            TaskRunningItemStreamType.Request: "request",
+            TaskRunningItemStreamType.Execute: "excute",
+            TaskRunningItemStreamType.Conclusion: "conclusion",
+        }
+        return map_list.get(stream_type)
+    
+    def action_start(self) -> bool:
+        # 不能处理 timestamp 为 0 的情况
+        if 0 == self.data[0].timestamp:
+            return False
+        
+        # 如果第一个不是 要处理的, 那么就不管
+        if self.data[0].call in self.listen_calls:
+            return True
+        return False
+
+    def is_first(self) -> bool:
+        if self.jss.path not in self.check:
+            return True
+        return False
+
+    @property
+    def done(self):
+        if len(self.error):
+            return False
+        
+        # 都没开始处理肯定没完成
+        if not self.action_start():
+            return False
+
+        has_wait = False
+        for _, done in self.check.items():
+            if not done:
+                has_wait = True
+                break
+
+        if not has_wait:
+            return True
+        return False
+    
+    def parser(self, buf) -> Generator[JsonStreamData, None, None]:
+        for stream in self.jss.parser(buf):
+            if stream.done:
+                action_key = self.get_action_key_by_stream_key(stream.path)
+                log_dbg(f"path: {stream.path}, action_key: {action_key}")
+
+                if stream.path == TaskRunningItemStreamType.Call:
+                    if stream.data not in self.listen_calls:
+                        self.error = f"not support stream call: {stream.data}"
+                        raise Exception(self.error)
+                
+                if action_key and hasattr(self.data[0], action_key):
+                    setattr(self.data[0], action_key, stream.data)
+
+            yield stream
+            if self.jss.path not in self.check:
+                self.check[self.jss.path] = stream.done
+
+    def __init__(self, listen_calls: List[str]):
+        self.jss = JsonStream()
+        self.listen_calls = listen_calls
+
+        task = TaskRunningItem(timestamp=0, call="", request=None, execute="system")
+        self.data.append(task)
+        
+
 class TaskItem(BaseModel):
     type: str = "object"
     task_id: Optional[Union[int, str]]
@@ -83,6 +190,70 @@ class Task(Bot):
     use_talk_messages: bool = True
     models: List[str] = []
     now_ctx_size: int = 0
+
+    
+    def task_dispatch_stream(self, tsc: TaskStreamContext, res: str) -> Generator[str, None, None]:
+        try:
+            log_dbg(f"recv str: {res}")
+            for stream in tsc.parser(res):
+                if stream.path == TaskRunningItemStreamType.Type:
+                    if stream.done:
+                        type_str = stream.data
+                        pass
+                elif stream.path == TaskRunningItemStreamType.Timestamp:
+                    if stream.done:
+                        timestamp = int(stream.data)
+                        log_dbg(f"Timestamp: {timestamp}")
+                        if timestamp < int(self.timestamp):
+                            raise Exception(
+                                f"system error: AI try copy old action, time: {timestamp}"
+                            )
+                elif stream.path == TaskRunningItemStreamType.Expect:
+                    log_dbg(f"Expect: {stream.path} {stream.chunk}")
+                    if tsc.is_first():
+                        yield f"**Expect**: "
+                    yield stream.chunk
+                    if stream.done:
+                        log_dbg(f"{stream.data}")
+                        yield "\n"
+                elif stream.path == TaskRunningItemStreamType.Conclusion:
+                    log_dbg(f"Conclusion: {stream.path} {stream.chunk}")
+                    if tsc.is_first():
+                        yield f"\n**Conclusion**: "
+                    yield stream.chunk
+                    if stream.done:
+                        log_dbg(f"{stream.data}")
+                        yield "\n"
+                elif stream.path == TaskRunningItemStreamType.Call:
+                    if stream.done:
+                        log_dbg(f"Call: {stream.data}")
+                elif stream.path == TaskRunningItemStreamType.RequestContent:
+                    task_stream = tsc.get_task_stream()
+                    log_dbg(f"task stream: {str(task_stream)} {stream.chunk}")
+
+                    if task_stream.call.lower() == f"chat_to_{self.master_name.lower()}":
+
+                        log_dbg(f"To {self.master_name}: {stream.path}")
+                        if tsc.is_first():
+                            yield f"**To {self.master_name}**: \n"
+                        yield stream.chunk
+                        if stream.done:
+                            log_dbg(f"{stream.data}")
+                            yield "\n"
+                
+                elif stream.path == TaskRunningItemStreamType.Reasoning:
+                    log_dbg(f"Reasoning: {stream.path} {stream.chunk}")
+                    if tsc.is_first():
+                        yield f"**Reasoning**:"
+                    yield stream.chunk
+                    if stream.done:
+                        log_dbg(f"{stream.data}")
+                        yield "\n\n"
+                
+        except Exception as e:
+            tsc.error = f"cann't parser stream: {e}"
+            log_dbg(tsc.error)
+            raise Exception(tsc.error)
 
     def task_dispatch(self, res: str) -> Generator[str, None, None]:
         def get_json_content(answer: str):
@@ -1795,26 +1966,79 @@ def chat_from(request: dict = None):
             model=self.get_openai_model(model),
         )
 
+        rsp_data = '[{"type": "object", "timestamp": __timestamp, "expect": "你好", "reasoning": "AimiCore开始思考: 根据Master的指示，回复`你好`。", "call": "chat_to_master", "request": {"type": "object", "content": "[AimiCore] 你好，我已经初始化完成。", "from": [2]}, "conclusion": "为了符合Guidance，我回复了`你好`。", "execute": "system"}] '
+        rsp_data = rsp_data.replace('__timestamp', str(self.timestamp))
+
+        tsc = TaskStreamContext([f"chat_to_{self.master_name.lower()}"])
+        send_tsc_cache = False
+        prev_text = ""
+        talk_cache = ""
+        
         for res in self.chatbot.ask(ChatBotType.OpenAI, ask_data):
             if res["code"] == -1:
+                talk_cache = ""
+                prev_text = ""
+                send_tsc_cache = False
+
                 err = res["message"]
                 log_dbg(f"openai req fail: {err}")
                 res["message"] = f"**AI Server Failed:** {err}\n\n"
+                
                 yield res
                 continue
 
-            if res["code"] != 0:
-                log_dbg(f"skip len: {len(str(res['message']))}")
-                if len(str(res["message"])) > 500:
-                    log_dbg(f"msg: {str(res['message'])}")
-                continue
+            piece = res["message"][len(prev_text):]
 
-            for talk in self.task_dispatch(res["message"]):
-                if isinstance(talk, str):
-                    answer["message"] += talk
-                else:
-                    log_err(f"task_response not str: {str(type(talk))}: {str(talk)}\n")
-                yield answer
+            if tsc.need_wait():
+                try:
+                    for talk in self.task_dispatch_stream(tsc, piece):
+                        if isinstance(talk, str):
+                            talk_cache += talk
+                        else:
+                            log_err(f"task_response not str: {str(type(talk))}: {str(talk)}\n")
+                        
+                        # 是需要解析的动作才会发送解析结果.
+                        if not send_tsc_cache:
+                            if not tsc.action_start():
+                                continue
+                            send_tsc_cache = True
+                        
+                        answer["message"] = talk_cache
+                        yield answer
+
+                except Exception as e:
+                    log_dbg(f"fail to parser stream: {e}")
+                    talk_cache = ""
+                    continue
+
+            else:
+                if res["code"] != 0:
+                    log_dbg(f"skip len: {len(str(res['message']))}")
+                    if len(str(res["message"])) > 500:
+                        log_dbg(f"msg: {str(res['message'])}")
+                    continue
+
+                talk_cache = ""
+                if not tsc.done: # 如果解析完成了, 则说明不需要再继续处理.
+
+                    for talk in self.task_dispatch(res["message"]):
+                        if isinstance(talk, str):
+                            talk_cache += talk
+                        else:
+                            log_err(f"task_response not str: {str(type(talk))}: {str(talk)}\n")
+                        
+                        answer["message"] = talk_cache
+                        yield answer
+                
+
+                msg = res["message"]
+                log_dbg(f"res: {msg}")
+                
+
+            prev_text = res["message"]
+
+            yield answer
+
 
         self.save_task()
 

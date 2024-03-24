@@ -32,7 +32,6 @@ class JsonStreamData:
 
     def str(self):
         if self.type == JsonStreamDataType.ARR:
-            cnt = 0
             for i in self.data:
                 i: "JsonStreamData"
                 log_dbg(f"path: {i.path}, {i.str()}")
@@ -104,7 +103,9 @@ class JsonStream:
         return self.stream_map[self.path].data
 
     def parser(self, buf: str):
-        self.buf += buf
+
+        if buf and len(buf):
+            self.buf += buf
 
         now_path = self.path
         now_stream = self.stream_map[self.path]
@@ -463,6 +464,9 @@ class JsonStream:
 
     def parser_str(self, str_stream: JsonStreamData, path):
         cur = len(self.buf) - self.offset
+        
+        str_stream.chunk = ""
+
         while cur and self.offset < len(self.buf):
             cur -= 1
 
@@ -476,43 +480,45 @@ class JsonStream:
             ):
                 self.offset += 1
                 str_stream.done = True
-                str_stream.chunk = ""
                 log_dbg(f"str parset val done: {str_stream.data}")
                 break
 
             add_str = self.buf[self.offset]
             str_stream.data += add_str
-            str_stream.chunk = add_str
+            str_stream.chunk += add_str
 
             self.offset += 1
-
-            yield str_stream
 
         yield str_stream
 
     def is_str_val_end(self, buf, now_offset):
         now = buf[now_offset]
         log_dbg(f"check end: {now}")
-
-        if buf[now_offset - 1] == "\\":
-            if buf[now_offset - 2] == "\\":
-                if buf[now_offset - 3] == "\\":
-                    if buf[now_offset - 4] == "\\":
-                        # \\ \\ " end
-                        return True
-                    else:
-                        # ? \\ \" continue
-                        return False
-                else:
-                    # ? \\ " end
-                    return True
-            else:
-                # ?\" continue
-                return False
-        else:
-            # 前面不是 \ , 这里收到了 " 说明 json val 结束
+        
+        if now_offset < 1: # 至少要有两个字符
+            return False
+        
+        if buf[now_offset - 1] != "\\": # 前面不是 \ , 这里收到了 " 说明 json val 结束
             return True
-
+        if now_offset < 2:
+            return True
+        
+        if buf[now_offset - 2] != "\\": # ?\" continue
+            return False
+        if now_offset < 3:
+            return False
+        
+        if buf[now_offset - 3] != "\\": # ? \\ " end
+            return True
+        if now_offset < 4:
+            return True
+        
+        if buf[now_offset - 4] != "\\": # ? \\ \" continue
+            return False
+        
+        # \\ \\ " end
+        return True 
+        
 
 if __name__ == "__main__":
     # ```json
