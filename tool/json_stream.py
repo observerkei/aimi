@@ -1,7 +1,7 @@
 from typing import Dict, Any, List, Generator, Optional, Union, Set
 from tool.util import log_dbg
 
-def log_dbg(str):
+def log_dbg(f):
     pass
 
 class JsonStreamDataType:
@@ -32,13 +32,25 @@ class JsonStreamData:
 
     def str(self):
         if self.type == JsonStreamDataType.ARR:
+            res = f"arr path: {self.path} {{ "
+            cnt = 0
             for i in self.data:
                 i: "JsonStreamData"
-                log_dbg(f"path: {i.path}, {i.str()}")
+                if cnt != 0:
+                    res += ','
+                res += f" {cnt}: {i.str()}"
+                cnt += 1
+            return res + " }"
         elif self.type == JsonStreamDataType.OBJ:
+            res = f"obj path: {self.path} {{"
+            cnt = 0
             for k, v in self.data.items():
                 v: "JsonStreamData"
-                log_dbg(f"path: {v.path}, k: {k}, v: {v.str()}")
+                if cnt != 0:
+                    res += ','
+                res += f' "{k}": {v.str()}'
+                cnt += 1
+            return res + ' }'
         else:
             return str(self.data)
 
@@ -132,16 +144,32 @@ class JsonStream:
                 if sub_stream.done:
                     break
 
-            if (
-                now_stream
-                and now_stream.type != JsonStreamDataType.ARR
-                and now_stream.type != JsonStreamDataType.OBJ
-                and now_stream.type != JsonStreamDataType.UND
-            ):
-                yield now_stream
+            if now_stream:
+                if (now_stream.type != JsonStreamDataType.OBJ
+                    and now_stream.type != JsonStreamDataType.ARR
+                    and now_stream.type != JsonStreamDataType.UND
+                ):
+                    yield now_stream
 
-            if now_stream and now_stream.done:
-                now_stream = self.parser_stream_done(now_stream)
+
+                if now_stream.done:
+                    if (now_stream.type == JsonStreamDataType.ARR
+                        or now_stream.type == JsonStreamDataType.OBJ
+                    ):
+                        yield now_stream
+                    
+                    now_stream = self.parser_stream_done(now_stream)
+                    
+    def del_stream_done_path(self, path):
+        if self.stream_map[path].done:
+            parent_path_end = path.rfind("[")
+            parent_path = ""
+            if -1 != parent_path_end:
+                parent_path = path[:parent_path_end]
+                return self.del_stream_done_path(parent_path)
+        return path
+
+        
 
 
     def parser_stream_done(self, stream: JsonStreamData):
@@ -158,16 +186,13 @@ class JsonStream:
         if -1 != parent_path_end:
             parent_path = self.path[:parent_path_end]
             parent = self.stream_map[parent_path]
-
+            
             if parent.type == JsonStreamDataType.OBJ:
-                log_dbg(f"del path: {self.path[parent_path_end:]}")
                 parent.type_parser_reset()
-                del self.stream_map[self.path]
-                self.path = parent_path
-            elif parent.type == JsonStreamDataType.ARR:
-                log_dbg(f"del path: {self.path[parent_path_end:]}")
-                del self.stream_map[self.path]
-                self.path = parent_path
+        
+        need_parser_path = self.del_stream_done_path(self.path)
+        log_dbg(f"update path {self.path} to {need_parser_path}")
+        self.path = need_parser_path
 
         stream.type_parser_reset()
 
@@ -233,10 +258,12 @@ class JsonStream:
                 self.offset += 1  # 跳过生成过的字符.
                 self.path = f"{path}.arr"
                 self.stream_map[self.path] = stream
+                log_dbg(f"{path} create arr {stream}")
             elif type == JsonStreamDataType.OBJ:
                 self.offset += 1  # 跳过生成过的字符.
                 self.path = f"{path}.obj"
                 self.stream_map[self.path] = stream
+                log_dbg(f"{path} create obj: {stream}")
             elif type == JsonStreamDataType.STR:
                 self.offset += 1  # 跳过生成过的字符.
             else:
@@ -254,6 +281,15 @@ class JsonStream:
             )
 
             if not obj_stream.key_start:
+                # 还没解析 key 就到了尾声, 如果结束了的话, 就设置完成.
+                if self.buf[self.offset] == "}" and self.is_str_val_end(
+                    self.buf, self.offset
+                ):
+                    obj_stream.done = True
+                    self.offset += 1
+                    log_dbg(f"path: {self.path}, obj_stream done. {obj_stream}")
+                    break
+
                 if self.buf[self.offset] == '"':
                     obj_stream.key_start = self.offset + 1
                     log_dbg(f"start: {obj_stream.key_start}")
@@ -296,6 +332,7 @@ class JsonStream:
 
                 # 解析完成了一个 key. 正在解析 val 中.
                 if obj_stream.now_key not in obj_stream.data:
+                    log_dbg(f"{new_path} append arr key: {obj_stream.now_key} obj: {obj_stream}")
                     obj_stream.data[obj_stream.now_key] = sub_stream
 
                     # 记录正在解析的路径信息.
@@ -318,14 +355,6 @@ class JsonStream:
                 yield stream
                 continue
 
-            # 到了尾声, 如果结束了的话, 就设置完成.
-            if self.buf[self.offset] == "}" and self.is_str_val_end(
-                self.buf, self.offset
-            ):
-                obj_stream.done = True
-                self.offset += 1
-                break
-
         yield obj_stream
 
     def parser_arr(self, arr_stream: JsonStreamData, path):
@@ -339,6 +368,13 @@ class JsonStream:
             if self.need_skip_char(self.buf[self.offset]):
                 self.offset += 1
                 continue
+
+            # 还没开始拿到元素就结束数组了 
+            if self.buf[self.offset] == "]":
+                arr_stream.done = True
+                self.offset += 1
+                log_dbg(f"path: {self.path}, arr_strem done. {arr_stream}")
+                break
 
             new_path = f"{path}[{arr_stream.now_arr_cnt}]"
             stream = JsonStreamData(JsonStreamDataType.UND, new_path)
@@ -354,6 +390,7 @@ class JsonStream:
                 if len(arr_stream.data) < arr_stream.now_arr_cnt + 1:
                     arr_data.append(item_stream)
                     if new_path not in self.stream_map:
+                        log_dbg(f"{new_path} append arr idx: {arr_stream.now_arr_cnt} arr: {arr_stream}")
                         self.stream_map[new_path] = item_stream
                         self.path = new_path
                 else:
@@ -376,10 +413,6 @@ class JsonStream:
                 self.offset += 1
                 continue
 
-            if self.buf[self.offset] == "]":
-                arr_stream.done = True
-                self.offset += 1
-                break
 
         yield arr_stream
 
@@ -582,4 +615,12 @@ if __name__ == "__main__":
             data = json_stream.path_data()
             print(f"path:{stream.path}: {str(data)}, done: {stream.done}")
             continue
+    
+
+    # for k, v in json_stream.stream_map.items():
+    #     print(f"jss. type: {v.type} k: {k} v: {v.str()} stream: {v}")
+
+
+    # root = json_stream.stream_map['json.arr[0]']
+    # print(f"jss: {root.str()}")
     
