@@ -2,14 +2,16 @@ import sys
 import subprocess
 from pydantic import BaseModel, constr
 from typing import List, Dict
+import time
 
 from tool.util import log_err, log_dbg
 
 
 class RunCodeReturn(BaseModel):
-    returncode: int = 0
+    returncode: int = -1 
     stdout: str = ""
     stderr: str = ""
+    runtime: int = 0 # 秒
 
 
 class Sandbox:
@@ -60,7 +62,7 @@ class Sandbox:
             )
 
     def __run_system_code(timeout):
-        run = RunCodeReturn(returncode=-1, stdout="", stderr="")
+        run = RunCodeReturn()
 
         result = Sandbox.__run_cmd([sys.executable, Sandbox.sandbox_file], timeout)
         run.returncode = int(result.returncode)
@@ -70,7 +72,7 @@ class Sandbox:
         return run
 
     def __run_docker_code(timeout):
-        run = RunCodeReturn(returncode=-1, stdout="", stderr="")
+        run = RunCodeReturn()
 
         # create requirements.txt
         # request: pipreqs
@@ -100,9 +102,11 @@ class Sandbox:
 
     def run_code(run_model: str = RunModel.system, timeout: int = None) -> RunCodeReturn:
         max_return_len = 2048
-        run = RunCodeReturn(returncode=-1, stdout="", stderr="")
+        run = RunCodeReturn()
 
         try:
+            start_time = time.time()
+
             if run_model == Sandbox.RunModel.system:
                 run = Sandbox.__run_system_code(timeout)
             elif run_model == Sandbox.RunModel.docker:
@@ -111,6 +115,9 @@ class Sandbox:
                 run.stderr = f"no support run model: {str(run_model)}"
                 log_err(f"run_code: {run.stderr}")
                 return run
+            
+            end_time = time.time()
+            run.runtime = end_time - start_time
 
             if not len(run.stdout):
                 run.returncode = -1

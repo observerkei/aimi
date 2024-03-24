@@ -658,10 +658,11 @@ class Task(Bot):
                         )
 
                         stdout = response["stdout"]
+                        runtime = response["runtime"]
                         if success:
-                            yield f"**Execution result:** \n```javascript\n{stdout}\n```\n"
+                            yield f"**Execution result[{runtime}s]:** \n```javascript\n{stdout}\n```\n"
                         else:
-                            yield f"**Execution failed:** \n```javascript\n{stdout}\n```\n"
+                            yield f"**Execution failed[{runtime}s]:** \n```javascript\n{stdout}\n```\n"
 
                     elif task.call == "chat_to_chatgpt":
                         aimi = task.request[f"{self.aimi_name}"]
@@ -846,6 +847,7 @@ class Task(Bot):
             f"针对具体出现的问题进行具体分析, 再思考怎么修改代码, 实现目标功能:\n "
             f"returncode: 程序运行的返回值\n "
             f"stdout: 代码执行的输出结果.",
+            "runtime": run.runtime,
             "returncode": str(run_returncode),
             "stdout": str(run_stdout),
         }
