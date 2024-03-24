@@ -1,7 +1,7 @@
 from typing import Dict, Any, List, Generator, Optional, Union, Set
 from tool.util import log_dbg
 
-def log_dbg(s):
+def log_dbg(str):
     pass
 
 class JsonStreamDataType:
@@ -20,6 +20,7 @@ class JsonStreamData:
     data: Any
     done: bool = False
     path: str
+    chunk: Any
 
     now_arr_cnt = 0
     now_key = ""
@@ -91,6 +92,11 @@ class JsonStream:
 
     def is_path(self, path=""):
         if self.path == path:
+            return True
+        return False
+    
+    def need_skip_char(self, ch) -> bool:
+        if ch == ' ' or ch == '\n' or ch == '\t':
             return True
         return False
 
@@ -273,7 +279,7 @@ class JsonStream:
                 self.offset += 1
                 continue
 
-            if self.buf[self.offset] == " ":
+            if self.need_skip_char(self.buf[self.offset]):
                 self.offset += 1
                 continue
 
@@ -329,7 +335,7 @@ class JsonStream:
 
             log_dbg(f"cur: {cur}, offset: {self.offset}, all: {len(self.buf)}")
 
-            if self.buf[self.offset] == " ":
+            if self.need_skip_char(self.buf[self.offset]):
                 self.offset += 1
                 continue
 
@@ -360,7 +366,7 @@ class JsonStream:
             if self.offset >= len(self.buf):
                 break
 
-            if self.buf[self.offset] == " ":
+            if self.need_skip_char(self.buf[self.offset]):
                 self.offset += 1
                 continue
 
@@ -394,6 +400,7 @@ class JsonStream:
                     f"num: {str(num)}, offset: {self.offset}, all: {len(self.buf)}, buf: {self.buf[self.offset:]}"
                 )
                 num_stream.data = int(num)
+                num_stream.chunk = num_stream.data
                 num_stream.done = True
 
                 break
@@ -417,6 +424,7 @@ class JsonStream:
                 if "null" != nul:
                     raise Exception(f"data not null: {self.buf}")
                 nul_stream.data = None
+                nul_stream.chunk = nul_stream.data
 
                 nul_stream.done = True
 
@@ -444,6 +452,7 @@ class JsonStream:
                     bol_stream.data = True
                 else:
                     bol_stream.data = False
+                bol_stream.chunk = bol_stream.data
                 bol_stream.done = True
 
                 break
@@ -467,11 +476,13 @@ class JsonStream:
             ):
                 self.offset += 1
                 str_stream.done = True
+                str_stream.chunk = ""
                 log_dbg(f"str parset val done: {str_stream.data}")
                 break
 
             add_str = self.buf[self.offset]
             str_stream.data += add_str
+            str_stream.chunk = add_str
 
             self.offset += 1
 
@@ -504,17 +515,65 @@ class JsonStream:
 
 
 if __name__ == "__main__":
-    json_stream = JsonStream()
-    rsp_data = '[{"type": "object", "timestamp": 4, "expect": "你好", "reasoning": "AimiCore开始思考: 根据Master的指示，回复`你好`。", "call": "chat_to_master", "request": {"type": "object", "content": "[AimiCore] 你好，我已经初始化完成。", "from": [2]}, "conclusion": "为了符合Guidance，我回复了`你好`。", "execute": "system"}]'
+    # ```json
+    rsp_data = """[
+        {
+            "type": "object", 
+            "timestamp": 4, 
+            "expect": "hello", 
+            "reasoning": "In order to reply to a message, you need to briefly think about where to start.  ", 
+            "call": "chat_to_master", 
+            "request": {
+                "type": "object",
+                "content": "[AimiCore] Hello, I have initialized. ", 
+                "from": [
+                    2
+                ]
+            }, 
+            "conclusion": "To comply with the Guidance, I replied 'hello'.", 
+            "execute": "system"
+        }
+    ]
+    """
+    # ```
 
-    import time
+    # You can access keys(type -> json.arr[0]["type"]) like this:
+    # ```python
+    # jss = JsonStream()
+    # for s in rsp_data: # s is stream str
+    #     for stream in jss.parser(s):
+    #         if stream.path == 'json.arr[0]["type"]':
+    #             print(f"json type: {stream.data}")
+    #             if stream.done:
+    #                 print(f"stream type parser done.")
+    # ```
+    #
+    # output:
+    # ```bash
+    # json type: object
+    # stream type parser done.
+    # ````
+    # # The meaning of `path`
+
+    # json.arr: json is an array structure
+    # json.obj: json is an object structure
+
+    # Where [num] (num is a number) indicates that the data is an array
+    # json.arr[0]: Access the first element of the array
+    # json.arr[0][0]: The first element of an array is an array
+
+    # Where ["Test"] (Key is enclosed in double quotes) means that the key of object is accessed as a member of Test,
+    # json.obj["Test"]: Access a value in object whose key is Test
+
+    # It can also be combined:
+    # json.arr[0]["Test"]: Access the first element of the array, and then access the value of the element whose Key is Test
+
+    
+    json_stream = JsonStream()
 
     for s in iter(rsp_data):
         for stream in json_stream.parser(s):
             data = json_stream.path_data()
             print(f"path:{stream.path}: {str(data)}, done: {stream.done}")
             continue
-
-    # for k, v in json_stream.stream_map.items():
-    #     log_dbg(f"=====")
-    #     log_dbg(f"{k}: {v.str()}")
+    
