@@ -64,6 +64,7 @@ class TaskActionKey:
     Conclusion = "conclusion"
     Execute = "execute"
 
+
 class TaskActionRequestKey:
     Content = "content"
 
@@ -78,21 +79,27 @@ class TaskRunningItemStreamType:
     Conclusion = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Conclusion}"]'
     Execute = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Execute}"]'
 
-    def __init__(self, root_idx = 0):
+    def __init__(self, root_idx=0):
         self.Type = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Type}"]'
-        self.Timestamp = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Timestamp}"]'
+        self.Timestamp = (
+            f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Timestamp}"]'
+        )
         self.Expect = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Expect}"]'
-        self.Reasoning = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Reasoning}"]'
+        self.Reasoning = (
+            f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Reasoning}"]'
+        )
         self.Call = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Call}"]'
         self.Request = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Request}"]'
-        self.Conclusion = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Conclusion}"]'
+        self.Conclusion = (
+            f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Conclusion}"]'
+        )
         self.Execute = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Execute}"]'
 
 
 class TaskRunItemStreamReqType(TaskRunningItemStreamType):
     Content = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]["{TaskActionRequestKey.Content}"]'
 
-    def __init__(self, root_idx = 0):
+    def __init__(self, root_idx=0):
         super().__init__(root_idx)
         self.Content = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Request}"]["{TaskActionRequestKey.Content}"]'
 
@@ -133,12 +140,12 @@ class TaskStreamContext:
             TaskRunningItemStreamType.Conclusion: TaskActionKey.Conclusion,
         }
         return map_list.get(stream_type)
-    
+
     def action_start(self) -> bool:
         # 不能处理 timestamp 为 0 的情况
         if 0 == self.data[0].timestamp:
             return False
-        
+
         # 如果第一个不是 要处理的, 那么就不管
         if self.data[0].call in self.listen_calls:
             return True
@@ -152,19 +159,19 @@ class TaskStreamContext:
     @property
     def done(self):
         return self.jss.done
-    
+
     def parser(self, buf) -> Generator[JsonStreamData, None, None]:
         for stream in self.jss.parser(buf):
             try:
                 if stream.done:
                     action_key = self.get_action_key_by_stream_key(stream.path)
-                    log_dbg(f"path: {stream.path}, action_key: {action_key}")
+                    log_dbg(f"{stream.path} = {stream.data}")
 
                     if stream.path == TaskRunningItemStreamType.Call:
                         if stream.data not in self.listen_calls:
                             self.error = f"not support stream call: {stream.data}"
                             raise Exception(self.error)
-                    
+
                     if action_key and hasattr(self.data[0], action_key):
                         setattr(self.data[0], action_key, stream.data)
 
@@ -181,7 +188,7 @@ class TaskStreamContext:
 
         task = TaskRunningItem(timestamp=0, call="", request=None, execute="system")
         self.data.append(task)
-        
+
 
 class TaskItem(BaseModel):
     type: str = "object"
@@ -215,14 +222,14 @@ class Task(Bot):
     models: List[str] = []
     now_ctx_size: int = 0
 
-    
-    def task_dispatch_stream(self, tsc: TaskStreamContext, res: str) -> Generator[str, None, None]:
+    def task_dispatch_stream(
+        self, tsc: TaskStreamContext, res: str
+    ) -> Generator[str, None, None]:
         try:
             for stream in tsc.parser(res):
                 if stream.path == TaskRunningItemStreamType.Type:
                     if stream.done:
-                        type_str = stream.data
-                        pass
+                        log_dbg(f"Type: {stream.data}")
                 elif stream.path == TaskRunningItemStreamType.Timestamp:
                     if stream.done:
                         timestamp = int(stream.data)
@@ -236,41 +243,42 @@ class Task(Bot):
                         yield f"**Expect**: "
                     yield stream.chunk
                     if stream.done:
-                        log_dbg(f"Expect: {stream.path} {stream.chunk}")
+                        log_dbg(f"Expect: {stream.data}")
                         yield "\n"
                 elif stream.path == TaskRunningItemStreamType.Reasoning:
                     if tsc.is_first():
                         yield f"**Reasoning**: "
                     yield stream.chunk
                     if stream.done:
-                        log_dbg(f"Reasoning: {stream.path} {stream.chunk}")
+                        log_dbg(f"Reasoning: {stream.data}")
                         yield "\n\n"
                 elif stream.path == TaskRunningItemStreamType.Call:
                     if stream.done:
                         log_dbg(f"Call: {stream.data}")
                 elif TaskRunningItemStreamType.Request in stream.path:
                     task_stream = tsc.get_task_stream()
-
-                    if task_stream.call.lower() == f"chat_to_{self.master_name.lower()}":
+                    if (
+                        task_stream.call.lower()
+                        == f"chat_to_{self.master_name.lower()}"
+                    ):
                         if stream.path == TaskRunItemStreamReqType.Content:
                             if tsc.is_first():
                                 yield f"**To {self.master_name}**: \n"
                             yield stream.chunk
                             if stream.done:
-                                log_dbg(f"To {self.master_name}: {stream.path} {stream.data}")
+                                log_dbg(
+                                    f"To {self.master_name}: {stream.path} {stream.data}"
+                                )
                                 yield "\n"
-                    
-                    if stream.done:
-                        log_dbg(f"task stream: {str(task_stream)} {stream.chunk}")
-                
+
                 elif stream.path == TaskRunningItemStreamType.Conclusion:
                     if tsc.is_first():
                         yield f"\n**Conclusion**: "
                     yield stream.chunk
                     if stream.done:
-                        log_dbg(f"Conclusion: {stream.path} {stream.chunk}")
+                        log_dbg(f"Conclusion: {stream.data}")
                         yield "\n"
-            
+
             if tsc.done:
                 try:
                     task = tsc.get_task_stream()
@@ -285,7 +293,9 @@ class Task(Bot):
             log_dbg(tsc.error)
             raise Exception(tsc.error)
 
-    def running_append_task(self, running: List[TaskRunningItem], task: TaskRunningItem):
+    def running_append_task(
+        self, running: List[TaskRunningItem], task: TaskRunningItem
+    ):
         if not task:
             log_dbg(f"task len overload: {len(str(task))}")
             return running
@@ -341,8 +351,6 @@ class Task(Bot):
                 answer = answer.replace('\\"', '"')
 
             return answer, has_error
-
-        
 
         def repair_action_dict(data):
             has_error = False
@@ -555,7 +563,7 @@ class Task(Bot):
                         yield "**Think...**\n"
 
                         yield from self.analysis(task.request)
-                        
+
                     elif task.call == "suppose":
                         yield "**Comprehend...**\n"
 
@@ -856,8 +864,9 @@ class Task(Bot):
     ) -> tuple[bool, str]:
         def remove_prefix_if_exists(input_string, prefix):
             if input_string.startswith(prefix):
-                return input_string[len(prefix):]
+                return input_string[len(prefix) :]
             return input_string
+
         if not save_action_call or not len(save_action_call):
             log_err(f"chat_to_save_action: save_action_call is None")
             return False, "save_action_call is None, need set save_action_call."
@@ -883,9 +892,11 @@ class Task(Bot):
                 )
 
             if ExternAction.action_call_prefix in action.call:
-                action.call = remove_prefix_if_exists(action.call, ExternAction.action_call_prefix)
+                action.call = remove_prefix_if_exists(
+                    action.call, ExternAction.action_call_prefix
+                )
                 log_dbg(f"del ai function prefix to: {action.call}")
-            
+
             if save_action_code:
                 if action.execute != "system":
                     log_err(
@@ -901,23 +912,27 @@ class Task(Bot):
                 ):
                     python_code = python_code[10:-4]
                     log_dbg(f"del code cover: ```python ...")
-                
+
                 log_info(f"\n```python\n{save_action_code}\n```")
-                
-                if (
-                    "def" in python_code
-                    and "chat_from" not in python_code
-                ):
-                    # find function name 
-                    matches = re.findall(r'def\s+(\w+)\s*\(', python_code)
+
+                if "def" in python_code and "chat_from" not in python_code:
+                    # find function name
+                    matches = re.findall(r"def\s+(\w+)\s*\(", python_code)
                     if matches:
                         last_function_name = matches[-1]
-                        python_code = re.sub(rf'def\s+{last_function_name}\s*', 'def chat_from ', python_code, count=1)
-                        log_dbg(f"AI not create chat_from function, try fix action:\n```python\n"
-                            f"{python_code}\n```\n")
+                        python_code = re.sub(
+                            rf"def\s+{last_function_name}\s*",
+                            "def chat_from ",
+                            python_code,
+                            count=1,
+                        )
+                        log_dbg(
+                            f"AI not create chat_from function, try fix action:\n```python\n"
+                            f"{python_code}\n```\n"
+                        )
                     else:
                         return False, "Error: No function definition found in the code."
-                   
+
                 save_action_code = python_code
 
                 log_info(f"\n```python\n{save_action_code}\n```")
@@ -1213,7 +1228,6 @@ s_action = ActionToolItem(
                 if has_node:
                     yield "\n"
 
-
             has_node = False
             tmp = self.get_key("analysis", analysis, "difference")
             if tmp:
@@ -1254,7 +1268,6 @@ s_action = ActionToolItem(
 
         except Exception as e:
             log_err(f"fail to analysis {str(e)}")
-    
 
     def get_key(self, name, analysis, key):
         if not isinstance(analysis, dict):
@@ -1263,7 +1276,7 @@ s_action = ActionToolItem(
         if key in analysis and analysis[key]:
             return analysis[key]
         return None
-    
+
     def suppose(self, request) -> Generator[str, None, None]:
         try:
             js = json.dumps(request, indent=4, ensure_ascii=False)
@@ -1276,7 +1289,7 @@ s_action = ActionToolItem(
                 for msg in message:
                     if not msg or not isinstance(msg, dict):
                         continue
-                    
+
                     has_msg = False
                     info = self.get_key("suppose", msg, "info")
                     if not info or not isinstance(info, str):
@@ -1297,11 +1310,11 @@ s_action = ActionToolItem(
                         if guess:
                             has_gess = True
                             yield f" * {guess} "
-                        
+
                         credibility = self.get_key("suppose", cond, "credibility")
                         if guess and credibility:
                             yield f"--- {credibility}"
-                        
+
                         if has_gess:
                             yield "\n"
                     if has_msg:
@@ -2003,15 +2016,15 @@ def chat_from(request: dict = None):
         )
 
         rsp_data = '[{"type": "object", "timestamp": __timestamp, "expect": "你好", "reasoning": "AimiCore开始思考: 根据Master的指示，回复`你好`。", "call": "chat_to_master", "request": {"type": "object", "content": "[AimiCore] 你好，我已经初始化完成。", "from": [2]}, "conclusion": "为了符合Guidance，我回复了`你好`。", "execute": "system"}] '
-        rsp_data = rsp_data.replace('__timestamp', str(self.timestamp))
+        rsp_data = rsp_data.replace("__timestamp", str(self.timestamp))
 
         tsc = TaskStreamContext([f"chat_to_{self.master_name.lower()}"])
-        
+
         tsc.clear_cache()
         send_tsc_cache = False
         prev_text = ""
         talk_cache = ""
-        
+
         for res in self.chatbot.ask(ChatBotType.OpenAI, ask_data):
             if res["code"] == -1:
                 talk_cache = ""
@@ -2021,11 +2034,11 @@ def chat_from(request: dict = None):
                 err = res["message"]
                 log_dbg(f"openai req fail: {err}")
                 res["message"] = f"**AI Server Failed:** {err}\n\n"
-                
+
                 yield res
                 continue
 
-            piece = res["message"][len(prev_text):]
+            piece = res["message"][len(prev_text) :]
 
             if tsc.need_wait():
                 try:
@@ -2033,14 +2046,16 @@ def chat_from(request: dict = None):
                         if isinstance(talk, str):
                             talk_cache += talk
                         else:
-                            log_err(f"task_response not str: {str(type(talk))}: {str(talk)}\n")
-                        
+                            log_err(
+                                f"task_response not str: {str(type(talk))}: {str(talk)}\n"
+                            )
+
                         # 是需要解析的动作才会发送解析结果.
                         if not send_tsc_cache:
                             if not tsc.action_start():
                                 continue
                             send_tsc_cache = True
-                        
+
                         answer["message"] = talk_cache
                         yield answer
 
@@ -2057,26 +2072,25 @@ def chat_from(request: dict = None):
                     continue
 
                 talk_cache = ""
-                if not tsc.done: # 如果解析完成了, 则说明不需要再继续处理.
+                if not tsc.done:  # 如果解析完成了, 则说明不需要再继续处理.
 
                     for talk in self.task_dispatch(res["message"]):
                         if isinstance(talk, str):
                             talk_cache += talk
                         else:
-                            log_err(f"task_response not str: {str(type(talk))}: {str(talk)}\n")
-                        
+                            log_err(
+                                f"task_response not str: {str(type(talk))}: {str(talk)}\n"
+                            )
+
                         answer["message"] = talk_cache
                         yield answer
-                
 
                 msg = res["message"]
                 log_dbg(f"res: {msg}")
-                
 
             prev_text = res["message"]
 
             yield answer
-
 
         self.save_task()
 
