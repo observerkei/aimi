@@ -321,6 +321,19 @@ class JsonStream:
         
         return self.stream_map[path]
 
+    def get_now_parser_obj_stream(self, obj_stream: JsonStreamData):
+        if obj_stream.now_key in obj_stream.stream_data:
+            return obj_stream.stream_data[obj_stream.now_key]
+        
+        new_path = f'{self.path}["{obj_stream.now_key}"]'
+        stream = self.get_stream(new_path)
+        stream.parent = obj_stream
+        obj_stream.stream_data[obj_stream.now_key] = stream
+
+        self.path = new_path
+
+        return stream
+
     def parser_obj(self, obj_stream: JsonStreamData):
         if obj_stream.type == JsonStreamDataType.OBJ:
             cur = len(self.buf) - self.offset
@@ -341,6 +354,10 @@ class JsonStream:
                         log_dbg(f"self.path: {self.path}, obj_stream.path: {obj_stream.path}, "
                                 f"obj_stream done. {obj_stream}")
                         break
+                    
+                    if self.buf[self.offset] == ",":
+                        self.offset += 1
+                        continue
 
                     if self.buf[self.offset] == '"':
                         obj_stream.key_start = self.offset + 1
@@ -358,9 +375,8 @@ class JsonStream:
                     continue
 
                 obj_stream.now_key = self.buf[obj_stream.key_start : obj_stream.key_end]
-                log_dbg(f"({self.path}) ({obj_stream.path}) {obj_stream.type} obj_stream new key: {obj_stream.now_key}")
 
-                new_path = f'{self.path}["{obj_stream.now_key}"]'
+                stream = self.get_now_parser_obj_stream(obj_stream)
 
                 if not obj_stream.colon_offset:
                     if self.buf[self.offset] == ":":
@@ -377,30 +393,16 @@ class JsonStream:
                     f"self.offset: {self.offset}, buf_len: {len(self.buf)}, "
                 )
 
-                stream = self.get_stream(new_path)
-                stream.parent = obj_stream
-                self.path = new_path
-
                 for sub_stream in self.parser_buf(stream):
                     sub_stream: JsonStreamData
 
                     if not sub_stream:
                         continue
+
                     if sub_stream.parent != obj_stream:
                         yield sub_stream
                         break
-
-                    # 解析完成了一个 key. 正在解析 val 中.
-                    if obj_stream.now_key not in obj_stream.stream_data:
-                        log_dbg(f"({self.path}) append obj key, ({obj_stream.path}) "
-                                f"obj_stream[{obj_stream.now_key}]: {obj_stream} = ({new_path}) sub_stream: {sub_stream}")
-                        obj_stream.stream_data[obj_stream.now_key] = sub_stream
-
-                        # 记录正在解析的路径信息.
-                        self.stream_map[new_path] = sub_stream
-                        self.path = new_path
-                        log_dbg(f"({self.path}) self.map[({new_path})] = new {sub_stream.type} {sub_stream}, self.path update to ({new_path})")
-
+                    
                     log_dbg(
                         f"send type: {sub_stream.type}, data: {str(sub_stream.data)}, done: {str(sub_stream.done)}"
                     )
@@ -409,13 +411,6 @@ class JsonStream:
 
                     if sub_stream.done:
                         break
-
-                if self.offset >= len(self.buf):
-                    break
-
-                if self.buf[self.offset] == ",":
-                    self.offset += 1
-                    continue
 
         yield obj_stream
     
@@ -467,6 +462,7 @@ class JsonStream:
 
                     if not item_stream:
                         continue
+
                     if item_stream.parent != arr_stream:
                         yield item_stream
                         break
@@ -667,10 +663,12 @@ if __name__ == "__main__":
         },
         "conclusion": "According to the Guidance, I responded to the Master's greeting and asked if I could help. ",
         "execute": "system"
-    }
-]
+    },
     """
-    rsp_data_arr = [rsp_data_0, rsp_data_1, rsp_data_2, rsp_data_3]
+    rsp_data_4 = """
+{"type": "object", "timestamp": 28, "expect": "问题解答", "reasoning": "AimiCore 开始思考: Master想知道如何在使用subprocess调用运行程序的过程中显示运行时间，需要以毫秒为单位。我应该回答他的问题。", "call": "chat_to_master", "request": {"type": "object", "content": "要在使用subprocess调用运行程序时显示运行时间，可以在程序开始和结束时分别获取时间戳，并计 算时间差。可以使用time模块的time()函数获取秒级时间戳，然后乘以1000转换为毫秒。示例代码如下：\n\n```python\nimport subprocess\nimport time\n\nstart_time = int(time.time() * 1000)\nsubprocess.run(['your_program'])\nend_time = int(time.time() * 1000)\n\nelapsed_time = end_time - start_time\nprint('程序运行时间（毫秒）：', elapsed_time)\n```\n\n这样就可以在运行程序时显示运行时间，单位 为毫秒。", "from": [0]}, "conclusion": "根据Master的问题，给出如何在使用subprocess调用运行程序时显示运行时间的解答。", "execute": "system"}]
+    """
+    rsp_data_arr = [rsp_data_0, rsp_data_1, rsp_data_2, rsp_data_3, rsp_data_4]
     # ```
 
     # You can access keys(type -> json[0]["type"]) like this:
@@ -710,6 +708,8 @@ if __name__ == "__main__":
         for stream in json_stream.parser(it):
             data = json_stream.path_data()
             print(f"type: {stream.type} chunk: {stream.chunk} ")
+            if stream.path == 'json[2]["request"]' and stream.done:
+                print(f"req: {stream.data}")
             continue
     
     root = json_stream.get_stream(JsonStreamRoot.Root)
