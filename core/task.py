@@ -589,15 +589,23 @@ class Task(Bot):
 
                     elif task.call == "chat_to_wolfram":
                         math = task.request["math"]
-                        response = self.chat_to_wolfram(task.request["math"])
                         yield f"**Calculate:** $$ {math} $$\n"
+                        
+                        yield f"**Computation:** \n"
+
+                        response = ""
+                        for res in self.chat_to_wolfram(math):
+                            response += res
+                            yield res
+
+                        yield "\n"
+
                         task_response = self.make_chat_from(
                             from_timestamp=self.timestamp,
                             from_name="wolfram",
                             content=response,
                             request_description="`response->wolfram` 的内容是 云端 wolfram 返回内容.",
                         )
-                        yield f"**Computation:** \n```javascript\n{response}\n```\n"
 
                     elif task.call == "chat_to_gemini":
                         ask_gemini = task.request["content"]
@@ -739,8 +747,6 @@ class Task(Bot):
                                 response = ""
 
                                 try:
-                                    
-
                                     start_time = time.time()                                    
                                     
                                     response = chat_from(task.request)
@@ -1055,35 +1061,42 @@ s_action = ActionToolItem(
         else:
             try:
                 ask_data = BotAskData(question=request)
+                prev = ""
                 for res in self.chatbot.ask(ChatBotType.Google, ask_data):
-                    if res["code"] == 1:
-                        continue
-                    answer = res["message"]
-                    yield res["message"]
-                    log_dbg(f"res gemini: {str(answer)}")
+                    if res['code'] == -1:
+                        raise Exception(f"code: -1, {res['message']}")
+                    chunk = res["message"][len(prev):]
+                    yield chunk
+                    prev = res["message"]
+
+                    if res["code"] == 0:
+                        log_dbg(f"res gemini: {res['message']}")
 
             except Exception as e:
                 log_err(f"fail to ask gemini: {e}")
                 yield f"fail to ask gemini: {e}"
 
-    def chat_to_wolfram(self, math: str) -> str:
+    def chat_to_wolfram(self, math: str) -> Generator[str, None, None]:
         if not math or not len(math):
-            return "request error"
+            yield "request error. no math."
+        else:
+            log_info(f"```math\n{math}\n```")
 
-        log_info(f"```math\n{math}\n```")
+            try:
+                ask_data = BotAskData(question=math)
+                prev = ""
+                for res in self.chatbot.ask(ChatBotType.Wolfram, ask_data):
+                    if res['code'] == -1:
+                        raise Exception(f"code: -1, {res['message']}")
+                    
+                    piece = res["message"][len(prev):]
+                    yield piece
+                    prev = res["message"]
 
-        answer = ""
+                    
 
-        try:
-            ask_data = BotAskData(question=math)
-            for res in self.chatbot.ask(ChatBotType.Wolfram, ask_data):
-                if res["code"] != 0:
-                    continue
-                answer = res["message"]
-        except Exception as e:
-            log_err(f"fail to ask wolfram: {e}")
-
-        return answer
+            except Exception as e:
+                log_err(f"fail to ask wolfram: {e}")
 
     def chat_to_append_node(self, note: str) -> str:
         if not note or not len(note):
