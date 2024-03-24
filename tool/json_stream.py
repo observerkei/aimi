@@ -1,8 +1,7 @@
 from typing import Dict, Any, List, Generator, Optional, Union, Set
 from tool.util import log_dbg
 
-
-def log_dbg(str):
+def log_dbg(f):
     pass
 
 class JsonStreamDataType:
@@ -68,6 +67,7 @@ class JsonStreamData:
             for item in self.__data:
                 item: 'JsonStreamData'
                 arr.append(item.data)
+            print(f"is arr")
             return arr
         elif self.type == JsonStreamDataType.OBJ:
             dict = {}
@@ -290,30 +290,35 @@ class JsonStream:
     def parser_und(self, stream: JsonStreamData):
         if stream.type == JsonStreamDataType.UND:
             # 未定义场景, 表示还没开始处理数据. 所以现在进行尝试.
-            type = self.get_parser_type(self.buf, self.offset)
-            log_dbg(f"({self.path}) check {stream.type} {stream} get type: {type}")
-            if type not in JsonStreamDataType.ALL:
-                log_dbg(
-                    f"cannot parser , type: {str(type)}, "
-                    f"offset: {self.offset}, all: {len(self.buf)} buf: {self.buf[self.offset:]}"
-                )
-                yield stream
-            else:
-                stream.reset(type)
-                log_dbg(f"({self.path}) new stream type: {stream.type} {stream}")
-
-                if type == JsonStreamDataType.ARR:
-                    self.offset += 1  # 跳过生成过的字符.
-                elif type == JsonStreamDataType.OBJ:
-                    self.offset += 1  # 跳过生成过的字符.
-                elif type == JsonStreamDataType.STR:
-                    self.offset += 1  # 跳过生成过的字符.
+            while self.offset < len(self.buf) and (
+                self.need_skip_char(self.buf[self.offset])
+            ):
+                self.offset += 1
+            
+            if self.offset < len(self.buf):
+                type = self.get_parser_type(self.buf, self.offset)
+                log_dbg(f"({self.path}) check {stream.type} {stream} get type: {type}")
+                if type not in JsonStreamDataType.ALL:
+                    log_dbg(
+                        f"cannot parser , type: {str(type)}, "
+                        f"offset: {self.offset}, all: {len(self.buf)} buf: {self.buf[self.offset:]}"
+                    )
                 else:
-                    pass
+                    stream.reset(type)
+                    log_dbg(f"({self.path}) new stream type: {stream.type} {stream}")
 
-                yield from self.parser_buf(stream)
-        else:
-            yield stream
+                    if type == JsonStreamDataType.ARR:
+                        self.offset += 1  # 跳过生成过的字符.
+                    elif type == JsonStreamDataType.OBJ:
+                        self.offset += 1  # 跳过生成过的字符.
+                    elif type == JsonStreamDataType.STR:
+                        self.offset += 1  # 跳过生成过的字符.
+                    else:
+                        pass
+
+                    yield from self.parser_buf(stream)
+
+        yield stream
     
     def append_stream(self, path, stream) -> JsonStreamData:
         if path not in self.stream_map:
@@ -459,6 +464,14 @@ class JsonStream:
                     log_dbg(f"self.path: {self.path}, arr_dream.path: {arr_stream.path}, "
                             f"arr_strem done. {arr_stream}")
                     break
+                
+                # 出现新下标就创建新的继续解析
+                if self.buf[self.offset] == ",":
+                    arr_stream.now_arr_cnt += 1
+                    self.offset += 1
+                    now_stream = self.get_now_parser_arr_stream(arr_stream)
+
+                    continue
 
                 for item_stream in self.parser_buf(now_stream):
                     item_stream: JsonStreamData
@@ -477,21 +490,6 @@ class JsonStream:
 
                     if item_stream.done:
                         break
-
-                if self.offset >= len(self.buf):
-                    break
-
-                if self.need_skip_char(self.buf[self.offset]):
-                    self.offset += 1
-                    continue
-
-                if self.buf[self.offset] == ",":
-                    arr_stream.now_arr_cnt += 1
-                    self.offset += 1
-                    now_stream = self.get_now_parser_arr_stream(arr_stream)
-
-                    continue
-
 
         yield arr_stream
 
@@ -642,30 +640,29 @@ class JsonStream:
 
 if __name__ == "__main__":
     # ```json
-    rsp_data = """[
-        {
-            "type": "object", 
-            "timestamp": 4, 
-            "expect": "hello", 
-            "reasoning": "In order to reply to a message, you need to briefly think about where to start.  ", 
-            "call": "chat_to_master", 
-            "request": {
-                "type": "object",
-                "content": "[AimiCore] Hello, I have initialized. ", 
-                "from": [
-                    2
-                ]
-            }, 
-            "conclusion": "To comply with the Guidance, I replied 'hello'.", 
-            "execute": "system"
-        }
-    ]
-    """
-    rsp_data_1 = """ 
+    rsp_data_0 = """
 [
     {
+        "type": "object", 
+        "timestamp": 4, 
+        "expect": "hello", 
+        "reasoning": "In order to reply to a message, you need to briefly think about where to start.  ", 
+        "call": "chat_to_master", 
+        "request": {
+            "type": "object",
+            "content": "[AimiCore] Hello, I have initialized. ", 
+            "from": [
+                2
+            ]
+        }, 
+        "conclusion": "To comply with the Guidance, I replied 'hello'.", 
+        "execute": "system"
+    },
+    """
+    rsp_data_1 = """ 
+    {
         "type": "object",
-        "timestamp": 4,
+        "timestamp": 5,
         "expect": "Return a greeting",
         "reasoning": "AimiCore began to think: The Master said good evening to me, and I needed to respond to the greeting. ",
         "call": "chat_to_master",
@@ -684,7 +681,7 @@ if __name__ == "__main__":
     }
 ]
     """
-    rsp_data_arr = [rsp_data_1, rsp_data_2, rsp_data_3]
+    rsp_data_arr = [rsp_data_0, rsp_data_1, rsp_data_2, rsp_data_3]
     # ```
 
     # You can access keys(type -> json[0]["type"]) like this:
@@ -730,7 +727,6 @@ if __name__ == "__main__":
 
     print(f"output({json_stream.done}) type:{root.type}:\n```json\n{json_stream.data}\n```\n")
     print(f'root: {root.data}')
-    print(f"str: {root.str()}")
 
     # for k, v in json_stream.stream_map.items():
     #     print(f"jss. type: {v.type} k: {k} v: {v.str()} stream: {v}")
