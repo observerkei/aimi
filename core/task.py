@@ -2,6 +2,7 @@ import json5
 import json
 import os
 import re
+import time
 from typing import Dict, Any, List, Generator, Optional, Union, Set
 from pydantic import BaseModel, constr
 
@@ -738,8 +739,15 @@ class Task(Bot):
                                 response = ""
 
                                 try:
+                                    
 
+                                    start_time = time.time()                                    
+                                    
                                     response = chat_from(task.request)
+
+                                    end_time = time.time()
+                                    runtime = end_time - start_time
+
                                     format_response = response
                                     if is_json(format_response):
                                         format_response = json.dumps(
@@ -751,7 +759,7 @@ class Task(Bot):
                                     log_info(
                                         f"{task.call}: chat_from: {str(format_response)}"
                                     )
-                                    yield f"**Execution result:** \n```javascript\n{format_response}\n```\n"
+                                    yield f"**Execution result[{runtime}s]:** \n```javascript\n{format_response}\n```\n"
 
                                 except Exception as e:
                                     log_err(
