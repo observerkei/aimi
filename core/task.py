@@ -123,7 +123,9 @@ class TaskStreamContext:
 
     def clear_cache(self):
         self.check = {}
-        self.jss.done = False
+        self.jss = JsonStream()
+        task = TaskRunningItem(timestamp=0, call="", request=None, execute="system")
+        self.data = [task]
 
     def get_task_stream(self) -> TaskRunningItem:
         return self.data[0]
@@ -186,11 +188,8 @@ class TaskStreamContext:
                 raise Exception(f"fail to parser steam: {e}")
 
     def __init__(self, listen_calls: List[str]):
-        self.jss = JsonStream()
         self.listen_calls = listen_calls
-
-        task = TaskRunningItem(timestamp=0, call="", request=None, execute="system")
-        self.data.append(task)
+        self.clear_cache()
 
 
 class TaskItem(BaseModel):
