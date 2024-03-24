@@ -62,8 +62,9 @@ class TaskRunningItemStreamType:
     Call = 'json.arr[0]["call"]'
     Request = 'json.arr[0]["request"]'
     RequestContent = 'json.arr[0]["request"]["content"]'
-    Conclusion = 'json.arr[0]["request"]["conclusion"]'
-    Execute = 'json.arr[0]["request"]["execute"]'
+    Conclusion = 'json.arr[0]["conclusion"]'
+    Execute = 'json.arr[0]["execute"]'
+    JsonRoot = 'json'
 
 
 class TaskStreamContext:
@@ -94,7 +95,7 @@ class TaskStreamContext:
             TaskRunningItemStreamType.Expect: "expect",
             TaskRunningItemStreamType.Call: "call",
             TaskRunningItemStreamType.Request: "request",
-            TaskRunningItemStreamType.Execute: "excute",
+            TaskRunningItemStreamType.Execute: "execute",
             TaskRunningItemStreamType.Conclusion: "conclusion",
         }
         return map_list.get(stream_type)
@@ -116,40 +117,29 @@ class TaskStreamContext:
 
     @property
     def done(self):
-        if len(self.error):
-            return False
-        
-        # 都没开始处理肯定没完成
-        if not self.action_start():
-            return False
-
-        has_wait = False
-        for _, done in self.check.items():
-            if not done:
-                has_wait = True
-                break
-
-        if not has_wait:
-            return True
-        return False
+        return self.jss.done
     
     def parser(self, buf) -> Generator[JsonStreamData, None, None]:
         for stream in self.jss.parser(buf):
-            if stream.done:
-                action_key = self.get_action_key_by_stream_key(stream.path)
-                log_dbg(f"path: {stream.path}, action_key: {action_key}")
+            try:
+                if stream.done:
+                    action_key = self.get_action_key_by_stream_key(stream.path)
+                    log_dbg(f"path: {stream.path}, action_key: {action_key}")
 
-                if stream.path == TaskRunningItemStreamType.Call:
-                    if stream.data not in self.listen_calls:
-                        self.error = f"not support stream call: {stream.data}"
-                        raise Exception(self.error)
-                
-                if action_key and hasattr(self.data[0], action_key):
-                    setattr(self.data[0], action_key, stream.data)
+                    if stream.path == TaskRunningItemStreamType.Call:
+                        if stream.data not in self.listen_calls:
+                            self.error = f"not support stream call: {stream.data}"
+                            raise Exception(self.error)
+                    
+                    if action_key and hasattr(self.data[0], action_key):
+                        setattr(self.data[0], action_key, stream.data)
 
-            yield stream
-            if self.jss.path not in self.check:
+                yield stream
+
                 self.check[self.jss.path] = stream.done
+            except Exception as e:
+                log_dbg(f"fail to parser date: {e}")
+                raise Exception(f"fail to parser steam: {e}")
 
     def __init__(self, listen_calls: List[str]):
         self.jss = JsonStream()
@@ -209,28 +199,24 @@ class Task(Bot):
                                 f"system error: AI try copy old action, time: {timestamp}"
                             )
                 elif stream.path == TaskRunningItemStreamType.Expect:
-                    log_dbg(f"Expect: {stream.path} {stream.chunk}")
                     if tsc.is_first():
                         yield f"**Expect**: "
                     yield stream.chunk
                     if stream.done:
-                        log_dbg(f"{stream.data}")
+                        log_dbg(f"Expect: {stream.path} {stream.chunk}")
                         yield "\n"
                 elif stream.path == TaskRunningItemStreamType.Conclusion:
-                    log_dbg(f"Conclusion: {stream.path} {stream.chunk}")
                     if tsc.is_first():
                         yield f"\n**Conclusion**: "
                     yield stream.chunk
                     if stream.done:
-                        log_dbg(f"{stream.data}")
+                        log_dbg(f"Conclusion: {stream.path} {stream.chunk}")
                         yield "\n"
                 elif stream.path == TaskRunningItemStreamType.Call:
                     if stream.done:
                         log_dbg(f"Call: {stream.data}")
                 elif stream.path == TaskRunningItemStreamType.RequestContent:
                     task_stream = tsc.get_task_stream()
-                    log_dbg(f"task stream: {str(task_stream)} {stream.chunk}")
-
                     if task_stream.call.lower() == f"chat_to_{self.master_name.lower()}":
 
                         log_dbg(f"To {self.master_name}: {stream.path}")
@@ -240,6 +226,9 @@ class Task(Bot):
                         if stream.done:
                             log_dbg(f"{stream.data}")
                             yield "\n"
+                    
+                    if stream.done:
+                        log_dbg(f"task stream: {str(task_stream)} {stream.chunk}")
                 
                 elif stream.path == TaskRunningItemStreamType.Reasoning:
                     log_dbg(f"Reasoning: {stream.path} {stream.chunk}")
@@ -249,11 +238,38 @@ class Task(Bot):
                     if stream.done:
                         log_dbg(f"{stream.data}")
                         yield "\n\n"
-                
+            
+            if tsc.done:
+                try:
+                    task = tsc.get_task_stream()
+                    self.__append_running([task])
+
+                    log_dbg(f"update running success: {len(str(task))}")
+                except Exception as e:
+                    raise Exception(f"fail to append running: {str(e)}")
+
         except Exception as e:
             tsc.error = f"cann't parser stream: {e}"
             log_dbg(tsc.error)
             raise Exception(tsc.error)
+
+    def running_append_task(self, running: List[TaskRunningItem], task: TaskRunningItem):
+        if not task:
+            log_dbg(f"task len overload: {len(str(task))}")
+            return running
+
+        new_running = []
+
+        task.timestamp = int(self.timestamp)
+        self.timestamp += 1
+        new_running.append(task)
+
+        for run in reversed(running):
+            if (len(str(new_running)) + len(str(run))) > self.max_running_size:
+                break
+            new_running.insert(0, run)
+
+        return new_running
 
     def task_dispatch(self, res: str) -> Generator[str, None, None]:
         def get_json_content(answer: str):
@@ -294,23 +310,7 @@ class Task(Bot):
 
             return answer, has_error
 
-        def running_append_task(running: List[TaskRunningItem], task: TaskRunningItem):
-            if not task:
-                log_dbg(f"task len overload: {len(str(task))}")
-                return running
-
-            new_running = []
-
-            task.timestamp = int(self.timestamp)
-            self.timestamp += 1
-            new_running.append(task)
-
-            for run in reversed(running):
-                if (len(str(new_running)) + len(str(run))) > self.max_running_size:
-                    break
-                new_running.insert(0, run)
-
-            return new_running
+        
 
         def repair_action_dict(data):
             has_error = False
@@ -741,15 +741,15 @@ class Task(Bot):
                         yield f"\n**Conclusion:** {task.conclusion}\n"
 
                     try:
-                        running = running_append_task(running, task)
-                        running = running_append_task(running, task_response)
+                        running = self.running_append_task(running, task)
+                        running = self.running_append_task(running, task_response)
                     except Exception as e:
                         raise Exception(f"fail to append running: {str(e)}")
 
                 except Exception as e:
                     log_err(f"fail to load task: {str(e)}: {str(task)}")
                     has_error = True
-                    # running = running_append_task(running, self.make_dream(task))
+                    # running = self.running_append_task(running, self.make_dream(task))
 
             self.__append_running(running)
             log_dbg(f"update running success: {len(running)}")
@@ -758,7 +758,7 @@ class Task(Bot):
                 f"fail to load task res: {str(e)} : \nanswer:\n{str(answer)}\nres str:\n{str(res)}"
             )
             has_error = True
-            # running = running_append_task(running, self.make_dream(res))
+            # running = self.running_append_task(running, self.make_dream(res))
             # self.__append_running(running)
 
         if has_error or has_format_error:
@@ -1857,23 +1857,27 @@ def chat_from(request: dict = None):
             log_dbg(f"no now_task ... {str(self.now_task_id)}")
             return
 
-        for run in reversed(self.running):
-            if (len(str(running)) + len(str(run))) > self.max_running_size:
-                break
-            running.insert(0, run)
+        try:
+            for run in reversed(self.running):
+                if (len(str(running)) + len(str(run))) > self.max_running_size:
+                    break
+                running.insert(0, run)
 
-        # set type in front
-        for run in running:
-            if isinstance(run.request, dict):
-                run.request = move_key_to_first_position(run.request, "type")
-                if "response" in run.request and isinstance(
-                    run.request["response"], dict
-                ):
-                    run.request["response"] = move_key_to_first_position(
-                        run.request["response"], "type"
-                    )
+            # set type in front
+            for run in running:
+                if isinstance(run.request, dict):
+                    run.request = move_key_to_first_position(run.request, "type")
+                    if "response" in run.request and isinstance(
+                        run.request["response"], dict
+                    ):
+                        run.request["response"] = move_key_to_first_position(
+                            run.request["response"], "type"
+                        )
 
-        self.running = running
+            self.running = running
+        except Exception as e:
+            log_dbg(f"fail to append running {e}")
+            raise Exception(f"fail to appnd run : {e}")
 
     def get_running(self) -> str:
         run_dict = [item.dict() for item in self.running]
