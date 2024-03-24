@@ -2065,6 +2065,9 @@ def chat_from(request: dict = None):
                     log_dbg(f"fail to parser stream: {e}")
                     talk_cache = ""
                     continue
+
+            prev_text = res["message"]
+
             if res["code"] != 0:
                 log_dbg(f"input {len(res['message'])} {piece}")
                 if len(str(res["message"])) > 500:
@@ -2088,7 +2091,6 @@ def chat_from(request: dict = None):
             msg = res["message"]
             log_dbg(f"res: {msg}")
 
-            prev_text = res["message"]
 
             yield answer
 
