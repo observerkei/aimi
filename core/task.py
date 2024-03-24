@@ -158,6 +158,9 @@ class TaskStreamContext:
 
     @property
     def done(self):
+        if self.data[0].call not in self.listen_calls:
+            return False
+
         return self.jss.done
 
     def parser(self, buf) -> Generator[JsonStreamData, None, None]:
@@ -2042,6 +2045,7 @@ def chat_from(request: dict = None):
 
             if tsc.need_wait():
                 try:
+                    lof_dbg(f"input {len(res['message'])} {piece}")
                     for talk in self.task_dispatch_stream(tsc, piece):
                         if isinstance(talk, str):
                             talk_cache += talk
