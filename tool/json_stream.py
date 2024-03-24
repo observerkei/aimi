@@ -1,7 +1,8 @@
 from typing import Dict, Any, List, Generator, Optional, Union, Set
 from tool.util import log_dbg
 
-def log_dbg(ff):
+
+def log_dbg(str):
     pass
 
 class JsonStreamDataType:

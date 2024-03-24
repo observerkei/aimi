@@ -55,15 +55,15 @@ class TaskRunningItem(BaseModel):
 
 
 class TaskRunningItemStreamType:
-    Type = 'json.arr[0]["type"]'
-    Timestamp = 'json.arr[0]["timestamp"]'
-    Expect = 'json.arr[0]["expect"]'
-    Reasoning = 'json.arr[0]["reasoning"]'
-    Call = 'json.arr[0]["call"]'
-    Request = 'json.arr[0]["request"]'
-    RequestContent = 'json.arr[0]["request"]["content"]'
-    Conclusion = 'json.arr[0]["conclusion"]'
-    Execute = 'json.arr[0]["execute"]'
+    Type = 'json[0]["type"]'
+    Timestamp = 'json[0]["timestamp"]'
+    Expect = 'json[0]["expect"]'
+    Reasoning = 'json[0]["reasoning"]'
+    Call = 'json[0]["call"]'
+    Request = 'json[0]["request"]'
+    RequestContent = 'json[0]["request"]["content"]'
+    Conclusion = 'json[0]["conclusion"]'
+    Execute = 'json[0]["execute"]'
     JsonRoot = 'json'
 
 
@@ -83,6 +83,10 @@ class TaskStreamContext:
         if self.action_start():
             return True
         return False
+
+    def clear_cache(self):
+        self.check = {}
+        self.jss.done = False
 
     def get_task_stream(self) -> TaskRunningItem:
         return self.data[0]
@@ -184,7 +188,6 @@ class Task(Bot):
     
     def task_dispatch_stream(self, tsc: TaskStreamContext, res: str) -> Generator[str, None, None]:
         try:
-            log_dbg(f"recv str: {res}")
             for stream in tsc.parser(res):
                 if stream.path == TaskRunningItemStreamType.Type:
                     if stream.done:
@@ -219,7 +222,7 @@ class Task(Bot):
                     task_stream = tsc.get_task_stream()
                     if task_stream.call.lower() == f"chat_to_{self.master_name.lower()}":
 
-                        log_dbg(f"To {self.master_name}: {stream.path}")
+                        log_dbg(f"To {self.master_name}: {stream.path} {stream.chunk}")
                         if tsc.is_first():
                             yield f"**To {self.master_name}**: \n"
                         yield stream.chunk
@@ -231,12 +234,11 @@ class Task(Bot):
                         log_dbg(f"task stream: {str(task_stream)} {stream.chunk}")
                 
                 elif stream.path == TaskRunningItemStreamType.Reasoning:
-                    log_dbg(f"Reasoning: {stream.path} {stream.chunk}")
                     if tsc.is_first():
-                        yield f"**Reasoning**:"
+                        yield f"**Reasoning**: "
                     yield stream.chunk
                     if stream.done:
-                        log_dbg(f"{stream.data}")
+                        log_dbg(f"Reasoning: {stream.path} {stream.chunk}")
                         yield "\n\n"
             
             if tsc.done:
@@ -1974,6 +1976,8 @@ def chat_from(request: dict = None):
         rsp_data = rsp_data.replace('__timestamp', str(self.timestamp))
 
         tsc = TaskStreamContext([f"chat_to_{self.master_name.lower()}"])
+        
+        tsc.clear_cache()
         send_tsc_cache = False
         prev_text = ""
         talk_cache = ""
