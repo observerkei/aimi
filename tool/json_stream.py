@@ -205,7 +205,6 @@ class JsonStream:
 
             now_stream = self.stream_map[self.path]
             log_dbg(f"exit. cur: {cur} now_stream: {now_stream}")
-        yield now_stream
                     
     def get_next_parser_path(self, stream: JsonStreamData):
         if not stream.done:
