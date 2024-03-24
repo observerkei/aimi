@@ -150,23 +150,9 @@ class JsonStream:
     def path_data(self):
         return self.stream_map[self.path].data
 
-    def add_buf(self, buf: str):
-        if buf and len(buf):
-            if not len(self.buf):
-                buf_offset = 0
-                while buf_offset < len(buf) and (
-                    self.need_skip_char(buf[buf_offset])
-                ):
-                    buf_offset += 1
-                if buf_offset < len(buf):
-                    self.buf += buf[buf_offset:]
-            else:
-                self.buf += buf
-
     def parser(self, buf: str):
-        self.add_buf(buf)
-
-
+        self.buf += buf
+        
         now_stream = self.stream_map[self.path]
         log_dbg(f"path: {self.path}")
 

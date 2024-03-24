@@ -54,17 +54,44 @@ class TaskRunningItem(BaseModel):
     execute: constr(regex="system|AI")
 
 
+class TaskActionKey:
+    Type = "type"
+    Timestamp = "timestamp"
+    Expect = "expect"
+    Reasoning = "reasoning"
+    Call = "call"
+    Request = "request"
+    Conclusion = "conclusion"
+    Execute = "execute"
+
+
 class TaskRunningItemStreamType:
-    Type = 'json[0]["type"]'
-    Timestamp = 'json[0]["timestamp"]'
-    Expect = 'json[0]["expect"]'
-    Reasoning = 'json[0]["reasoning"]'
-    Call = 'json[0]["call"]'
-    Request = 'json[0]["request"]'
-    RequestContent = 'json[0]["request"]["content"]'
-    Conclusion = 'json[0]["conclusion"]'
-    Execute = 'json[0]["execute"]'
-    JsonRoot = 'json'
+    Type = f'json[0]["{TaskActionKey.Type}"]'
+    Timestamp = f'json[0]["{TaskActionKey.Timestamp}"]'
+    Expect = f'json[0]["{TaskActionKey.Expect}"]'
+    Reasoning = f'json[0]["{TaskActionKey.Reasoning}"]'
+    Call = f'json[0]["{TaskActionKey.Call}"]'
+    Request = f'json[0]["{TaskActionKey.Request}"]'
+    Conclusion = f'json[0]["{TaskActionKey.Conclusion}"]'
+    Execute = f'json[0]["{TaskActionKey.Execute}"]'
+
+    def __init__(self, root_idx = 0):
+        self.Type = f'json[{root_idx}]["{TaskActionKey.Type}"]'
+        self.Timestamp = f'json[{root_idx}]["{TaskActionKey.Timestamp}"]'
+        self.Expect = f'json[{root_idx}]["{TaskActionKey.Expect}"]'
+        self.Reasoning = f'json[{root_idx}]["{TaskActionKey.Reasoning}"]'
+        self.Call = f'json[{root_idx}]["{TaskActionKey.Call}"]'
+        self.Request = f'json[{root_idx}]["{TaskActionKey.Request}"]'
+        self.Conclusion = f'json[{root_idx}]["{TaskActionKey.Conclusion}"]'
+        self.Execute = f'json[{root_idx}]["{TaskActionKey.Execute}"]'
+
+
+class TaskRunItemStreamReqType(TaskRunningItemStreamType):
+    Content = f'json[0]["{TaskActionKey.Request}"]["content"]'
+
+    def __init__(self, root_idx = 0):
+        super().__init__(root_idx)
+        self.Content - f'json[{root_idx}]["{TaskActionKey.Request}"]["content"]'
 
 
 class TaskStreamContext:
@@ -93,14 +120,14 @@ class TaskStreamContext:
 
     def get_action_key_by_stream_key(self, stream_type: TaskRunningItemStreamType):
         map_list = {
-            TaskRunningItemStreamType.Type: "type",
-            TaskRunningItemStreamType.Timestamp: "timestamp",
-            TaskRunningItemStreamType.Reasoning: "reasoning",
-            TaskRunningItemStreamType.Expect: "expect",
-            TaskRunningItemStreamType.Call: "call",
-            TaskRunningItemStreamType.Request: "request",
-            TaskRunningItemStreamType.Execute: "execute",
-            TaskRunningItemStreamType.Conclusion: "conclusion",
+            TaskRunningItemStreamType.Type: TaskActionKey.Type,
+            TaskRunningItemStreamType.Timestamp: TaskActionKey.Timestamp,
+            TaskRunningItemStreamType.Reasoning: TaskActionKey.Reasoning,
+            TaskRunningItemStreamType.Expect: TaskActionKey.Expect,
+            TaskRunningItemStreamType.Call: TaskActionKey.Call,
+            TaskRunningItemStreamType.Request: TaskActionKey.Request,
+            TaskRunningItemStreamType.Execute: TaskActionKey.Execute,
+            TaskRunningItemStreamType.Conclusion: TaskActionKey.Conclusion,
         }
         return map_list.get(stream_type)
     
@@ -208,31 +235,6 @@ class Task(Bot):
                     if stream.done:
                         log_dbg(f"Expect: {stream.path} {stream.chunk}")
                         yield "\n"
-                elif stream.path == TaskRunningItemStreamType.Conclusion:
-                    if tsc.is_first():
-                        yield f"\n**Conclusion**: "
-                    yield stream.chunk
-                    if stream.done:
-                        log_dbg(f"Conclusion: {stream.path} {stream.chunk}")
-                        yield "\n"
-                elif stream.path == TaskRunningItemStreamType.Call:
-                    if stream.done:
-                        log_dbg(f"Call: {stream.data}")
-                elif stream.path == TaskRunningItemStreamType.RequestContent:
-                    task_stream = tsc.get_task_stream()
-                    if task_stream.call.lower() == f"chat_to_{self.master_name.lower()}":
-
-                        log_dbg(f"To {self.master_name}: {stream.path} {stream.chunk}")
-                        if tsc.is_first():
-                            yield f"**To {self.master_name}**: \n"
-                        yield stream.chunk
-                        if stream.done:
-                            log_dbg(f"{stream.data}")
-                            yield "\n"
-                    
-                    if stream.done:
-                        log_dbg(f"task stream: {str(task_stream)} {stream.chunk}")
-                
                 elif stream.path == TaskRunningItemStreamType.Reasoning:
                     if tsc.is_first():
                         yield f"**Reasoning**: "
@@ -240,6 +242,32 @@ class Task(Bot):
                     if stream.done:
                         log_dbg(f"Reasoning: {stream.path} {stream.chunk}")
                         yield "\n\n"
+                elif stream.path == TaskRunningItemStreamType.Call:
+                    if stream.done:
+                        log_dbg(f"Call: {stream.data}")
+                elif TaskRunningItemStreamType.Request in stream.path:
+                    task_stream = tsc.get_task_stream()
+
+                    if task_stream.call.lower() == f"chat_to_{self.master_name.lower()}":
+                        if stream.path == TaskRunItemStreamReqType.Content:
+                            log_dbg(f"To {self.master_name}: {stream.path} {stream.chunk}")
+                            if tsc.is_first():
+                                yield f"**To {self.master_name}**: \n"
+                            yield stream.chunk
+                            if stream.done:
+                                log_dbg(f"{stream.data}")
+                                yield "\n"
+                    
+                    if stream.done:
+                        log_dbg(f"task stream: {str(task_stream)} {stream.chunk}")
+                
+                elif stream.path == TaskRunningItemStreamType.Conclusion:
+                    if tsc.is_first():
+                        yield f"\n**Conclusion**: "
+                    yield stream.chunk
+                    if stream.done:
+                        log_dbg(f"Conclusion: {stream.path} {stream.chunk}")
+                        yield "\n"
             
             if tsc.done:
                 try:
