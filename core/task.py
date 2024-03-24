@@ -2045,7 +2045,7 @@ def chat_from(request: dict = None):
 
             if tsc.need_wait():
                 try:
-                    lof_dbg(f"input {len(res['message'])} {piece}")
+                    log_dbg(f"input {len(res['message'])} {piece}")
                     for talk in self.task_dispatch_stream(tsc, piece):
                         if isinstance(talk, str):
                             talk_cache += talk
