@@ -4,6 +4,9 @@ from tool.util import log_dbg
 def log_dbg(f):
     pass
 
+class JsonStreamRoot:
+    Root = 'json'
+
 class JsonStreamDataType:
     ARR = "arr"
     BOL = "bol"
@@ -121,7 +124,7 @@ class JsonStreamData:
 
 class JsonStream:
     done: bool = False
-    path = "json"
+    path = JsonStreamRoot.Root
 
     buf: str = ""
     offset: int = 0
@@ -131,7 +134,7 @@ class JsonStream:
         self.stream_map = {}
         stream = JsonStreamData(JsonStreamDataType.UND, self.path)
         stream.parent = stream
-        self.append_stream('json', stream)
+        self.append_stream(JsonStreamRoot.Root, stream)
 
     def is_path(self, path=""):
         if self.path == path:
@@ -145,7 +148,7 @@ class JsonStream:
 
     @property
     def data(self):
-        return self.stream_map['json'].data
+        return self.stream_map[JsonStreamRoot.Root].data
 
     def path_data(self):
         return self.stream_map[self.path].data
@@ -189,7 +192,7 @@ class JsonStream:
                 ):
                     yield now_stream
 
-                if now_stream.path == 'json': # root
+                if now_stream.path == JsonStreamRoot.Root: # root
                     self.done = now_stream.done
 
                 if now_stream.done:
@@ -206,8 +209,8 @@ class JsonStream:
     def get_next_parser_path(self, stream: JsonStreamData):
         if not stream.done:
             return stream.path
-        if 'json' == stream.path:
-            return 'json'
+        if JsonStreamRoot.Root == stream.path:
+            return JsonStreamRoot.Root
         
         return self.get_next_parser_path(stream.parent)
 
@@ -709,7 +712,7 @@ if __name__ == "__main__":
             print(f"type: {stream.type} chunk: {stream.chunk} ")
             continue
     
-    root = json_stream.get_stream('json')
+    root = json_stream.get_stream(JsonStreamRoot.Root)
 
     print(f"output({json_stream.done}) type:{root.type}:\n```json\n{json_stream.data}\n```\n")
     print(f'root: {root.data}')

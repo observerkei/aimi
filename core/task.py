@@ -18,7 +18,7 @@ from tool.util import (
     is_json,
 )
 
-from tool.json_stream import JsonStream, JsonStreamData
+from tool.json_stream import JsonStream, JsonStreamData, JsonStreamRoot
 
 from core.aimi_plugin import (
     ChatBot,
@@ -64,34 +64,37 @@ class TaskActionKey:
     Conclusion = "conclusion"
     Execute = "execute"
 
+class TaskActionRequestKey:
+    Content = "content"
+
 
 class TaskRunningItemStreamType:
-    Type = f'json[0]["{TaskActionKey.Type}"]'
-    Timestamp = f'json[0]["{TaskActionKey.Timestamp}"]'
-    Expect = f'json[0]["{TaskActionKey.Expect}"]'
-    Reasoning = f'json[0]["{TaskActionKey.Reasoning}"]'
-    Call = f'json[0]["{TaskActionKey.Call}"]'
-    Request = f'json[0]["{TaskActionKey.Request}"]'
-    Conclusion = f'json[0]["{TaskActionKey.Conclusion}"]'
-    Execute = f'json[0]["{TaskActionKey.Execute}"]'
+    Type = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Type}"]'
+    Timestamp = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Timestamp}"]'
+    Expect = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Expect}"]'
+    Reasoning = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Reasoning}"]'
+    Call = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Call}"]'
+    Request = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]'
+    Conclusion = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Conclusion}"]'
+    Execute = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Execute}"]'
 
     def __init__(self, root_idx = 0):
-        self.Type = f'json[{root_idx}]["{TaskActionKey.Type}"]'
-        self.Timestamp = f'json[{root_idx}]["{TaskActionKey.Timestamp}"]'
-        self.Expect = f'json[{root_idx}]["{TaskActionKey.Expect}"]'
-        self.Reasoning = f'json[{root_idx}]["{TaskActionKey.Reasoning}"]'
-        self.Call = f'json[{root_idx}]["{TaskActionKey.Call}"]'
-        self.Request = f'json[{root_idx}]["{TaskActionKey.Request}"]'
-        self.Conclusion = f'json[{root_idx}]["{TaskActionKey.Conclusion}"]'
-        self.Execute = f'json[{root_idx}]["{TaskActionKey.Execute}"]'
+        self.Type = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Type}"]'
+        self.Timestamp = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Timestamp}"]'
+        self.Expect = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Expect}"]'
+        self.Reasoning = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Reasoning}"]'
+        self.Call = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Call}"]'
+        self.Request = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Request}"]'
+        self.Conclusion = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Conclusion}"]'
+        self.Execute = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Execute}"]'
 
 
 class TaskRunItemStreamReqType(TaskRunningItemStreamType):
-    Content = f'json[0]["{TaskActionKey.Request}"]["content"]'
+    Content = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]["{TaskActionRequestKey.Content}"]'
 
     def __init__(self, root_idx = 0):
         super().__init__(root_idx)
-        self.Content - f'json[{root_idx}]["{TaskActionKey.Request}"]["content"]'
+        self.Content = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Request}"]["{TaskActionRequestKey.Content}"]'
 
 
 class TaskStreamContext:
@@ -250,12 +253,11 @@ class Task(Bot):
 
                     if task_stream.call.lower() == f"chat_to_{self.master_name.lower()}":
                         if stream.path == TaskRunItemStreamReqType.Content:
-                            log_dbg(f"To {self.master_name}: {stream.path} {stream.chunk}")
                             if tsc.is_first():
                                 yield f"**To {self.master_name}**: \n"
                             yield stream.chunk
                             if stream.done:
-                                log_dbg(f"{stream.data}")
+                                log_dbg(f"To {self.master_name}: {stream.path} {stream.data}")
                                 yield "\n"
                     
                     if stream.done:
