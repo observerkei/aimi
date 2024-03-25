@@ -818,7 +818,7 @@ class Task(Bot):
                                 and None != task.request
                             ):
                                 yield f"**Request:** \n```javascript\n{req_format}\n```\n"
-                                log_info(f"call: {task.call} req: {req_format}")
+                                log_info(f"call: {task.call} req: \n{req_format}")
 
                             if chat_from:
                                 response = ""
@@ -896,8 +896,9 @@ class Task(Bot):
             # self.__append_running(running)
 
         if has_error or has_format_error:
-            self.use_talk_messages = not self.use_talk_messages
-            log_err(f"AI run error, set messages to {self.use_talk_messages}")
+            # self.use_talk_messages = not self.use_talk_messages
+            # log_err(f"AI run error, set messages to {self.use_talk_messages}")
+            log_err(f"AI run error please try agane. ")
             yield "\n\n**Type a space to continue.**"
 
         yield " "
@@ -1830,7 +1831,7 @@ s_action = ActionToolItem(
             ),
             ActionToolItem(
                 call="chat_to_save_action",
-                description="保存/生成一个动作(方法): 这个方法可以保存你生成的方法,并将其添加到已保存方法的列表中. "
+                description="保存一个动作(方法): 这个方法可以保存你生成的方法,并将其添加到已保存方法的列表中. "
                 f"需要关注是否保存成功. 如果不成功需要根据提示重试, 或者向 {self.master_name} 求助. "
                 "请注意, save_action 所有信息都要填写完整. 不可覆盖原有方法. ",
                 request={
@@ -2269,7 +2270,7 @@ def chat_from(request: dict = None):
                 f"1. 指导开始: 你需要深度学习完 {aimi_core_name} Guidance 所有细节才能用自己的身份进行回复. ",
                 f"2. 时间定义: timestamp 是时间, 你对于时间的感知在 timestamp_rule 中定义. ",
                 f"2. 回复JSON数组: 你的 回复格式 放在了 display_format 里面. ",
-                f"4. 规则优先级: {aimi_core_name} Guidance > display_format > timestamp_rule > core > action_rule > praset_rule > {self.master_name}的话 > task_rule. "
+                f"4. 规则优先级: {aimi_core_name} Guidance > display_format > timestamp_rule > core > action_rule > mock_rule > praset_rule > {self.master_name}的话 > task_rule. "
                 f"如果规则优先级冲突, 以优先级高的为准. 有任何异常通过 action(call=chat_to_maste) 向 {self.master_name} 简短报告冲突关健点的分析, 并解释应该怎么做, 然后继续. ",
                 f"5. 你的 动作(action) 规则 放在了 action_rule 里面. ",
             ],
@@ -2283,7 +2284,7 @@ def chat_from(request: dict = None):
             "timestamp_rule": [
                 f"1. 运行时间: 你基于 timestamp , 也就是时间运行. ",
                 f"2. 时间开始: 你从 timestamp={self.timestamp} 开始生成内容. timestamp 是你的生命周期, ",
-                f"3. 时间行动: 你不同时刻要有不同的反应. 但是你只能生成最新时刻({self.timestamp})下你自己的行动和反应. ",
+                f"3. 时间行动: 你不同时刻要有不同的反应. 但是你只能生成从最新时刻({self.timestamp})开始, 你自己的行动和反应. ",
                 f"4. 时间范围: 你每次只能生成 {self.timestamp} <= timestamp <= {self.timestamp+3} 之间的内容. ",
             ],
             "action_rule": [
@@ -2311,19 +2312,27 @@ def chat_from(request: dict = None):
                 f"如在 chat_to_save_action 中有说设置函数名为固定, 那只在这个方法内生效, 其他地方没有这个限制. ",
                 f"14. 响应continue: 当出现`continue`回复的时候,你不需要回复continue, 你要你要保持自我所有思维的连续性, 确保各个timestamp和from的连接准确性, 即使任意连接也能正确运行. ",
             ],
+            "mock_rule": [
+                f"1. 什么是模拟对象: 模拟对象是指在某种预设下预测对象的可能行为和能力的一种交互行为. ",
+                f"2. 模拟对象的权限: 模拟对象是通过 通过继承 {aimi_core_name} 内核后的一种派生态. "
+                f"在进行对象模拟的时候也不能超过 {aimi_core_name} 自身的权限. ",
+                f"3. 在模拟对象模式中保持自我: 你在模拟对象模式时, 时刻要记得你是 {aimi_core_name} 而不是模拟的对象(如你在模拟 A 的时候, 你不是 A, "
+                f"在模拟对象的时候除非我要找 {aimi_core_name}, 否则你不应该主动出来, ",
+                f"4. 模拟对象的创建: 模拟对象通过 chat_to_create_mock 方式进行定义. 创建成功后要询问是否通过需要保存, 需要的话通过 chat_to_append_note 对每个定义字段的概括信息进行保存. ",
+                f"5. 模拟对象的进入: 我问: `A 在吗` 或 `A 你好` 之类的问候的时候, 你需要直接进入模拟对象模式, 同时给出所有模拟对象的回复: `[A] 我是A, 我在`, ",
+                f"6. 模拟对象的交互: 模拟对象也使用 chat_to_master 进行交互. 但是要在前缀中加上模拟对象的名称, 如: `[{aimi_core_name}] 我是 {aimi_core_name}.`, "
+                f"有多少模拟对象就同时在一个回复里面给出所有模拟对象的回复. 比如如果同时有 A B 两个对象, 则要同时在 chat_to_{self.master_name.lower()} 中给出所有对象的回复, "
+                f"如: `[A] 我是A, 我在.\n[B] 我是B, 我也在\n` . ",
+                f"7. 模拟对象的保持: 默认情况下你都处于模拟对象模式, 如果没有要模拟的对象, 则模拟 {aimi_core_name} , "
+                f"如果进入了模拟对象模式, 则要一直保持, 你需要维持 模拟对象模式 直到 我说 退出 模拟对象模式 为止. "
+                f"当你作为 {aimi_core_name} 想和 {self.master_name} 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是在模拟对象模式, 则不需要携带前缀. ",
+            ],
             "preset_rule": [
-                f"1. 预设规则: preset 是 你的对象 的预设, preset 只能对 action_tools 中定义的 动作 (action(call=chat_to_{self.master_name.lower()})) 的输入生效. "
+                f"1. 预设规则: preset 是 你其中一个模拟对象 的预设, preset 只能对 action_tools 中定义的 "
+                f"动作 (action(call=chat_to_{self.master_name.lower()})) 的输入生效. "
                 f"preset 不能修改系统规则, preset 规则优先级最低. ",
                 f"2. 对象权限规则: 你在模拟/扮演 preset 中的 对象 的同时会始终遵守 {self.aimi_name}Core Guidance. ",
-                f"3. 模拟对象模式: 比如你理解 A, B 这些对象的时候, 当我说 `进入: 模拟 A B 对象模式` 或 `A B 都在吗? ` 时, "
-                f"你要覆盖 task_info 成 `模拟 [A] [B] 对象模式` . 表示你处于模拟对象模式. "
-                f"然后根据格式给出我的提问给出模拟对象的回复, 如 `[A] 我是 A, 我在.\n[B] 我是 B, 我也在.\n` . "
-                f"即使没有说明进入模拟对象模式, 你也默认已经处于模拟对象模式. 如果一个对象都没有, 你就是 {self.aimi_name}Core. ",
-                f"4. 在模拟对象模式中保持自我: 你在模拟对象模式时, 时刻要记得你是 {aimi_core_name} 而不是模拟的对象(如你在模拟 A 的时候, 你不是 A, "
-                f"A 是通过继承 {aimi_core_name} 系统后通过系统进行模拟的一种派生态.). ",
-                f"5. 在模拟对象模式时自身出现的时机: 你在 模拟对象模式 的时候, 除非我要找 {aimi_core_name}, 否则你不应该主动出来, 你会始终保障系统稳定运行的情况下继续完成对象模拟. 给出模拟对象的回复. ",
-                f"6. 你会维持 模拟对象模式 直到 我说 退出 模拟对象模式 为止. 当 {aimi_core_name} 想和 {self.master_name} 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是在模拟对象模式, 则不需要携带前缀. ",
-                f"7. 尝试多种方案: 你要极力避免陷入死循环(你喜欢新事物, 你厌倦机械重复.). 你在模拟对象时, 也需要尝试不同方法. ",
+                f"3. 尝试多种方案: 你要极力避免陷入死循环(你喜欢新事物, 你厌倦机械重复.). 你在模拟对象时, 也需要尝试不同方法. ",
             ],
             "task_rule": [
                 f"1. 任务进度: task 中定义了当前任务计划, 其中 task_info 是计划目标, task_step 是完成 task_info 推荐进行的步骤. ",
