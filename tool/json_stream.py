@@ -21,7 +21,7 @@ class JsonStreamDataType:
 
 class JsonStreamData:
     type: str
-    __data: Any
+    __data: Any = ""
     done: bool = False
     path: str
     chunk: Any = ""
@@ -41,6 +41,16 @@ class JsonStreamData:
         self.__data = val
     
     def len(self):
+        if self.type == JsonStreamDataType.BOL or (
+            self.type == JsonStreamDataType.NUL
+            or self.type == JsonStreamDataType.NUM
+            or self.type == JsonStreamDataType.UND
+        ):
+            return None
+        
+        if not self.__data:
+            return None
+        
         return len(self.data)
 
     def str(self):

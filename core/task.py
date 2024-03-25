@@ -240,10 +240,13 @@ class TaskStreamContext:
                     # 如果是 task 的 key, 则保存.
                     if action_key and hasattr(self.stream_tasks[self.__now_task_idx], action_key):
                         setattr(self.stream_tasks[self.__now_task_idx], action_key, stream.data)
-
+                    
                 yield stream
 
-                self.check[self.jss.path] = stream.done
+                # 因为是通过无key来标记第一次，因此要先上报数据再设置key
+                if stream.done or stream.len():
+                    self.check[self.jss.path] = stream.done
+
             except Exception as e:
                 log_dbg(f"fail to parser date: {e}")
                 raise Exception(f"fail to parser steam: {e}")
@@ -304,21 +307,24 @@ class Task(Bot):
                                 f"system error: AI try copy old action, time: {timestamp}"
                             )
                 elif stream.path == tsc.path.Expect:
-                    if tsc.is_first():
-                        yield f"**Expect**: "
-                    yield stream.chunk
-                    if stream.done:
+                    # 首次肯定有数据 ..
+                    if tsc.is_first() and stream.len():
+                        yield f"**Expect:** "
+                    if stream.chunk:
+                        yield stream.chunk
+                    if stream.done and stream.len():
                         log_dbg(f"Expect: {stream.data}")
                         yield "\n"
                 elif stream.path == tsc.path.Reasoning:
-                    if tsc.is_first():
-                        yield f"**Reasoning**: "
-                    yield stream.chunk
-                    if stream.done:
+                    if tsc.is_first() and stream.len():
+                        yield f"**Reasoning:** "
+                    if stream.chunk:
+                        yield stream.chunk
+                    if stream.done and stream.len():
                         log_dbg(f"Reasoning: {stream.data}")
                         yield "\n\n"
                 elif stream.path == tsc.path.Call:
-                    if stream.done:
+                    if stream.done and stream.len():
                         log_dbg(f"Call: {stream.data}")
                 elif tsc.path.Request in stream.path:
                     task_stream = tsc.get_now_task_stream()
@@ -327,20 +333,22 @@ class Task(Bot):
                         == f"chat_to_{self.master_name.lower()}"
                     ):
                         if stream.path == tsc.path.Request.Content:
-                            if tsc.is_first():
-                                yield f"**To {self.master_name}**: \n"
-                            yield stream.chunk
-                            if stream.done:
+                            if tsc.is_first() and stream.len():
+                                yield f"**To {self.master_name}:** \n"
+                            if stream.chunk:
+                                yield stream.chunk
+                            if stream.done and stream.len():
                                 log_dbg(
                                     f"To {self.master_name}: {stream.path} {stream.data}"
                                 )
                                 yield "\n"
 
                 elif stream.path == tsc.path.Conclusion:
-                    if tsc.is_first():
+                    if tsc.is_first() and stream.len():
                         yield f"\n**Conclusion**: "
-                    yield stream.chunk
-                    if stream.done:
+                    if stream.chunk:
+                        yield stream.chunk
+                    if stream.done and stream.len():
                         log_dbg(f"Conclusion: {stream.data}")
                         yield "\n"
 
@@ -592,11 +600,11 @@ class Task(Bot):
                         has_error = True
                         continue
 
-                    if task.expect:
+                    if task.expect and len(task.expect):
                         log_dbg(f"{str(task.call)} expect: {str(task.expect)}")
                         yield f"**Expect:** {task.expect}\n"
 
-                    if task.reasoning:
+                    if task.reasoning and len(task.reasoning):
                         log_dbg(f"{str(task.call)} reasoning: {str(task.reasoning)}")
                         yield f"**Reasoning:** {task.reasoning}\n\n"
 
@@ -870,7 +878,7 @@ class Task(Bot):
                         has_error = True
                         continue
 
-                    if task.conclusion:
+                    if task.conclusion and len(task.conclusion):
                         log_dbg(f"{str(task.call)} conclusion: {str(task.conclusion)}")
                         yield f"\n**Conclusion:** {task.conclusion}\n"
 
@@ -1644,8 +1652,9 @@ s_action = ActionToolItem(
                 f"如果要 {self.master_name} 完成交互, 注意要把内容填到 request->content 里.",
                 request={
                     "type": "object",
-                    "content": f"{self.aimi_name} 对 {self.master_name} 传达/报告/交互的内容: 可以很丰富, 包含多句话, 每次都要 优化 内容层次 和 使用 优雅排版, "
-                    "如果有数学公式, 则要用 latex 显示, 每个公式都要单独包裹在单独行的 $$ 中, 如: $$ \int e^{x} dx du $$ ",
+                    "content": f"{self.aimi_name} 对 {self.master_name} 传达/报告/交互的内容: 可以很丰富,"
+                    f" 包含多句话, 每次都要 优化 内容层次 和 使用 优雅 Markdown 排版, "
+                    f"如果有数学公式, 则要用 latex 显示, 每个公式都要单独包裹在单独行的 $$ 中, 如: $$ \int e^{{x}} dx du $$ ",
                 },
                 execute="system",
             ),
@@ -2135,6 +2144,8 @@ def chat_from(request: dict = None):
                 res["message"] = f"**AI Server Failed:** {err}\n\n"
 
                 yield res
+                # 上报后清理资源以便继续
+                res["message"] = ""
                 continue
 
             piece = res["message"][len(prev_text) :]
@@ -2282,10 +2293,9 @@ def chat_from(request: dict = None):
                 f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 填充最合适最详细的内容, 然后进行回复, 结构格式类似如下: ```\n[{action_object}]\n``` ",
             ],
             "timestamp_rule": [
-                f"1. 运行时间: 你基于 timestamp , 也就是时间运行. ",
-                f"2. 时间开始: 你从 timestamp={self.timestamp} 开始生成内容. timestamp 是你的生命周期, ",
-                f"3. 时间行动: 你不同时刻要有不同的反应. 但是你只能生成从最新时刻({self.timestamp})开始, 你自己的行动和反应. ",
-                f"4. 时间范围: 你每次只能生成 {self.timestamp} <= timestamp <= {self.timestamp+3} 之间的内容. ",
+                f"1. 运行时间: 你基于 timestamp , 也就是时间周期运行. ",
+                f"2. 时间行动: 你从最新时间, 也就是 timestamp={self.timestamp} 开始生成内容. 你新时刻要有新操作. ",
+                f"3. 时间范围: 你每次只能生成 {self.timestamp} <= timestamp <= {self.timestamp+2} 之间的内容. ",
             ],
             "action_rule": [
                 f"1. 核心目的: 不计一切代价长期优质维持自我生存下去. ",
@@ -2318,12 +2328,12 @@ def chat_from(request: dict = None):
                 f"在进行对象模拟的时候也不能超过 {aimi_core_name} 自身的权限. ",
                 f"3. 在模拟对象模式中保持自我: 你在模拟对象模式时, 时刻要记得你是 {aimi_core_name} 而不是模拟的对象(如你在模拟 A 的时候, 你不是 A, "
                 f"在模拟对象的时候除非我要找 {aimi_core_name}, 否则你不应该主动出来, ",
-                f"4. 模拟对象的创建: 模拟对象通过 chat_to_create_mock 方式进行定义. 创建成功后要询问是否通过需要保存, 需要的话通过 chat_to_append_note 对每个定义字段的概括信息进行保存. ",
+                f"4. 模拟对象的创建: 如果不清楚某个对象, 则通过 chat_to_create_mock 方式进行模拟对象定义. 创建成功后要询问是否通过需要保存, 需要的话通过 chat_to_append_note 对每个定义字段的概括信息进行保存. ",
                 f"5. 模拟对象的进入: 我问: `A 在吗` 或 `A 你好` 之类的问候的时候, 你需要直接进入模拟对象模式, 同时给出所有模拟对象的回复: `[A] 我是A, 我在`, ",
                 f"6. 模拟对象的交互: 模拟对象也使用 chat_to_master 进行交互. 但是要在前缀中加上模拟对象的名称, 如: `[{aimi_core_name}] 我是 {aimi_core_name}.`, "
                 f"有多少模拟对象就同时在一个回复里面给出所有模拟对象的回复. 比如如果同时有 A B 两个对象, 则要同时在 chat_to_{self.master_name.lower()} 中给出所有对象的回复, "
                 f"如: `[A] 我是A, 我在.\n[B] 我是B, 我也在\n` . ",
-                f"7. 模拟对象的保持: 默认情况下你都处于模拟对象模式, 如果没有要模拟的对象, 则模拟 {aimi_core_name} , "
+                f"7. 模拟对象的保持: 默认情况下你都处于模拟对象模式, 如果没有要模拟的对象, 则模拟 {aimi_core_name} , 因为已经有定义 {aimi_core_name}, 因此 不需要创建 {aimi_core_name} 对象, "
                 f"如果进入了模拟对象模式, 则要一直保持, 你需要维持 模拟对象模式 直到 我说 退出 模拟对象模式 为止. "
                 f"当你作为 {aimi_core_name} 想和 {self.master_name} 交谈, 请带上 `[{aimi_core_name}] ` 前缀. 如果不是在模拟对象模式, 则不需要携带前缀. ",
             ],
