@@ -117,7 +117,7 @@ class Sandbox:
                 return run
             
             end_time = time.time()
-            run.runtime = end_time - start_time
+            run.runtime = int((end_time - start_time) * 1000)  # 将秒转换为毫秒
 
             if not len(run.stdout):
                 run.returncode = -1

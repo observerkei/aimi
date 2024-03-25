@@ -669,9 +669,9 @@ class Task(Bot):
                         stdout = response["stdout"]
                         runtime = response["runtime"]
                         if success:
-                            yield f"**Execution result[{runtime}s]:** \n```javascript\n{stdout}\n```\n"
+                            yield f"**Execution result[{runtime}ms]:** \n```javascript\n{stdout}\n```\n"
                         else:
-                            yield f"**Execution failed[{runtime}s]:** \n```javascript\n{stdout}\n```\n"
+                            yield f"**Execution failed[{runtime}ms]:** \n```javascript\n{stdout}\n```\n"
 
                     elif task.call == "chat_to_chatgpt":
                         aimi = task.request[f"{self.aimi_name}"]
@@ -752,7 +752,7 @@ class Task(Bot):
                                     response = chat_from(task.request)
 
                                     end_time = time.time()
-                                    runtime = end_time - start_time
+                                    runtime = int((end_time - start_time) * 1000)  # 将秒转换为毫秒
 
                                     format_response = response
                                     if is_json(format_response):
@@ -765,7 +765,7 @@ class Task(Bot):
                                     log_info(
                                         f"{task.call}: chat_from: {str(format_response)}"
                                     )
-                                    yield f"**Execution result[{runtime}s]:** \n```javascript\n{format_response}\n```\n"
+                                    yield f"**Execution result[{runtime}ms]:** \n```javascript\n{format_response}\n```\n"
 
                                 except Exception as e:
                                     log_err(
@@ -1093,7 +1093,7 @@ s_action = ActionToolItem(
                     yield piece
                     prev = res["message"]
 
-                    
+
 
             except Exception as e:
                 log_err(f"fail to ask wolfram: {e}")
