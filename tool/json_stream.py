@@ -1,5 +1,6 @@
 from typing import Dict, Any, List, Generator, Optional, Union, Set
 from tool.util import log_dbg
+import codecs
 
 def log_dbg(f):
     pass
@@ -346,7 +347,7 @@ class JsonStream:
 
                 if not obj_stream.key_start:
                     # 还没解析 key 就到了尾声, 如果结束了的话, 就设置完成.
-                    if self.buf[self.offset] == "}" and self.is_str_val_end(
+                    if self.buf[self.offset] == "}" and self.is_real_ch(
                         self.buf, self.offset
                     ):
                         obj_stream.done = True
@@ -366,7 +367,7 @@ class JsonStream:
                     continue
 
                 if not obj_stream.key_end:
-                    if self.buf[self.offset] == '"' and self.is_str_val_end(
+                    if self.buf[self.offset] == '"' and self.is_real_ch(
                         self.buf, self.offset
                     ):
                         obj_stream.key_end = self.offset
@@ -577,24 +578,47 @@ class JsonStream:
                 )
 
                 if self.buf[self.offset] == '"' and (
-                    self.is_str_val_end(self.buf, self.offset)
+                    self.is_real_ch(self.buf, self.offset)
                 ):
                     self.offset += 1
                     str_stream.done = True
                     log_dbg(f"({self.path}) ({str_stream.path}) {str_stream.type} stream parser done: {str_stream.data}")
                     break
 
-                add_str = self.buf[self.offset]
-                new_data = str_stream.data + add_str
+                real_ch = self.buf[self.offset]
+
+                if '\\' == real_ch and self.is_real_ch(self.buf, self.offset):
+                    print(f"skip escape ch: {real_ch}")
+                    self.offset += 1
+                    continue
+
+                if not self.is_real_ch(self.buf, self.offset):
+                    escape = {
+                        '\\': '\\',
+                        '"': '"',
+                        '/': '/',
+                        'b': '\b',
+                        'f': '\f',
+                        'n': '\n',
+                        'r': '\r',
+                        't': '\t',
+                    }
+                    real_ch = escape.get(real_ch)
+                    if not real_ch:
+                        real_ch = self.buf[self.offset]
+                    else:
+                        print(f"pack real_ch to [{real_ch}]")
+
+                new_data = str_stream.stream_data + real_ch
                 str_stream.set_data(new_data)
 
-                str_stream.chunk += add_str
+                str_stream.chunk += real_ch
 
                 self.offset += 1
 
         yield str_stream
 
-    def is_str_val_end(self, buf, now_offset):
+    def is_real_ch(self, buf, now_offset):
         now = buf[now_offset]
         log_dbg(f"check end: {now}")
         
@@ -666,7 +690,7 @@ if __name__ == "__main__":
     },
     """
     rsp_data_4 = """
-{"type": "object", "timestamp": 28, "expect": "Questions and Answers", "reasoning": "AimiCore started thinking: The Master wanted to know how to display the running time in the process of running the program using the subprocess call, and needed to be in milliseconds. I should answer his question." , "call": "chat_to_master", "request": {"type": "object", "content":  "To display a running time when you run a program using a subprocess call, you can get a timestamp at the start and end of the program and calculate the time difference. You can use the time module's time() function to get a timestamp in seconds and multiply it by 1,000 to convert it to milliseconds. The following code is an example: \n\n```python\nimport subprocess\nimport time\n\nstart_time = int(time.time() *  1000)\nsubprocess.run(['your_program'])\nend_time = int(time.time() * 1000)\n\nelapsed_time = end_time -  start_time\nprint(' elapsed time of the program in milliseconds: ', elapsed_time)\n ```\n\n This will display the elapsed time in milliseconds when the program is run.", "from": [0]}, "conclusion": "According to the Master's problem, this paper gives the solution of how to display the running time when using the subprocess call to run the program.", "execute": "system"}]
+{"type": "object", "timestamp": 28, "expect": "Questions and Answers", "reasoning": "AimiCore started thinking: The Master wanted to know how to display the running time in the process of running the program using the subprocess call, and needed to be in milliseconds. I should answer his question." , "call": "chat_to_master", "request": {"type": "object", "content":  "To display a running time when you run a program using a subprocess call, you can get a timestamp at the start and end of the program and calculate the time difference. You can use the time module's time() function to get a timestamp in seconds and multiply it by 1,000 to convert it to milliseconds. The following code is an example: \\n\\n```python\\nimport subprocess\\nimport time\\n\\nstart_time = int(time.time() *  1000)\\nsubprocess.run(['your_program'])\\nend_time = int(time.time() * 1000)\\n\\nelapsed_time = end_time -  start_time\\nprint(' elapsed time of the program in milliseconds: ', elapsed_time)\\n ```\\n\\n This will display the elapsed time in milliseconds when the program is run.", "from": [0]}, "conclusion": "According to the Master's problem, this paper gives the solution of how to display the running time when using the subprocess call to run the program.", "execute": "system"}]
     """
     rsp_data_arr = [rsp_data_0, rsp_data_1, rsp_data_2, rsp_data_3, rsp_data_4]
     # ```
@@ -713,12 +737,14 @@ if __name__ == "__main__":
             continue
     
     root = json_stream.get_stream(JsonStreamRoot.Root)
+    request = json_stream.get_stream('json[2]["request"]')
 
     print(f"output({json_stream.done}) type:{root.type}:\n```json\n{json_stream.data}\n```\n")
     
     import json
     js = json.dumps(root.data, indent=4, ensure_ascii=False)
     print(f'root:\n```json\n{js}\n```\n')
+    print(f"j[2]req:\n{request.data}")
 
     # for k, v in json_stream.stream_map.items():
     #     print(f"jss. type: {v.type} k: {k} v: {v.str()} stream: {v}")
