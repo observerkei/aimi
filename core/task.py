@@ -85,6 +85,9 @@ class TaskRunningItemStreamType:
         Content: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]["{TaskActionRequestKey.Content}"]'
 
         def __new__(cls, base_path=""):
+            if not len(base_path):
+                base_path = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]'
+
             return super().__new__(cls, base_path)
 
         def __init__(self, base_path=""):
@@ -122,7 +125,7 @@ class TaskRunningItemStreamType:
 class TaskStreamContext:
     jss: JsonStream
     check: Dict = {}
-    data: List[TaskRunningItem] = []
+    tasks: List[TaskRunningItem] = []
     listen_calls: List[str]
     error: str = ""
     __parser_path: TaskRunningItemStreamType
@@ -133,7 +136,7 @@ class TaskStreamContext:
         if len(self.error):
             return False
         # 没有解析到任何动作的时候进行等待
-        if not len(self.data[0].call):
+        if not len(self.tasks[0].call):
             return True
         # 如果开始处理了, 但是没有错误, 则继续处理. 
         if self.action_start():
@@ -149,11 +152,11 @@ class TaskStreamContext:
         self.check = {}
         self.jss = JsonStream()
         task = TaskRunningItem(timestamp=0, call="", request=None, execute="system")
-        self.data = [task]
+        self.tasks = [task]
 
     # 获取当前正在处理的task结构.
     def get_now_task_stream(self) -> TaskRunningItem:
-        return self.data[self.__now_task_idx]
+        return self.tasks[self.__now_task_idx]
 
     def get_action_key_by_stream_key(self, stream_type: TaskRunningItemStreamType):
         map_list = {
@@ -170,11 +173,11 @@ class TaskStreamContext:
 
     def action_start(self) -> bool:
         # 不能处理 timestamp 为 0 的情况
-        if 0 == self.data[0].timestamp:
+        if 0 == self.tasks[0].timestamp:
             return False
 
         # 如果第一个不是 要处理的, 那么就不管
-        if self.data[0].call in self.listen_calls:
+        if self.tasks[0].call in self.listen_calls:
             return True
         return False
 
@@ -187,9 +190,9 @@ class TaskStreamContext:
         self.__parser_path.update_path(self.__now_task_idx)
 
         # 根据现有最新的下标创建 对应的 task, 实际上每次只递增1, 这里做了兼容处理
-        for i in range(self.__now_task_idx, now_task_idx + 1):  # 包括 now_task_idx
+        for i in range(self.__now_task_idx, now_task_idx):
             task = TaskRunningItem(timestamp=0, call="", request=None, execute="system")
-            self.data.append(task)
+            self.tasks.append(task)
         
         self.__now_task_idx = now_task_idx
     
@@ -201,7 +204,7 @@ class TaskStreamContext:
     def done(self):
         if self.jss.done:
             # 有任何动作不是需要处理的, 则表示处理异常.
-            for task in self.data:
+            for task in self.tasks:
                 if task.call not in self.listen_calls:
                     return False
             return True
@@ -226,8 +229,8 @@ class TaskStreamContext:
                             raise Exception(self.error)
 
                     # 如果是 task 的 key, 则保存.
-                    if action_key and hasattr(self.data[self.__now_task_idx], action_key):
-                        setattr(self.data[self.__now_task_idx], action_key, stream.data)
+                    if action_key and hasattr(self.tasks[self.__now_task_idx], action_key):
+                        setattr(self.tasks[self.__now_task_idx], action_key, stream.data)
 
                 yield stream
 
@@ -333,10 +336,9 @@ class Task(Bot):
 
             if tsc.done:
                 try:
-                    task = tsc.get_now_task_stream()
-                    self.__append_running([task])
+                    self.__append_running(tsc.tasks)
 
-                    log_dbg(f"update running success: {len(str(task))}")
+                    log_dbg(f"update running success: {len(str(tsc.tasks))}")
                 except Exception as e:
                     raise Exception(f"fail to append running: {str(e)}")
 
