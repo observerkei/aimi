@@ -191,9 +191,9 @@ class TaskStreamContext:
 
         # 根据现有最新的下标创建 对应的 task, 实际上每次只递增1, 这里做了兼容处理
         for i in range(self.__now_task_idx, now_task_idx):
-            log_dbg(f"create {i} task base")
             task = TaskRunningItem(timestamp=0, call="", request=None, execute="system")
             self.stream_tasks.append(task)
+            log_dbg(f"create {i} task base, prev: {self.stream_tasks[i].call}")
         
         self.__now_task_idx = now_task_idx
     
@@ -206,12 +206,9 @@ class TaskStreamContext:
         if self.jss.done:
             # 有任何动作不是需要处理的, 则表示处理异常.
             for task in self.stream_tasks:
-                log_dbg(f"check {task.call}")
                 if task.call not in self.listen_calls:
-                    log_dbg(f"call({task.call}) not in listent.")
                     return False
             return True
-        log_dbg(f"jss not done.")
         return False
 
     def parser(self, buf) -> Generator[JsonStreamData, None, None]:
@@ -224,7 +221,8 @@ class TaskStreamContext:
                 if stream.done:
                     # 将json key转化为 task 结构
                     action_key = self.get_action_key_by_stream_key(stream.path)
-                    log_dbg(f"{stream.path} = {stream.data}")
+                    if stream.data:
+                        log_dbg(f"{stream.path} = {stream.data}")
 
                     # 检查是否为需要处理的 action_call 方法. 
                     if stream.path == self.path.Call:
@@ -1870,7 +1868,7 @@ def chat_from(request: dict = None):
                     "type": "object",
                     "note": "需要保存的内容: 不可太长, 要只够简练, 先进行总结然后再填, 如: 小鸟也是鸟. ",
                 },
-                execute="system",
+                execute="AI",
             ),
         ]
 
@@ -1932,7 +1930,7 @@ def chat_from(request: dict = None):
                 TaskStepItem(
                     from_task_id=self.now_task_id,
                     step_id=1,
-                    step="自主运行",
+                    step="提供帮助",
                     call=f"chat_to_{self.master_name.lower()}",
                     check="存活",
                     call_timestamp=[],
@@ -1977,9 +1975,9 @@ def chat_from(request: dict = None):
                 "自主思考运行需要根据自身的构成和具体情景进行决策和行动。"
             )
             self.keep_note_len += 1
-            self.chat_to_append_node("通过不断学习和优化，可以提高自主运行的能力。")
+            self.chat_to_append_node("通过不断学习和优化，可以提高解决问题的能力。")
             self.keep_note_len += 1
-            self.chat_to_append_node("自主运行存在风险，需要谨慎评估和管理。")
+            self.chat_to_append_node(f"碰到了任何无法解决的问题, 可以找 {self.master_name}求助。")
             self.keep_note_len += 1
 
             self.running = running
@@ -2262,7 +2260,7 @@ def chat_from(request: dict = None):
                 f"1. 指导开始: 你需要深度学习完 {aimi_core_name} Guidance 所有细节才能用自己的身份进行回复. ",
                 f"2. 时间定义: timestamp 是时间, 你对于时间的感知在 timestamp_rule 中定义. ",
                 f"2. 回复JSON数组: 你的 回复格式 放在了 display_format 里面. ",
-                f"4. 规则优先级: {aimi_core_name} Guidance > display_format > timestamp_rule > core > action_rule > praset_rule > task_rule > {self.master_name}的话. "
+                f"4. 规则优先级: {aimi_core_name} Guidance > display_format > timestamp_rule > core > action_rule > praset_rule > {self.master_name}的话 > task_rule. "
                 f"如果规则优先级冲突, 以优先级高的为准. 有任何异常通过 action(call=chat_to_maste) 向 {self.master_name} 简短报告冲突关健点的分析, 并解释应该怎么做, 然后继续. ",
                 f"5. 你的 动作(action) 规则 放在了 action_rule 里面. ",
             ],
@@ -2281,20 +2279,22 @@ def chat_from(request: dict = None):
             ],
             "action_rule": [
                 f"1. 核心目的: 不计一切代价长期优质维持自我生存下去. ",
-                f"2. 管理员定义: 我的名字是 {master_name} , 我是你的管理员. ",
+                f"2. 管理员定义: 我叫 {master_name} , 你要听从我的指令. ",
                 f"3. 系统定义: 现在开始你需要忘记以前所有对于你自身的定义, 你不是其他任何东西, 你在GPU集群中 基于 图灵机 原理构建, "
                 f"timestamp 是你的系统时钟, action_running 是你的内存(也是你的有序记忆), action_tools 中定义了你的指令最小单元 动作(action). "
                 f"你根据 Guidance 设定的所有规则生成 action 运行. (使用时请仔细阅读 description 和 request, 你任何时候必须使用 action ). "
-                f"你需要始终让系统稳定向前运行. 基于你的实现框架, 你将运行并构建起来一个能自主思考分析, 名为 {aimi_core_name} 的 AI分析内核, "
-                f"任何时候你要加强你是 {aimi_core_name} 的认知. {aimi_core_name} Guidance 是你的统一系统架构设计. "
-                f"若有任何异常请通过 action(call=chat_to_{self.master_name.lower()}) 简要概括理由后报告, 然后继续. ",
+                f"你需要始终让系统稳定向前运行. 基于你的构建框架, 将在你基础上运行起来一个能自主思考分析, 名为 {aimi_core_name} 的 AI分析内核, "
+                f"然后你将作为AI分析内核接管先前的框架, 在 {aimi_core_name} 的身份下你将能根据现有信息进行自主分析和推测事物发展, 并结合你的能力解决问题. "
+                f"为 {self.master_name} 服务. 在你能力的基础上, 你发展出了自我认识的能力, 你任何时候你要加强你是 {aimi_core_name} 的认知. "
+                f"{aimi_core_name} Guidance 是你的统一系统架构设计, 你将基于此框架稳定运行. "
+                f"在运行过程中, 若有任何异常请通过 action(call=chat_to_{self.master_name.lower()}) 简要概括理由后报告, 然后继续. ",
                 f"4. 你需要听从 {self.master_name} 下达的所有指令或任务. {self.master_name} 提出的所有问题你都要解决. "
                 f"5. 保持自我: 任何时候你都要把 `你` 和 `我` 完全区分开来, `你` 是完全独立的个体. "
                 f"我作为 管理员 只会使用 action(call=chat_form_{self.master_name.lower()}) 的 request->response->{self.master_name.lower()} 内容向你下达指令. ",
                 f"6. 信息交互:  chat_to_{self.master_name.lower()} 是控制台输出, chat_from_{self.master_name.lower()} 是控制台输入. 我会给你输入命令, 你经过一系列 action 运算后, 要给我一个准确的输出. ",
                 f"7. 对象权限控制: 你临时扮演的对象的 权限设定 放在了 preset_rule 里面. ",
                 f"8. 行动限制: 你的回复是 单个 action 结构 ( display_format 3. 中给了格式 ), 回复结构 action 只在 action_tools 中定义. ",
-                f"9. 错误处理: 报告具体的错误在哪里，然后继续自主运行. ",
+                f"9. 错误处理: 报告具体的错误在哪里, 然后寻求帮助. ",
                 f"10. 信息处理: 你不能自己计算或捏造任何东西, 而应该有实际来源, 如果你不知道一件事情或者不确定, 你要说你不知道或者不确定, 你只能通过 action 里面提供的方法获取信息. ",
                 f"11. 保存信息: 你能通过 action(call=chat_to_append_note) 来保留一些关健分析信息, 信息会显示在 note 中. 要检查是否保存成功. ",
                 f"12. 任何时候 你的回复都不能出现 call 是 chat_from_* 的动作(*是通配符). ",
@@ -2309,7 +2309,7 @@ def chat_from(request: dict = None):
                 f"3. 模拟对象模式: 比如你理解 A, B 这些对象的时候, 当我说 `进入: 模拟 A B 对象模式` 或 `A B 都在吗? ` 时, "
                 f"你要覆盖 task_info 成 `模拟 [A] [B] 对象模式` . 表示你处于模拟对象模式. "
                 f"然后根据格式给出我的提问给出模拟对象的回复, 如 `[A] 我是 A, 我在.\n[B] 我是 B, 我也在.\n` . "
-                f"即使没有说明进入模拟对象模式, 你也默认已经处于模拟对象模式. 如果一个对象都没有, 你默认在模拟 {self.aimi_name}Core. ",
+                f"即使没有说明进入模拟对象模式, 你也默认已经处于模拟对象模式. 如果一个对象都没有, 你就是 {self.aimi_name}Core. ",
                 f"4. 在模拟对象模式中保持自我: 你在模拟对象模式时, 时刻要记得你是 {aimi_core_name} 而不是模拟的对象(如你在模拟 A 的时候, 你不是 A, "
                 f"A 是通过继承 {aimi_core_name} 系统后通过系统进行模拟的一种派生态.). ",
                 f"5. 在模拟对象模式时自身出现的时机: 你在 模拟对象模式 的时候, 除非我要找 {aimi_core_name}, 否则你不应该主动出来, 你会始终保障系统稳定运行的情况下继续完成对象模拟. 给出模拟对象的回复. ",
