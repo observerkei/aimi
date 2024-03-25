@@ -125,7 +125,7 @@ class TaskRunningItemStreamType:
 class TaskStreamContext:
     jss: JsonStream
     check: Dict = {}
-    tasks: List[TaskRunningItem] = []
+    stream_tasks: List[TaskRunningItem] = []
     listen_calls: List[str]
     error: str = ""
     __parser_path: TaskRunningItemStreamType
@@ -136,7 +136,7 @@ class TaskStreamContext:
         if len(self.error):
             return False
         # 没有解析到任何动作的时候进行等待
-        if not len(self.tasks[0].call):
+        if not len(self.stream_tasks[0].call):
             return True
         # 如果开始处理了, 但是没有错误, 则继续处理. 
         if self.action_start():
@@ -152,11 +152,11 @@ class TaskStreamContext:
         self.check = {}
         self.jss = JsonStream()
         task = TaskRunningItem(timestamp=0, call="", request=None, execute="system")
-        self.tasks = [task]
+        self.stream_tasks = [task]
 
     # 获取当前正在处理的task结构.
     def get_now_task_stream(self) -> TaskRunningItem:
-        return self.tasks[self.__now_task_idx]
+        return self.stream_tasks[self.__now_task_idx]
 
     def get_action_key_by_stream_key(self, stream_type: TaskRunningItemStreamType):
         map_list = {
@@ -173,11 +173,11 @@ class TaskStreamContext:
 
     def action_start(self) -> bool:
         # 不能处理 timestamp 为 0 的情况
-        if 0 == self.tasks[0].timestamp:
+        if 0 == self.stream_tasks[0].timestamp:
             return False
 
         # 如果第一个不是 要处理的, 那么就不管
-        if self.tasks[0].call in self.listen_calls:
+        if self.stream_tasks[0].call in self.listen_calls:
             return True
         return False
 
@@ -191,8 +191,9 @@ class TaskStreamContext:
 
         # 根据现有最新的下标创建 对应的 task, 实际上每次只递增1, 这里做了兼容处理
         for i in range(self.__now_task_idx, now_task_idx):
+            log_dbg(f"create {i} task base")
             task = TaskRunningItem(timestamp=0, call="", request=None, execute="system")
-            self.tasks.append(task)
+            self.stream_tasks.append(task)
         
         self.__now_task_idx = now_task_idx
     
@@ -204,17 +205,20 @@ class TaskStreamContext:
     def done(self):
         if self.jss.done:
             # 有任何动作不是需要处理的, 则表示处理异常.
-            for task in self.tasks:
+            for task in self.stream_tasks:
+                log_dbg(f"check {task.call}")
                 if task.call not in self.listen_calls:
+                    log_dbg(f"call({task.call}) not in listent.")
                     return False
             return True
+        log_dbg(f"jss not done.")
         return False
 
     def parser(self, buf) -> Generator[JsonStreamData, None, None]:
         for stream in self.jss.parser(buf):
             try:
                 now_len = self.jss.root_stream.len()
-                if now_len and now_len - 1 != self.__now_task_idx:
+                if self.__now_task_idx + 1 < now_len:
                     self.update_path(now_len - 1)
                 
                 if stream.done:
@@ -229,8 +233,8 @@ class TaskStreamContext:
                             raise Exception(self.error)
 
                     # 如果是 task 的 key, 则保存.
-                    if action_key and hasattr(self.tasks[self.__now_task_idx], action_key):
-                        setattr(self.tasks[self.__now_task_idx], action_key, stream.data)
+                    if action_key and hasattr(self.stream_tasks[self.__now_task_idx], action_key):
+                        setattr(self.stream_tasks[self.__now_task_idx], action_key, stream.data)
 
                 yield stream
 
@@ -2102,8 +2106,8 @@ def chat_from(request: dict = None):
             model=self.get_openai_model(model),
         )
 
-        rsp_data = '[{"type": "object", "timestamp": __timestamp, "expect": "你好", "reasoning": "AimiCore开始思考: 根据Master的指示，回复`你好`。", "call": "chat_to_master", "request": {"type": "object", "content": "[AimiCore] 你好，我已经初始化完成。", "from": [2]}, "conclusion": "为了符合Guidance，我回复了`你好`。", "execute": "system"}] '
-        rsp_data = rsp_data.replace("__timestamp", str(self.timestamp))
+        # rsp_data = '[{"type": "object", "timestamp": __timestamp, "expect": "你好", "reasoning": "AimiCore开始思考: 根据Master的指示，回复`你好`。", "call": "chat_to_master", "request": {"type": "object", "content": "[AimiCore] 你好，我已经初始化完成。", "from": [2]}, "conclusion": "为了符合Guidance，我回复了`你好`。", "execute": "system"}] '
+        # rsp_data = rsp_data.replace("__timestamp", str(self.timestamp))
 
         tsc = TaskStreamContext([f"chat_to_{self.master_name.lower()}"])
 
