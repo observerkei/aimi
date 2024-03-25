@@ -3,6 +3,7 @@ import json
 import os
 import re
 import time
+import copy
 from typing import Dict, Any, List, Generator, Optional, Union, Set
 from pydantic import BaseModel, constr
 
@@ -283,6 +284,7 @@ class Task(Bot):
         self, tsc: TaskStreamContext, res: str
     ) -> Generator[str, None, None]:
         try:
+            running = []
             for stream in tsc.parser(res):
                 if stream.path == tsc.path.Type:
                     if stream.done:
@@ -338,9 +340,11 @@ class Task(Bot):
 
             if tsc.done:
                 try:
-                    self.__append_running(tsc.tasks)
+                    running = copy.deepcopy(tsc.stream_tasks)
+                    
+                    self.__append_running(running)
 
-                    log_dbg(f"update running success: {len(str(tsc.tasks))}")
+                    log_dbg(f"update running success: {len(str(tsc.stream_tasks))}")
                 except Exception as e:
                     raise Exception(f"fail to append running: {str(e)}")
 
