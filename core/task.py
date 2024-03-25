@@ -295,7 +295,24 @@ class Task(Bot):
             tsc.error = f"cann't parser stream: {e}"
             log_dbg(tsc.error)
             raise Exception(tsc.error)
-
+        
+    def del_code_prefix(self, python_code):
+        if (
+            len(python_code) > 11
+            and "```python" == python_code[:9]
+            and "```" == python_code[-3:]
+        ):
+            python_code = python_code[10:-4]
+            return python_code, True
+        if (
+            len(python_code) > 5
+            and "```" == python_code[:3]
+            and "```" == python_code[-3:]
+        ):
+            python_code = python_code[4:-4]
+            return python_code, True
+        return python_code, False
+    
     def running_append_task(
         self, running: List[TaskRunningItem], task: TaskRunningItem
     ):
@@ -644,13 +661,10 @@ class Task(Bot):
 
                     elif task.call == "chat_to_python":
                         python_code = task.request["code"]
-                        if (
-                            len(python_code) > 9
-                            and "```python" == python_code[:9]
-                            and "```" == python_code[-3:]
-                        ):
-                            python_code = python_code[10:-4]
-                            log_dbg(f"del code cover: ```python ...")
+                        
+                        python_code, status = self.del_code_prefix(python_code)
+                        if status:
+                            log_dbg(f"del code cover: ```...```")
 
                         log_info(f"\n```python\n{python_code}\n```")
                         yield f"**Programming:** \n```python\n{python_code}\n```\n"
@@ -923,13 +937,10 @@ class Task(Bot):
                     action.execute = "system"
 
                 python_code = save_action_code
-                if (
-                    len(python_code) > 9
-                    and "```python" == python_code[:9]
-                    and "```" == python_code[-3:]
-                ):
-                    python_code = python_code[10:-4]
-                    log_dbg(f"del code cover: ```python ...")
+        
+                python_code, status = self.del_code_prefix(python_code)
+                if status:
+                    log_dbg(f"del code cover: ```...```")
 
                 log_info(f"\n```python\n{save_action_code}\n```")
 
