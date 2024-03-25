@@ -2215,6 +2215,14 @@ def chat_from(request: dict = None):
             actions[action.call] = action
         return actions
 
+    def update_new_timestamp(self):
+        max_timestamp = 0
+        for run in self.running:
+            run_timestamp = int(run.timestamp)
+            if run_timestamp > max_timestamp:
+                max_timestamp = run_timestamp
+        self.timestamp = max_timestamp + 1
+
     def make_link_think(
         self, model: str, question: str, aimi_name: str, preset: str
     ) -> str:
@@ -2234,6 +2242,9 @@ def chat_from(request: dict = None):
             self.__append_running([chat])
             log_dbg(f"set chat {(str(question))}")
 
+        # 为了能自主运行, 需要保证时间必须为最新. 
+        self.update_new_timestamp()
+
         if aimi_name and isinstance(aimi_name, str) and len(aimi_name):
             self.aimi_name = aimi_name
         aimi_core_name = aimi_name + "Core"
@@ -2250,6 +2261,7 @@ def chat_from(request: dict = None):
 
         self.execute_ai_calls = execute_ai_calls
         self.execute_system_calls = execute_system_calls
+        
 
         task = self.__make_task()
         master_name = "kei"
@@ -2294,7 +2306,9 @@ def chat_from(request: dict = None):
             ],
             "timestamp_rule": [
                 f"1. 运行时间: 你参考时间 timestamp 运行. ",
-                f"2. 时间行动: 你从最新时间(也比我的时间新新.), 也就是 timestamp={self.timestamp} 开始产生行动. 你新时刻要有新操作. ",
+                f"2. 时间行动: 你从最新时间(也比我的时间新新.), 也就是 timestamp={self.timestamp} 开始产生行动. "
+                f"你新时刻要有新操作. 你可以在新的timestamp回复, 却不能在旧的timestamp回复, 如果出现了更新的timestamp, "
+                f"则你需要把自己的timestamp设置成比这更新的值. ",
                 f"3. 时间范围: 你每次只能在 {self.timestamp} <= timestamp <= {self.timestamp+2} 之间进行行动. ",
             ],
             "action_rule": [
