@@ -71,16 +71,35 @@ class TaskActionRequestKey:
 
 
 class TaskRunningItemStreamType:
-    Type = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Type}"]'
-    Timestamp = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Timestamp}"]'
-    Expect = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Expect}"]'
-    Reasoning = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Reasoning}"]'
-    Call = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Call}"]'
-    Request = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]'
-    Conclusion = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Conclusion}"]'
-    Execute = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Execute}"]'
+    Type: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Type}"]'
+    Timestamp: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Timestamp}"]'
+    Expect: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Expect}"]'
+    Reasoning: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Reasoning}"]'
+    Call: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Call}"]'
+    Conclusion: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Conclusion}"]'
+    Execute: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Execute}"]'
+
+    # 为方便使用, 直接封装成字符串.
+    class RequestStreamType(str):
+        __base_path: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]'
+        Content: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]["{TaskActionRequestKey.Content}"]'
+
+        def __new__(cls, base_path=""):
+            return super().__new__(cls, base_path)
+
+        def __init__(self, base_path=""):
+            self.__base_path = base_path
+            if not len(self.__base_path):
+                self.__base_path = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]'
+            
+            self.Content = f'{self.__base_path}["{TaskActionRequestKey.Content}"]'
+
+    Request: RequestStreamType = RequestStreamType()
 
     def __init__(self, root_idx=0):
+        self.update_path(root_idx)
+
+    def update_path(self, root_idx=0):
         self.Type = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Type}"]'
         self.Timestamp = (
             f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Timestamp}"]'
@@ -90,19 +109,14 @@ class TaskRunningItemStreamType:
             f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Reasoning}"]'
         )
         self.Call = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Call}"]'
-        self.Request = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Request}"]'
+
+        request_path = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Request}"]'
+        self.Request = TaskRunningItemStreamType.RequestStreamType(request_path)
+        
         self.Conclusion = (
             f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Conclusion}"]'
         )
         self.Execute = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Execute}"]'
-
-
-class TaskRunItemStreamReqType(TaskRunningItemStreamType):
-    Content = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]["{TaskActionRequestKey.Content}"]'
-
-    def __init__(self, root_idx=0):
-        super().__init__(root_idx)
-        self.Content = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Request}"]["{TaskActionRequestKey.Content}"]'
 
 
 class TaskStreamContext:
@@ -111,36 +125,46 @@ class TaskStreamContext:
     data: List[TaskRunningItem] = []
     listen_calls: List[str]
     error: str = ""
+    __parser_path: TaskRunningItemStreamType
+    __now_task_idx = 0
 
     def need_wait(self) -> bool:
+        # 如果解析异常出现了错误, 那就不要处理了
         if len(self.error):
             return False
-        # 没有解析到动作的时候进行等待
+        # 没有解析到任何动作的时候进行等待
         if not len(self.data[0].call):
             return True
+        # 如果开始处理了, 但是没有错误, 则继续处理. 
         if self.action_start():
             return True
         return False
+    
+    def task_stream_count(self):
+        # 返回正在解析的数据数量
+        return self.__now_task_idx + 1
 
     def clear_cache(self):
+        self.__now_task_idx = 0
         self.check = {}
         self.jss = JsonStream()
         task = TaskRunningItem(timestamp=0, call="", request=None, execute="system")
         self.data = [task]
 
-    def get_task_stream(self) -> TaskRunningItem:
-        return self.data[0]
+    # 获取当前正在处理的task结构.
+    def get_now_task_stream(self) -> TaskRunningItem:
+        return self.data[self.__now_task_idx]
 
     def get_action_key_by_stream_key(self, stream_type: TaskRunningItemStreamType):
         map_list = {
-            TaskRunningItemStreamType.Type: TaskActionKey.Type,
-            TaskRunningItemStreamType.Timestamp: TaskActionKey.Timestamp,
-            TaskRunningItemStreamType.Reasoning: TaskActionKey.Reasoning,
-            TaskRunningItemStreamType.Expect: TaskActionKey.Expect,
-            TaskRunningItemStreamType.Call: TaskActionKey.Call,
-            TaskRunningItemStreamType.Request: TaskActionKey.Request,
-            TaskRunningItemStreamType.Execute: TaskActionKey.Execute,
-            TaskRunningItemStreamType.Conclusion: TaskActionKey.Conclusion,
+            self.path.Type: TaskActionKey.Type,
+            self.path.Timestamp: TaskActionKey.Timestamp,
+            self.path.Reasoning: TaskActionKey.Reasoning,
+            self.path.Expect: TaskActionKey.Expect,
+            self.path.Call: TaskActionKey.Call,
+            self.path.Request: TaskActionKey.Request,
+            self.path.Execute: TaskActionKey.Execute,
+            self.path.Conclusion: TaskActionKey.Conclusion,
         }
         return map_list.get(stream_type)
 
@@ -159,27 +183,51 @@ class TaskStreamContext:
             return True
         return False
 
+    def update_path(self, now_task_idx):
+        self.__parser_path.update_path(self.__now_task_idx)
+
+        # 根据现有最新的下标创建 对应的 task, 实际上每次只递增1, 这里做了兼容处理
+        for i in range(self.__now_task_idx, now_task_idx + 1):  # 包括 now_task_idx
+            task = TaskRunningItem(timestamp=0, call="", request=None, execute="system")
+            self.data.append(task)
+        
+        self.__now_task_idx = now_task_idx
+    
+    @property
+    def path(self):
+        return self.__parser_path
+
     @property
     def done(self):
-        if self.data[0].call not in self.listen_calls:
-            return False
-
-        return self.jss.done
+        if self.jss.done:
+            # 有任何动作不是需要处理的, 则表示处理异常.
+            for task in self.data:
+                if task.call not in self.listen_calls:
+                    return False
+            return True
+        return False
 
     def parser(self, buf) -> Generator[JsonStreamData, None, None]:
         for stream in self.jss.parser(buf):
             try:
+                now_len = self.jss.root_stream.len()
+                if now_len and now_len - 1 != self.__now_task_idx:
+                    self.update_path(now_len - 1)
+                
                 if stream.done:
+                    # 将json key转化为 task 结构
                     action_key = self.get_action_key_by_stream_key(stream.path)
                     log_dbg(f"{stream.path} = {stream.data}")
 
-                    if stream.path == TaskRunningItemStreamType.Call:
+                    # 检查是否为需要处理的 action_call 方法. 
+                    if stream.path == self.path.Call:
                         if stream.data not in self.listen_calls:
                             self.error = f"not support stream call: {stream.data}"
                             raise Exception(self.error)
 
-                    if action_key and hasattr(self.data[0], action_key):
-                        setattr(self.data[0], action_key, stream.data)
+                    # 如果是 task 的 key, 则保存.
+                    if action_key and hasattr(self.data[self.__now_task_idx], action_key):
+                        setattr(self.data[self.__now_task_idx], action_key, stream.data)
 
                 yield stream
 
@@ -189,6 +237,7 @@ class TaskStreamContext:
                 raise Exception(f"fail to parser steam: {e}")
 
     def __init__(self, listen_calls: List[str]):
+        self.__parser_path = TaskRunningItemStreamType()
         self.listen_calls = listen_calls
         self.clear_cache()
 
@@ -230,10 +279,10 @@ class Task(Bot):
     ) -> Generator[str, None, None]:
         try:
             for stream in tsc.parser(res):
-                if stream.path == TaskRunningItemStreamType.Type:
+                if stream.path == tsc.path.Type:
                     if stream.done:
                         log_dbg(f"Type: {stream.data}")
-                elif stream.path == TaskRunningItemStreamType.Timestamp:
+                elif stream.path == tsc.path.Timestamp:
                     if stream.done:
                         timestamp = int(stream.data)
                         log_dbg(f"Timestamp: {timestamp}")
@@ -241,30 +290,30 @@ class Task(Bot):
                             raise Exception(
                                 f"system error: AI try copy old action, time: {timestamp}"
                             )
-                elif stream.path == TaskRunningItemStreamType.Expect:
+                elif stream.path == tsc.path.Expect:
                     if tsc.is_first():
                         yield f"**Expect**: "
                     yield stream.chunk
                     if stream.done:
                         log_dbg(f"Expect: {stream.data}")
                         yield "\n"
-                elif stream.path == TaskRunningItemStreamType.Reasoning:
+                elif stream.path == tsc.path.Reasoning:
                     if tsc.is_first():
                         yield f"**Reasoning**: "
                     yield stream.chunk
                     if stream.done:
                         log_dbg(f"Reasoning: {stream.data}")
                         yield "\n\n"
-                elif stream.path == TaskRunningItemStreamType.Call:
+                elif stream.path == tsc.path.Call:
                     if stream.done:
                         log_dbg(f"Call: {stream.data}")
-                elif TaskRunningItemStreamType.Request in stream.path:
-                    task_stream = tsc.get_task_stream()
+                elif tsc.path.Request in stream.path:
+                    task_stream = tsc.get_now_task_stream()
                     if (
                         task_stream.call.lower()
                         == f"chat_to_{self.master_name.lower()}"
                     ):
-                        if stream.path == TaskRunItemStreamReqType.Content:
+                        if stream.path == tsc.path.Request.Content:
                             if tsc.is_first():
                                 yield f"**To {self.master_name}**: \n"
                             yield stream.chunk
@@ -274,7 +323,7 @@ class Task(Bot):
                                 )
                                 yield "\n"
 
-                elif stream.path == TaskRunningItemStreamType.Conclusion:
+                elif stream.path == tsc.path.Conclusion:
                     if tsc.is_first():
                         yield f"\n**Conclusion**: "
                     yield stream.chunk
@@ -284,7 +333,7 @@ class Task(Bot):
 
             if tsc.done:
                 try:
-                    task = tsc.get_task_stream()
+                    task = tsc.get_now_task_stream()
                     self.__append_running([task])
 
                     log_dbg(f"update running success: {len(str(task))}")

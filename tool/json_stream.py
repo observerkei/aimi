@@ -39,6 +39,9 @@ class JsonStreamData:
 
     def set_data(self, val):
         self.__data = val
+    
+    def len(self):
+        return len(self.data)
 
     def str(self):
         if self.type == JsonStreamDataType.ARR:
@@ -148,10 +151,15 @@ class JsonStream:
 
     @property
     def data(self):
-        return self.stream_map[JsonStreamRoot.Root].data
+        return self.root_stream.data
 
+    @property
     def path_data(self):
         return self.stream_map[self.path].data
+    
+    @property
+    def root_stream(self):
+        return self.stream_map[JsonStreamRoot.Root]
 
     def parser(self, buf: str):
         if isinstance(buf, str):
@@ -730,10 +738,12 @@ if __name__ == "__main__":
 
     for it in rsp_data_arr:
         for stream in json_stream.parser(it):
-            data = json_stream.path_data()
+            data = json_stream.path_data
             print(f"type: {stream.type} chunk: {stream.chunk} ")
             if stream.path == 'json[2]["request"]' and stream.done:
                 print(f"req: {stream.data}")
+            l = len(json_stream.data)
+            print(f"jss len: {l}")
             continue
     
     root = json_stream.get_stream(JsonStreamRoot.Root)
