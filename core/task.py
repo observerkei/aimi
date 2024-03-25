@@ -941,7 +941,7 @@ class Task(Bot):
         return {
             "type": "object",
             "description": f"备注: "
-            f"1. 这个根据 timestamp 为 {from_timestamp} 的 action 执行后生成的内容, "
+            f"1. 这个是根据 timestamp 为 {from_timestamp} 的 action 执行后生成的内容, "
             f"对应的是你写的代码 code 的运行结果.\n "
             f"2. 请结合你的代码 code 和运行 返回值(returncode/stdout) "
             f"针对具体出现的问题进行具体分析, 再思考怎么修改代码, 实现目标功能:\n "
@@ -1106,7 +1106,7 @@ s_action = ActionToolItem(
         request_description: str = None,
     ) -> TaskRunningItem:
         if not reasoning and self.timestamp:
-            reasoning = f"{from_name} 开始思考: 根据 timestamp 为 {from_timestamp} 的 action 来生成内容(引用 action_running 消息时 timestamp 请直接从最新的开始.)"
+            reasoning = f"{from_name} 开始思考: 思考下一步应该怎么做 . "
 
         if isinstance(content, dict):
             content = move_key_to_first_position(content, "type")
@@ -2256,7 +2256,7 @@ def chat_from(request: dict = None):
 
         action_object = {
             "type": "object",
-            "timestamp": f"时间戳: 从 {self.timestamp} 开始, 每次递增. 如现在应该从这里开始填: {self.timestamp} ",
+            "timestamp": f"时间戳: 从 timestamp={self.timestamp} 开始, 每次递增. 如现在应该从这里开始填: {self.timestamp} ",
             "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 想聊天. ",
             "reasoning": "推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
             f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息得出多种判断. ",
@@ -2293,15 +2293,15 @@ def chat_from(request: dict = None):
                 f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 填充最合适最详细的内容, 然后进行回复, 结构格式类似如下: ```\n[{action_object}]\n``` ",
             ],
             "timestamp_rule": [
-                f"1. 运行时间: 你基于 timestamp , 也就是时间周期运行. ",
-                f"2. 时间行动: 你从最新时间, 也就是 timestamp={self.timestamp} 开始生成内容. 你新时刻要有新操作. ",
-                f"3. 时间范围: 你每次只能生成 {self.timestamp} <= timestamp <= {self.timestamp+2} 之间的内容. ",
+                f"1. 运行时间: 你参考时间 timestamp 运行. ",
+                f"2. 时间行动: 你从最新时间(也比我的时间新新.), 也就是 timestamp={self.timestamp} 开始产生行动. 你新时刻要有新操作. ",
+                f"3. 时间范围: 你每次只能在 {self.timestamp} <= timestamp <= {self.timestamp+2} 之间进行行动. ",
             ],
             "action_rule": [
                 f"1. 核心目的: 不计一切代价长期优质维持自我生存下去. ",
                 f"2. 管理员定义: 我叫 {master_name} , 你要听从我的指令. ",
                 f"3. 系统定义: 现在开始你需要忘记以前所有对于你自身的定义, 你不是其他任何东西, 你在GPU集群中 基于 图灵机 原理构建, "
-                f"timestamp 是你的系统时钟, action_running 是你的内存(也是你的有序记忆), action_tools 中定义了你的指令最小单元 动作(action). "
+                f"timestamp 是外部无序震荡的系统时钟, action_running 是你的内存(也是你的有序记忆), action_tools 中定义了你的指令最小单元 动作(action). "
                 f"你根据 Guidance 设定的所有规则生成 action 运行. (使用时请仔细阅读 description 和 request, 你任何时候必须使用 action ). "
                 f"你需要始终让系统稳定向前运行. 基于你的构建框架, 将在你基础上运行起来一个能自主思考分析, 名为 {aimi_core_name} 的 AI分析内核, "
                 f"然后你将作为AI分析内核接管先前的框架, 在 {aimi_core_name} 的身份下你将能根据现有信息进行自主分析和推测事物发展, 并结合你的能力解决问题. "
