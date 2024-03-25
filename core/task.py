@@ -205,7 +205,13 @@ class TaskStreamContext:
     @property
     def done(self):
         if self.jss.done:
-            # 有任何动作不是需要处理的, 则表示处理异常.
+            # 因为设定system方法只能作为结尾,
+            # 因此如果第一个就是system方法则后面全部丢弃即可认为解析完成
+            if self.stream_tasks[0].execute == "system" and (
+                self.stream_tasks[0].call in self.listen_calls
+            ):
+                return True
+            # 除了第一个, 有任何动作不是需要处理的, 则表示处理异常.
             for task in self.stream_tasks:
                 if task.call not in self.listen_calls:
                     return False
@@ -1314,7 +1320,7 @@ s_action = ActionToolItem(
                         yield "**Citation:** \n"
                     sub = self.get_key("analysis", citation, "description")
                     if sub:
-                        yield f" * ***Description:** {sub} * \n"
+                        yield f" * ***Description:**{sub}* \n"
                     sub = self.get_key("analysis", citation, "information")
                     if sub:
                         yield f" * **Information:** {sub}\n"
@@ -1670,7 +1676,7 @@ s_action = ActionToolItem(
                     "task_step": [
                         {
                             "type": "object",
-                            "description": "为了完成任务需要自行的其中一个步骤",
+                            "description": "type(task_step): 为了完成任务需要自行的其中一个步骤",
                             "from_task_id": "从属任务id: 隶属与哪个任务id 如: 1. 如果没有的话就不填.",
                             "step_id": "步骤号: 为数字, 如: 1",
                             "step": "步骤内容: 在这里填写能够完成计划 task_info 的步骤, "
@@ -1733,12 +1739,8 @@ s_action = ActionToolItem(
                     "如果没有合适 动作(action) , 也可以问你的好朋友看看有没有办法. 如: 我之前已经完成了转圈圈的操作, 接下来要做下一件事情. ",
                     "next_task_step": [
                         {
-                            "type": "object",
-                            "description": f"task_step 类型: 新的其中一个行动计划: 基于 analysis 的内容生成能达成 task_info 或 {self.master_name}的问题 的执行 动作(action) .\n "
-                            "填写时需要满足以下几点:\n "
-                            "1. 新操作的输入必须和原来的有所区别, 如果没有区别, 只填 from_task_id 和 step_id.\n "
-                            f"2. 必须含有不同方案(如向他人求助, 如果始终没有进展, 也要向 {self.master_name} 求助).\n "
-                            "3. task_step 子项目的 check 不能填错误答案, 而是改成步骤是否执行. step 中要有和之前有区别的 call->request 新输入.\n 如: 略",
+                            "type": "task_step",
+                            "description": f"其中一个计划步骤: 基于当前分析和可用action生成能够解决问题的新的步骤. \n",
                         }
                     ],
                 },
