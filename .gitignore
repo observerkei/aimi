@@ -153,6 +153,7 @@ run/bing_*.json
 run/google_*.json
 run/*cookies.json
 run/setting.yml
+run/database
 run/memory.yml
 
 #vscode

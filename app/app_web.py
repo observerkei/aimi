@@ -198,7 +198,6 @@ class AppWEB:
             api_key = ""
             broswer_session_id = ""
             authorization = ""
-            need_update_cookie = True
             body = ""
 
             try:
@@ -217,7 +216,8 @@ class AppWEB:
                 f"URL={url}, Headers->Authorization={authorization}, body={body}"
             )
 
-            session_id, need_update_cookie = self.cul_session_id(
+            # 只是获取模型列表，但是不使用的话，实际上并不需要更新 session_id
+            session_id, _ = self.cul_session_id(
                 broswer_session_id=broswer_session_id, api_key=api_key
             )
             if not session_id:
@@ -225,10 +225,6 @@ class AppWEB:
                 log_err(f"not session: {err}")
                 resp.set_data(err)
                 return resp
-
-            if need_update_cookie:
-                log_dbg(f"Refreshing Browser cookie of session_id to {session_id}")
-                resp.set_cookie("session_id", session_id, samesite='None', secure=True)
 
             session_api_key = self.session.get_chatbot_setting_api_key(session_id)
             if session_api_key != api_key:
