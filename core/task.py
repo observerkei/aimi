@@ -1982,7 +1982,7 @@ def chat_from(request: dict = None):
                 description=f"保存一条信息: 用于保存分析总结的内容. 可多次使用, 最多只能保存{self.max_note_size}条. ",
                 request={
                     "type": "object",
-                    "note": "需要保存的内容: 不可太长, 要只够简练, 先进行总结然后再填, 如: 小鸟也是鸟. ",
+                    "note": "需要保存的内容: 不可太长, 否则容易失败, 要只够简练, 先进行总结然后再填, 要支持Markdown语法, 如: 小鸟也是鸟. ",
                 },
                 execute="AI",
             ),
