@@ -218,7 +218,7 @@ class AppWEB:
             )
 
             session_id, need_update_cookie = self.cul_session_id(
-                broswer_session_id=broswer_session_id, api_key=api_key
+                broswer_session_id=broswer_session_id, api_key=api_key, preset=" "
             )
             if not session_id:
                 err = "Cannot create session."
