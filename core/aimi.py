@@ -578,6 +578,12 @@ class Aimi:
             self.aimi_name = "Aimi"
 
         try:
+            self.max_link_think = setting["max_link_think"]
+        except Exception as e:
+            log_err(f"fail to load aimi: {e}")
+            self.max_link_think = 1024
+
+        try:
             self.task_setting = Config.load_setting(ChatBotType.Task)
         except Exception as e:
             log_err(f"fail to load aimi: {e}")
@@ -585,7 +591,6 @@ class Aimi:
         
         try:
             self.web_setting = Config.load_setting("web")
-            self.web_setting['cpu_id'] = 0
         except Exception as e:
             log_err(f"fail to load aimi: {e}")
             self.web_setting = {}
