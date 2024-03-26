@@ -205,14 +205,14 @@ class JsonStream:
             log_dbg(f"({self.path}) ({now_stream.path}) {now_stream.type} now_stream: {now_stream}")
 
             if now_stream:
+                if now_stream.path == JsonStreamRoot.Root: # root
+                    self.done = now_stream.done
+                
                 if (now_stream.type != JsonStreamDataType.OBJ
                     and now_stream.type != JsonStreamDataType.ARR
                     and now_stream.type != JsonStreamDataType.UND
                 ):
                     yield now_stream
-
-                if now_stream.path == JsonStreamRoot.Root: # root
-                    self.done = now_stream.done
 
                 if now_stream.done:
                     if (now_stream.type == JsonStreamDataType.ARR

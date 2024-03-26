@@ -310,7 +310,6 @@ class Task(Bot):
         self, tsc: TaskStreamContext, res: str
     ) -> Generator[str, None, None]:
         try:
-            running = []
             task_response = ""
             for stream in tsc.parser(res):
                 if stream.path == tsc.path.Type:
@@ -376,7 +375,9 @@ class Task(Bot):
                             yield "\n"
 
                             try:
-                                running = self.running_append_task(running, task_stream)
+                                # 因为是流式解析，因此解析完成后就要保存, 否则下次过来的时候可能就没数据了
+                                running = self.running_append_task([], task_stream)
+                                self.__append_running(running)
                             except Exception as e:
                                 raise Exception(f"fail to append running: {str(e)}")
 
@@ -435,10 +436,12 @@ class Task(Bot):
                                 yield f"**Execution failed[{runtime}ms]:** \n```javascript\n{stdout}\n```\n"
 
                             try:
-                                running = self.running_append_task(running, task_stream)
+                                # 因为是流式解析，因此解析完成后就要保存, 否则下次过来的时候可能就没数据了
+                                running = self.running_append_task([], task_stream)
                                 running = self.running_append_task(
                                     running, task_response
                                 )
+                                self.__append_running(running)
                             except Exception as e:
                                 raise Exception(f"fail to append running: {str(e)}")
 
@@ -450,14 +453,6 @@ class Task(Bot):
                     if stream.done and stream.len():
                         log_dbg(f"Conclusion: {stream.data}")
                         yield "\n"
-
-            if tsc.done:
-                try:
-                    self.__append_running(running)
-
-                    log_dbg(f"update running success: {len(str(tsc.stream_tasks))}")
-                except Exception as e:
-                    raise Exception(f"fail to append running: {str(e)}")
 
         except Exception as e:
             tsc.error = f"Cann't parser stream: {e}\n"
@@ -2117,6 +2112,10 @@ def chat_from(request: dict = None):
     def __append_running(self, running: List[TaskRunningItem]):
         if not (self.now_task_id in self.tasks):
             log_dbg(f"no now_task ... {str(self.now_task_id)}")
+            return
+
+        if not len(running):
+            log_dbg(f"running is empty... ")
             return
 
         try:
