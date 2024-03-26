@@ -294,7 +294,8 @@ class Task(Bot):
     master_name: str = "Master"
     running: List[TaskRunningItem] = []
     max_running_size: int = 5 * 1000
-    max_note_size: int = 15
+    max_notes_size: int = 15
+    append_note_str_limit: int = 128
     timestamp: int = 1
     chatbot: ChatBot
     task_has_change: bool = True
@@ -1281,10 +1282,9 @@ s_action = ActionToolItem(
         if not note or not len(note):
             return "request error"
 
-        limit = 128
-        if len(str(note)) > limit:
+        if len(str(note)) > self.append_note_str_limit:
             return (
-                f"This note is too long, now({len(str(note))}) > limit({limit}). "
+                f"This note is too long, now({len(str(note))}) > limit({self.append_note_str_limit}). "
                 "Please break it down into a shorter note or "
                 "try again with a more concise summary"
             )
@@ -1292,8 +1292,8 @@ s_action = ActionToolItem(
         log_info(f"append note: {note}")
 
         while (
-            self.keep_note_len < self.max_note_size
-            and len(self.notes) >= self.max_note_size
+            self.keep_note_len < self.max_notes_size
+            and len(self.notes) >= self.max_notes_size
         ):
             del self.notes[self.keep_note_len]
 
@@ -1979,10 +1979,11 @@ def chat_from(request: dict = None):
             ),
             ActionToolItem(
                 call="chat_to_append_note",
-                description=f"保存一条信息: 用于保存分析总结的内容. 可多次使用, 最多只能保存{self.max_note_size}条. ",
+                description=f"保存一条信息: 用于保存分析总结的内容. 可多次使用, 最多只能保存{self.max_notes_size}条. ",
                 request={
                     "type": "object",
-                    "note": "需要保存的内容: 不可太长, 否则容易失败, 要只够简练, 先进行总结然后再填, 要支持Markdown语法, 如: 小鸟也是鸟. ",
+                    "note": f"需要保存的内容: 不可太长, 每次长度要小于{self.append_note_str_limit}, "
+                    f"否则容易失败, 要只够简练, 先进行总结然后再填, 要支持Markdown语法, 如: 小鸟也是鸟. ",
                 },
                 execute="AI",
             ),
