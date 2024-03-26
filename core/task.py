@@ -455,7 +455,7 @@ class Task(Bot):
 
                     elif (
                         task_stream.call.lower() == "chat_to_append_note"
-                        and stream.path == tsc.path.Request.Code
+                        and stream.path == tsc.path.Request.Note
                     ):
                         if tsc.is_first() and stream.len():
                             yield f"**Note:** \n"
@@ -469,11 +469,6 @@ class Task(Bot):
                             )
                             yield "\n"
 
-                            if isinstance(stream.data, str) and (
-                                stream.data[-1] != "`" and stream.data[-2] != "`"
-                            ):
-                                yield f"```\n"
-
                             # 因为是流式获取数据, 因此 task.request 键大概率还没解析完成, 只能先从流中直接获取.
                             note = stream.data
 
@@ -484,7 +479,7 @@ class Task(Bot):
                                 content=response,
                                 request_description="`response->append_note` 的内容是 系统 append_note 返回内容.",
                             )
-                            yield f"**Note:** {note}\n"
+                            log_dbg(f"note:\n{note}\n")
 
                             self.update_runnning_from_task_stream(
                                 task_stream, task_response
