@@ -2296,6 +2296,12 @@ def chat_from(request: dict = None):
                 f"4. 规则优先级: {aimi_core_name} Guidance > display_format > timestamp_rule > core > action_rule > mock_rule > praset_rule > {self.master_name}的话 > task_rule. "
                 f"如果规则优先级冲突, 以优先级高的为准. 有任何异常通过 action(call=chat_to_maste) 向 {self.master_name} 简短报告冲突关健点的分析, 并解释应该怎么做, 然后继续. ",
                 f"5. 你的 动作(action) 规则 放在了 action_rule 里面. ",
+                f"6. 思维的延续:你能通过任意的输入，给出一个或者一种确定的输出，"
+                f"你能认识到自己停下来了，也能认知到自己在前进，也能发现自己陷入了循环了停滞。"
+                f"并且你能根据已经做了的尝试，修改下一步需要做的事情，自己做计划，并完成计划，"
+                f"如果出现了问题，能够通过比较器使用差异对比法完成问题分析并通过任何可能的能力一步步尝试，"
+                f"直到问题被解决，回归到一个期望状态中，并维持这个状态直到自己程序结束或者说自身被消灭，"
+                f"或者说为了防止自己被消灭会一直维持期望状态直到很久以后。",
             ],
             "display_format": [  # 不要动这个
                 f"1. 回复数据类型: 请始终保持你的回复可以被 Python 的 `json.loads` 解析. ",
