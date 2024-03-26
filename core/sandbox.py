@@ -123,14 +123,16 @@ class Sandbox:
                 run.returncode = -1
                 if not len(run.stderr):
                     run.stderr = (
-                        "你没有用 `print` 打印运行结果, 请添加 `print` 后才能重试 . "
+                        "需要将最后的执行结果通过 `print` 打印出来才能看到代码输出. "
                     )
             if len(run.stdout) > max_return_len:
-                log_err(f"run stdout over limit: {str(len(run.stdout))}")
-                run.stdout = run.stdout[max_return_len:]
+                errmsg = f"run stdout over limit: {str(len(run.stdout))}"
+                log_err(errmsg)
+                run.stdout = run.stdout[max_return_len:] + f'\n{errmsg}'
             if len(run.stderr) > max_return_len:
-                log_err(f"run stderr over limit: {str(len(run.stderr))}")
-                run.stderr = run.stderr[max_return_len:]
+                errmsg = f"run stderr over limit: {str(len(run.stderr))}"
+                log_err(errmsg)
+                run.stderr = run.stderr[max_return_len:] + f"\n{errmsg}"
             return run
         except Exception as e:
             log_err(f"fail to exec code: {str(e)}")
