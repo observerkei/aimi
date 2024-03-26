@@ -69,6 +69,7 @@ class TaskActionKey:
 
 class TaskActionRequestKey:
     Content = "content"
+    Code = "code"
 
 
 class TaskRunningItemStreamType:
@@ -84,6 +85,7 @@ class TaskRunningItemStreamType:
     class RequestStreamType(str):
         __base_path: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]'
         Content: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]["{TaskActionRequestKey.Content}"]'
+        Code: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]["{TaskActionRequestKey.Code}"]'
 
         def __new__(cls, base_path=""):
             if not len(base_path):
@@ -97,6 +99,7 @@ class TaskRunningItemStreamType:
                 self.__base_path = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]'
             
             self.Content = f'{self.__base_path}["{TaskActionRequestKey.Content}"]'
+            self.Code = f'{self.__base_path}["{TaskActionRequestKey.Code}"]'
 
     Request: RequestStreamType = RequestStreamType()
 
@@ -294,6 +297,7 @@ class Task(Bot):
     ) -> Generator[str, None, None]:
         try:
             running = []
+            task_response = ""
             for stream in tsc.parser(res):
                 if stream.path == tsc.path.Type:
                     if stream.done:
@@ -328,20 +332,85 @@ class Task(Bot):
                         log_dbg(f"Call: {stream.data}")
                 elif tsc.path.Request in stream.path:
                     task_stream = tsc.get_now_task_stream()
-                    if (
+
+                    if "chat_from_" in task_stream.call:
+                        if task_stream.call.lower() == f"chat_from_{self.master_name.lower()}":
+                            log_err(
+                                f"{str(task_stream.call)}: AI try predict {self.master_name.lower()}: {str(task_stream.request)}"
+                            )
+                            raise Exception(f"AI try predict: {task_stream.call}")
+                        else:
+                            log_err(f"{str(task_stream.call)}: AI create char_from.")
+                            raise Exception(f"AI make chat_from: {task_stream.call}")
+               
+                    elif (
                         task_stream.call.lower()
                         == f"chat_to_{self.master_name.lower()}"
+                        and stream.path == tsc.path.Request.Content
                     ):
-                        if stream.path == tsc.path.Request.Content:
-                            if tsc.is_first() and stream.len():
-                                yield f"**To {self.master_name}:** \n"
-                            if stream.chunk:
-                                yield stream.chunk
-                            if stream.done and stream.len():
-                                log_dbg(
-                                    f"To {self.master_name}: {stream.path} {stream.data}"
-                                )
-                                yield "\n"
+                        if tsc.is_first() and stream.len():
+                            yield f"**To {self.master_name}:** \n"
+                        if stream.chunk:
+                            yield stream.chunk
+                        if stream.done and stream.len():
+                            log_dbg(
+                                f"To {self.master_name}: {stream.path} {stream.data}"
+                            )
+                            yield "\n"
+                        
+                            try:
+                                running = self.running_append_task(running, task_stream)
+                            except Exception as e:
+                                raise Exception(f"fail to append running: {str(e)}")
+                        
+                    elif (
+                        task_stream.call.lower()
+                        == f"chat_to_python"
+                        and stream.path == tsc.path.Request.Code
+                    ):
+                        if tsc.is_first() and stream.len():
+                            yield f"**Programming:** \n"
+
+                        if stream.chunk:
+                            yield stream.chunk
+
+                        if stream.done and stream.len():
+                            log_dbg(
+                                f"To {self.master_name}: {stream.path} {stream.data}"
+                            )
+                            yield "\n"
+
+                            python_code = task_stream.request["code"]
+                            
+                            python_code, status = self.del_code_prefix(python_code)
+                            if status:
+                                log_dbg(f"del code cover: ```...```")
+
+                            log_info(f"\n```python\n{python_code}\n```")
+
+                            success, response = self.chat_to_python(
+                                self.timestamp, python_code
+                            )
+
+                            task_response = self.make_chat_from(
+                                from_timestamp=self.timestamp,
+                                from_name="python",
+                                content=response,
+                                request_description="`response->python` 的内容是 python运行信息.",
+                            )
+
+                            stdout = response["stdout"]
+                            runtime = response["runtime"]
+                            if success:
+                                yield f"**Execution result[{runtime}ms]:** \n```javascript\n{stdout}\n```\n"
+                            else:
+                                yield f"**Execution failed[{runtime}ms]:** \n```javascript\n{stdout}\n```\n"
+
+                            try:
+                                running = self.running_append_task(running, task_stream)
+                                running = self.running_append_task(running, task_response)
+                            except Exception as e:
+                                raise Exception(f"fail to append running: {str(e)}")
 
                 elif stream.path == tsc.path.Conclusion:
                     if tsc.is_first() and stream.len():
@@ -354,8 +423,6 @@ class Task(Bot):
 
             if tsc.done:
                 try:
-                    running = copy.deepcopy(tsc.stream_tasks)
-                    
                     self.__append_running(running)
 
                     log_dbg(f"update running success: {len(str(tsc.stream_tasks))}")
@@ -2126,7 +2193,10 @@ def chat_from(request: dict = None):
         # rsp_data = '[{"type": "object", "timestamp": __timestamp, "expect": "你好", "reasoning": "AimiCore开始思考: 根据Master的指示，回复`你好`。", "call": "chat_to_master", "request": {"type": "object", "content": "[AimiCore] 你好，我已经初始化完成。", "from": [2]}, "conclusion": "为了符合Guidance，我回复了`你好`。", "execute": "system"}] '
         # rsp_data = rsp_data.replace("__timestamp", str(self.timestamp))
 
-        tsc = TaskStreamContext([f"chat_to_{self.master_name.lower()}"])
+        tsc = TaskStreamContext([
+            f"chat_to_{self.master_name.lower()}",
+            "chat_to_python"
+        ])
 
         tsc.clear_cache()
         send_tsc_cache = False
