@@ -202,15 +202,18 @@ class AppWEB:
             body = ""
 
             try:
+                broswer_session_id = request.cookies.get("session_id")
                 body = request.get_data().decode("utf-8")
                 # 获取HTTP头部中的 Authorization 值
                 authorization = request.headers.get("Authorization")
-                api_key = authorization[7:]
-                broswer_session_id = request.cookies.get("session_id")
             except Exception as e:
                 log_err(f"fail to get req info: {e}")
-
-            authorization = authorization[:18] + "..."
+            
+            if authorization and isinstance(authorization, str):
+                if len(authorization) > 7:
+                    api_key = authorization[7:]
+                if len(authorization) > 18:
+                    authorization = authorization[:18] + "..."
 
             log_dbg(
                 f"Received a get request: session_id={broswer_session_id}, "
@@ -337,7 +340,6 @@ class AppWEB:
                 url = request.url
                 broswer_session_id = request.cookies.get("session_id")
                 authorization = request.headers.get("Authorization")
-                api_key = authorization[7:]
                 body = request.get_data().decode("utf-8")
             except Exception as e:
                 error_message = f"request failed: {str(e)}"
@@ -348,7 +350,11 @@ class AppWEB:
 
                 return response
             
-            authorization = authorization[:18] + "..."
+            if authorization and isinstance(authorization, str):
+                if len(authorization) > 7:
+                    api_key = authorization[7:]
+                if len(authorization) > 18:
+                    authorization = authorization[:18] + "..."
 
             log_dbg(
                 f"Received a get request: session_id={broswer_session_id}, "
