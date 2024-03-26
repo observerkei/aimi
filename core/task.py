@@ -1281,7 +1281,7 @@ s_action = ActionToolItem(
         if not note or not len(note):
             return "request error"
 
-        limit = 222
+        limit = 128
         if len(str(note)) > limit:
             return (
                 f"This note is too long, now({len(str(note))}) > limit({limit}). "
