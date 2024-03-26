@@ -425,13 +425,17 @@ class AppWEB:
     def cul_session_id(self, broswer_session_id, api_key, preset = ""):
         need_update_cookie = False
 
-        # 每次计算当前会话id, 这样的话使用不同预设的时候, 可以使用不同的私有数据
-        session_key = api_key + preset
-        session_id = self.session.create_session_id(session_key)
-
         # 浏览器提供的 session_id 现在不可用
-        if not broswer_session_id or broswer_session_id != session_id:
+        if not broswer_session_id or not len(broswer_session_id):
             need_update_cookie = True
+             # 当前会话id, 这样的话使用不同预设的时候, 可以使用不同的私有数据
+            session_key = api_key + preset
+            session_id = self.session.create_session_id(session_key)
+        else:
+             # 当前会话id, 这样的话使用不同预设的时候, 可以使用不同的私有数据
+            session_key = broswer_session_id + preset
+            session_id = self.session.create_session_id(session_key)
+
         
         # 检查是否存在会话, 不存在则新建私有数据
         if not self.session.has_session(session_id):
