@@ -70,6 +70,7 @@ class TaskActionKey:
 class TaskActionRequestKey:
     Content = "content"
     Code = "code"
+    Note = "note"
 
 
 class TaskRunningItemStreamType:
@@ -90,6 +91,9 @@ class TaskRunningItemStreamType:
         Code: str = (
             f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]["{TaskActionRequestKey.Code}"]'
         )
+        Note: str = (
+            f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]["{TaskActionRequestKey.Note}"]'
+        )
 
         def __new__(cls, base_path=""):
             if not len(base_path):
@@ -106,6 +110,7 @@ class TaskRunningItemStreamType:
 
             self.Content = f'{self.__base_path}["{TaskActionRequestKey.Content}"]'
             self.Code = f'{self.__base_path}["{TaskActionRequestKey.Code}"]'
+            self.Note = f'{self.__base_path}["{TaskActionRequestKey.Note}"]'
 
     Request: RequestStreamType = RequestStreamType()
 
@@ -161,7 +166,7 @@ class TaskStreamContext:
         self.__now_task_idx = 0
         self.check = {}
         self.jss = JsonStream()
-        task = TaskRunningItem(timestamp=0, call="", request=None, execute="system")
+        task = TaskRunningItem(timestamp=0, call="", request=None, execute="AI")
         self.stream_tasks = [task]
 
     # 获取当前正在处理的task结构.
@@ -201,7 +206,7 @@ class TaskStreamContext:
 
         # 根据现有最新的下标创建 对应的 task, 实际上每次只递增1, 这里做了兼容处理
         for i in range(self.__now_task_idx, now_task_idx):
-            task = TaskRunningItem(timestamp=0, call="", request=None, execute="system")
+            task = TaskRunningItem(timestamp=0, call="", request=None, execute="AI")
             self.stream_tasks.append(task)
             log_dbg(f"create {i} task base, prev: {self.stream_tasks[i].call}")
 
@@ -306,12 +311,28 @@ class Task(Bot):
     models: List[str] = []
     now_ctx_size: int = 0
 
+    def update_runnning_from_task_stream(self, task_stream, task_response=None):
+        try:
+            # 因为是流式解析，因此解析完成后就要保存, 否则下次过来的时候可能就没数据了
+            running = self.running_append_task([], task_stream)
+            running = self.running_append_task(running, task_response)
+            self.__append_running(running)
+        except Exception as e:
+            raise Exception(f"fail to append running: {str(e)}")
+
     def task_dispatch_stream(
         self, tsc: TaskStreamContext, res: str
     ) -> Generator[str, None, None]:
         try:
             task_response = ""
             for stream in tsc.parser(res):
+                task_stream = tsc.get_now_task_stream()
+
+                if tsc.task_stream_count() > 1 and (
+                    len(task_stream.call) and task_stream.execute == "system:"
+                ):
+                    raise Exception(f"AI try run multi system call: {task_stream.call}")
+
                 if stream.path == tsc.path.Type:
                     if stream.done:
                         log_dbg(f"Type: {stream.data}")
@@ -344,8 +365,6 @@ class Task(Bot):
                     if stream.done and stream.len():
                         log_dbg(f"Call: {stream.data}")
                 elif tsc.path.Request in stream.path:
-                    task_stream = tsc.get_now_task_stream()
-
                     if "chat_from_" in task_stream.call:
                         if (
                             task_stream.call.lower()
@@ -374,15 +393,10 @@ class Task(Bot):
                             )
                             yield "\n"
 
-                            try:
-                                # 因为是流式解析，因此解析完成后就要保存, 否则下次过来的时候可能就没数据了
-                                running = self.running_append_task([], task_stream)
-                                self.__append_running(running)
-                            except Exception as e:
-                                raise Exception(f"fail to append running: {str(e)}")
+                            self.update_runnning_from_task_stream(task_stream)
 
                     elif (
-                        task_stream.call.lower() == f"chat_to_python"
+                        task_stream.call.lower() == "chat_to_python"
                         and stream.path == tsc.path.Request.Code
                     ):
                         if tsc.is_first() and stream.len():
@@ -435,15 +449,46 @@ class Task(Bot):
                             else:
                                 yield f"**Execution failed[{runtime}ms]:** \n```javascript\n{stdout}\n```\n"
 
-                            try:
-                                # 因为是流式解析，因此解析完成后就要保存, 否则下次过来的时候可能就没数据了
-                                running = self.running_append_task([], task_stream)
-                                running = self.running_append_task(
-                                    running, task_response
-                                )
-                                self.__append_running(running)
-                            except Exception as e:
-                                raise Exception(f"fail to append running: {str(e)}")
+                            self.update_runnning_from_task_stream(
+                                task_stream, task_response
+                            )
+
+                    elif (
+                        task_stream.call.lower() == "chat_to_append_note"
+                        and stream.path == tsc.path.Request.Code
+                    ):
+                        if tsc.is_first() and stream.len():
+                            yield f"**Note:** \n"
+
+                        if stream.chunk:
+                            yield stream.chunk
+
+                        if stream.done and stream.len():
+                            log_dbg(
+                                f"{task_stream.call}: {stream.path} = {stream.data}"
+                            )
+                            yield "\n"
+
+                            if isinstance(stream.data, str) and (
+                                stream.data[-1] != "`" and stream.data[-2] != "`"
+                            ):
+                                yield f"```\n"
+
+                            # 因为是流式获取数据, 因此 task.request 键大概率还没解析完成, 只能先从流中直接获取.
+                            note = stream.data
+
+                            response = self.chat_to_append_note(note)
+                            task_response = self.make_chat_from(
+                                from_timestamp=self.timestamp,
+                                from_name="append_note",
+                                content=response,
+                                request_description="`response->append_note` 的内容是 系统 append_note 返回内容.",
+                            )
+                            yield f"**Note:** {note}\n"
+
+                            self.update_runnning_from_task_stream(
+                                task_stream, task_response
+                            )
 
                 elif stream.path == tsc.path.Conclusion:
                     if tsc.is_first() and stream.len():
@@ -481,7 +526,7 @@ class Task(Bot):
         self, running: List[TaskRunningItem], task: TaskRunningItem
     ):
         if not task:
-            log_dbg(f"task len overload: {len(str(task))}")
+            log_dbg(f"empty task. ")
             return running
 
         new_running = []
@@ -759,7 +804,7 @@ class Task(Bot):
 
                     elif task.call == "chat_to_append_note":
                         note = task.request["note"]
-                        response = self.chat_to_append_node(note)
+                        response = self.chat_to_append_note(note)
                         task_response = self.make_chat_from(
                             from_timestamp=self.timestamp,
                             from_name="append_note",
@@ -1274,7 +1319,7 @@ s_action = ActionToolItem(
             except Exception as e:
                 log_err(f"fail to ask wolfram: {e}")
 
-    def chat_to_append_node(self, note: str) -> str:
+    def chat_to_append_note(self, note: str) -> str:
         if not note or not len(note):
             return "request error"
 
@@ -1292,6 +1337,7 @@ s_action = ActionToolItem(
             and len(self.notes) >= self.max_notes_size
         ):
             del self.notes[self.keep_note_len]
+            log_dbg(f"over load note, del one note")
 
         self.notes.append(note)
 
@@ -1989,7 +2035,7 @@ def chat_from(request: dict = None):
                     "note": f"需要保存的内容: 不可太长, 每次长度要小于{self.append_note_str_limit}, "
                     f"否则容易失败, 要只够简练, 先进行总结然后再填, 要支持Markdown语法, 如: 小鸟也是鸟. ",
                 },
-                execute="AI",
+                execute="system",
             ),
         ]
 
@@ -2092,13 +2138,13 @@ def chat_from(request: dict = None):
             self.timestamp += 1
 
             # create learning note.
-            self.chat_to_append_node(
+            self.chat_to_append_note(
                 "自主思考运行需要根据自身的构成和具体情景进行决策和行动。"
             )
             self.keep_note_len += 1
-            self.chat_to_append_node("通过不断学习和优化，可以提高解决问题的能力。")
+            self.chat_to_append_note("通过不断学习和优化，可以提高解决问题的能力。")
             self.keep_note_len += 1
-            self.chat_to_append_node(
+            self.chat_to_append_note(
                 f"碰到了任何无法解决的问题, 可以找 {self.master_name}求助。"
             )
             self.keep_note_len += 1
@@ -2235,7 +2281,11 @@ def chat_from(request: dict = None):
         # rsp_data = rsp_data.replace("__timestamp", str(self.timestamp))
 
         tsc = TaskStreamContext(
-            [f"chat_to_{self.master_name.lower()}", "chat_to_python"]
+            [
+                f"chat_to_{self.master_name.lower()}",
+                "chat_to_python",
+                "chat_to_append_note",
+            ]
         )
 
         tsc.clear_cache()
