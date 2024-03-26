@@ -84,8 +84,12 @@ class TaskRunningItemStreamType:
     # 为方便使用, 直接封装成字符串.
     class RequestStreamType(str):
         __base_path: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]'
-        Content: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]["{TaskActionRequestKey.Content}"]'
-        Code: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]["{TaskActionRequestKey.Code}"]'
+        Content: str = (
+            f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]["{TaskActionRequestKey.Content}"]'
+        )
+        Code: str = (
+            f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]["{TaskActionRequestKey.Code}"]'
+        )
 
         def __new__(cls, base_path=""):
             if not len(base_path):
@@ -96,8 +100,10 @@ class TaskRunningItemStreamType:
         def __init__(self, base_path=""):
             self.__base_path = base_path
             if not len(self.__base_path):
-                self.__base_path = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]'
-            
+                self.__base_path = (
+                    f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Request}"]'
+                )
+
             self.Content = f'{self.__base_path}["{TaskActionRequestKey.Content}"]'
             self.Code = f'{self.__base_path}["{TaskActionRequestKey.Code}"]'
 
@@ -119,7 +125,7 @@ class TaskRunningItemStreamType:
 
         request_path = f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Request}"]'
         self.Request = TaskRunningItemStreamType.RequestStreamType(request_path)
-        
+
         self.Conclusion = (
             f'{JsonStreamRoot.Root}[{root_idx}]["{TaskActionKey.Conclusion}"]'
         )
@@ -142,11 +148,11 @@ class TaskStreamContext:
         # 没有解析到任何动作的时候进行等待
         if not len(self.stream_tasks[0].call):
             return True
-        # 如果开始处理了, 但是没有错误, 则继续处理. 
+        # 如果开始处理了, 但是没有错误, 则继续处理.
         if self.action_start():
             return True
         return False
-    
+
     def task_stream_count(self):
         # 返回正在解析的数据数量
         return self.__now_task_idx + 1
@@ -198,9 +204,9 @@ class TaskStreamContext:
             task = TaskRunningItem(timestamp=0, call="", request=None, execute="system")
             self.stream_tasks.append(task)
             log_dbg(f"create {i} task base, prev: {self.stream_tasks[i].call}")
-        
+
         self.__now_task_idx = now_task_idx
-    
+
     @property
     def path(self):
         return self.__parser_path
@@ -227,23 +233,29 @@ class TaskStreamContext:
                 now_len = self.jss.root_stream.len()
                 if self.__now_task_idx + 1 < now_len:
                     self.update_path(now_len - 1)
-                
+
                 if stream.done:
                     # 将json key转化为 task 结构
                     action_key = self.get_action_key_by_stream_key(stream.path)
                     if stream.data:
                         log_dbg(f"{stream.path} = {stream.data}")
 
-                    # 检查是否为需要处理的 action_call 方法. 
+                    # 检查是否为需要处理的 action_call 方法.
                     if stream.path == self.path.Call:
                         if stream.data not in self.listen_calls:
                             self.error = f"not support stream call: {stream.data}"
                             raise Exception(self.error)
 
                     # 如果是 task 的 key, 则保存.
-                    if action_key and hasattr(self.stream_tasks[self.__now_task_idx], action_key):
-                        setattr(self.stream_tasks[self.__now_task_idx], action_key, stream.data)
-                    
+                    if action_key and hasattr(
+                        self.stream_tasks[self.__now_task_idx], action_key
+                    ):
+                        setattr(
+                            self.stream_tasks[self.__now_task_idx],
+                            action_key,
+                            stream.data,
+                        )
+
                 yield stream
 
                 # 因为是通过无key来标记第一次，因此要先上报数据再设置key
@@ -334,7 +346,10 @@ class Task(Bot):
                     task_stream = tsc.get_now_task_stream()
 
                     if "chat_from_" in task_stream.call:
-                        if task_stream.call.lower() == f"chat_from_{self.master_name.lower()}":
+                        if (
+                            task_stream.call.lower()
+                            == f"chat_from_{self.master_name.lower()}"
+                        ):
                             log_err(
                                 f"{str(task_stream.call)}: AI try predict {self.master_name.lower()}: {str(task_stream.request)}"
                             )
@@ -342,7 +357,7 @@ class Task(Bot):
                         else:
                             log_err(f"{str(task_stream.call)}: AI create char_from.")
                             raise Exception(f"AI make chat_from: {task_stream.call}")
-               
+
                     elif (
                         task_stream.call.lower()
                         == f"chat_to_{self.master_name.lower()}"
@@ -357,31 +372,42 @@ class Task(Bot):
                                 f"To {self.master_name}: {stream.path} {stream.data}"
                             )
                             yield "\n"
-                        
+
                             try:
                                 running = self.running_append_task(running, task_stream)
                             except Exception as e:
                                 raise Exception(f"fail to append running: {str(e)}")
-                        
+
                     elif (
-                        task_stream.call.lower()
-                        == f"chat_to_python"
+                        task_stream.call.lower() == f"chat_to_python"
                         and stream.path == tsc.path.Request.Code
                     ):
                         if tsc.is_first() and stream.len():
                             yield f"**Programming:** \n"
+                            data: str = stream.data
+                            if isinstance(stream.data, str) and (
+                                stream.data[0] != "`"
+                                or (stream.len() > 1 and stream.data[1] != "`")
+                            ):
+                                yield "```python\n"
 
                         if stream.chunk:
                             yield stream.chunk
 
                         if stream.done and stream.len():
                             log_dbg(
-                                f"To {self.master_name}: {stream.path} {stream.data}"
+                                f"{task_stream.call}: {stream.path} = {stream.data}"
                             )
                             yield "\n"
 
-                            python_code = task_stream.request["code"]
-                            
+                            if isinstance(stream.data, str) and (
+                                stream.data[-1] != "`" and stream.data[-2] != "`"
+                            ):
+                                yield f"```\n"
+
+                            # 因为是流式获取数据, 因此 task.request 键大概率还没解析完成, 只能先从流中直接获取.
+                            python_code = stream.data
+
                             python_code, status = self.del_code_prefix(python_code)
                             if status:
                                 log_dbg(f"del code cover: ```...```")
@@ -408,7 +434,9 @@ class Task(Bot):
 
                             try:
                                 running = self.running_append_task(running, task_stream)
-                                running = self.running_append_task(running, task_response)
+                                running = self.running_append_task(
+                                    running, task_response
+                                )
                             except Exception as e:
                                 raise Exception(f"fail to append running: {str(e)}")
 
@@ -430,10 +458,11 @@ class Task(Bot):
                     raise Exception(f"fail to append running: {str(e)}")
 
         except Exception as e:
-            tsc.error = f"cann't parser stream: {e}"
+            tsc.error = f"Cann't parser stream: {e}\n"
+            yield f"**Cann't parser stream:** {e}\n"
             log_dbg(tsc.error)
             raise Exception(tsc.error)
-        
+
     def del_code_prefix(self, python_code):
         if (
             len(python_code) > 11
@@ -450,7 +479,7 @@ class Task(Bot):
             python_code = python_code[4:-4]
             return python_code, True
         return python_code, False
-    
+
     def running_append_task(
         self, running: List[TaskRunningItem], task: TaskRunningItem
     ):
@@ -745,7 +774,7 @@ class Task(Bot):
                     elif task.call == "chat_to_wolfram":
                         math = task.request["math"]
                         yield f"**Calculate:** $$ {math} $$\n"
-                        
+
                         yield f"**Computation:** \n"
 
                         response = ""
@@ -799,7 +828,7 @@ class Task(Bot):
 
                     elif task.call == "chat_to_python":
                         python_code = task.request["code"]
-                        
+
                         python_code, status = self.del_code_prefix(python_code)
                         if status:
                             log_dbg(f"del code cover: ```...```")
@@ -899,12 +928,14 @@ class Task(Bot):
                                 response = ""
 
                                 try:
-                                    start_time = time.time()                                    
-                                    
+                                    start_time = time.time()
+
                                     response = chat_from(task.request)
 
                                     end_time = time.time()
-                                    runtime = int((end_time - start_time) * 1000)  # 将秒转换为毫秒
+                                    runtime = int(
+                                        (end_time - start_time) * 1000
+                                    )  # 将秒转换为毫秒
 
                                     format_response = response
                                     if is_json(format_response):
@@ -1076,7 +1107,7 @@ class Task(Bot):
                     action.execute = "system"
 
                 python_code = save_action_code
-        
+
                 python_code, status = self.del_code_prefix(python_code)
                 if status:
                     log_dbg(f"del code cover: ```...```")
@@ -1213,9 +1244,9 @@ s_action = ActionToolItem(
                 ask_data = BotAskData(question=request)
                 prev = ""
                 for res in self.chatbot.ask(ChatBotType.Google, ask_data):
-                    if res['code'] == -1:
+                    if res["code"] == -1:
                         raise Exception(f"code: -1, {res['message']}")
-                    chunk = res["message"][len(prev):]
+                    chunk = res["message"][len(prev) :]
                     yield chunk
                     prev = res["message"]
 
@@ -1236,14 +1267,12 @@ s_action = ActionToolItem(
                 ask_data = BotAskData(question=math)
                 prev = ""
                 for res in self.chatbot.ask(ChatBotType.Wolfram, ask_data):
-                    if res['code'] == -1:
+                    if res["code"] == -1:
                         raise Exception(f"code: -1, {res['message']}")
-                    
-                    piece = res["message"][len(prev):]
+
+                    piece = res["message"][len(prev) :]
                     yield piece
                     prev = res["message"]
-
-
 
             except Exception as e:
                 log_err(f"fail to ask wolfram: {e}")
@@ -1889,8 +1918,9 @@ s_action = ActionToolItem(
             ),
             ActionToolItem(
                 call="chat_to_python",
-                description="执行 python 代码: 有联网, 要打印才能看到结果, "
-                "需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, "
+                description=f"执行某段 python 代码: 禁止使用这个方法来回答问题. "
+                f"这个方法只能执行代码而不能做任何其他操作. "
+                "有联网, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, "
                 "然后再按照设计和 python 实现要求 一次性实现代码.\n "
                 "python 实现要求如下:\n "
                 "1. 在最后一行必须使用 `print` 把结果打印出来. 如: print('hi') .\n "
@@ -1898,7 +1928,8 @@ s_action = ActionToolItem(
                 "4. 输入必须只有 python, 内容不需要单独用 ``` 包裹. \n "
                 "5. 执行成功后, 长度不会超过2048, 所以你看到的内容可能被截断, \n "
                 "6. 要一次性把内容写好, 不能分开几次写, 因为每次调用 chat_to_python 都会覆盖之前的 python 代码. "
-                f"7. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找 {self.master_name}.",
+                f"7. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找 {self.master_name}. "
+                f"8. 执行代码的时候如果程序不会自动停止, 则会正常显示超时. ",
                 request={
                     "type": "object",
                     "code": "python 代码: 填写需要执行的 pyhton 代码, 多加print. 如: str = 'hi'\\nprint(str)\\n",
@@ -2063,7 +2094,9 @@ def chat_from(request: dict = None):
             self.keep_note_len += 1
             self.chat_to_append_node("通过不断学习和优化，可以提高解决问题的能力。")
             self.keep_note_len += 1
-            self.chat_to_append_node(f"碰到了任何无法解决的问题, 可以找 {self.master_name}求助。")
+            self.chat_to_append_node(
+                f"碰到了任何无法解决的问题, 可以找 {self.master_name}求助。"
+            )
             self.keep_note_len += 1
 
             self.running = running
@@ -2193,19 +2226,19 @@ def chat_from(request: dict = None):
         # rsp_data = '[{"type": "object", "timestamp": __timestamp, "expect": "你好", "reasoning": "AimiCore开始思考: 根据Master的指示，回复`你好`。", "call": "chat_to_master", "request": {"type": "object", "content": "[AimiCore] 你好，我已经初始化完成。", "from": [2]}, "conclusion": "为了符合Guidance，我回复了`你好`。", "execute": "system"}] '
         # rsp_data = rsp_data.replace("__timestamp", str(self.timestamp))
 
-        tsc = TaskStreamContext([
-            f"chat_to_{self.master_name.lower()}",
-            "chat_to_python"
-        ])
+        tsc = TaskStreamContext(
+            [f"chat_to_{self.master_name.lower()}", "chat_to_python"]
+        )
 
         tsc.clear_cache()
         send_tsc_cache = False
         prev_text = ""
         talk_cache = ""
+        talk_stream_cache = ""
 
         for res in self.chatbot.ask(ChatBotType.OpenAI, ask_data):
             if res["code"] == -1:
-                talk_cache = ""
+                talk_stream_cache = ""
                 prev_text = ""
                 send_tsc_cache = False
 
@@ -2224,7 +2257,7 @@ def chat_from(request: dict = None):
                 try:
                     for talk in self.task_dispatch_stream(tsc, piece):
                         if isinstance(talk, str):
-                            talk_cache += talk
+                            talk_stream_cache += talk
                         else:
                             log_err(
                                 f"task_response not str: {str(type(talk))}: {str(talk)}\n"
@@ -2236,12 +2269,12 @@ def chat_from(request: dict = None):
                                 continue
                             send_tsc_cache = True
 
-                        answer["message"] = talk_cache
+                        answer["message"] = talk_stream_cache
                         yield answer
 
                 except Exception as e:
                     log_dbg(f"fail to parser stream: {e}")
-                    talk_cache = ""
+                    talk_stream_cache = ""
                     continue
 
             prev_text = res["message"]
@@ -2252,7 +2285,6 @@ def chat_from(request: dict = None):
                     log_dbg(f"msg: {str(res['message'])}")
                 continue
 
-            talk_cache = ""
             if not tsc.done:  # 如果解析完成了, 则说明不需要再继续处理.
 
                 for talk in self.task_dispatch(res["message"]):
@@ -2268,7 +2300,6 @@ def chat_from(request: dict = None):
 
             msg = res["message"]
             log_dbg(f"res: {msg}")
-
 
             yield answer
 
@@ -2312,7 +2343,7 @@ def chat_from(request: dict = None):
             self.__append_running([chat])
             log_dbg(f"set chat {(str(question))}")
 
-        # 为了能自主运行, 需要保证时间必须为最新. 
+        # 为了能自主运行, 需要保证时间必须为最新.
         self.update_new_timestamp()
 
         if aimi_name and isinstance(aimi_name, str) and len(aimi_name):
@@ -2331,7 +2362,6 @@ def chat_from(request: dict = None):
 
         self.execute_ai_calls = execute_ai_calls
         self.execute_system_calls = execute_system_calls
-        
 
         task = self.__make_task()
         master_name = "kei"
