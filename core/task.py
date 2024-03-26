@@ -295,6 +295,7 @@ class Task(Bot):
     running: List[TaskRunningItem] = []
     max_running_size: int = 5 * 1000
     max_notes_size: int = 15
+    session_id: str = "default"
     append_note_str_limit: int = 128
     timestamp: int = 1
     chatbot: ChatBot
@@ -1627,11 +1628,17 @@ s_action = ActionToolItem(
             log_err(f"fail to load task: {e}")
             self.extern_action_path = "./aimi_plugin/action"
 
+        try:
+            self.session_id = setting["session_id"]
+        except Exception as e:
+            log_err(f"fail to load task: {e}")
+            self.session_id = "./default"
+
     def __load_task_data(self):
         has_err = False
         task_config = {}
         try:
-            task_config = Config.load_task()
+            task_config = Config.load_task(self.session_id)
             if not task_config or not len(task_config):
                 log_dbg(f"no task config.")
                 return False
@@ -1700,7 +1707,9 @@ s_action = ActionToolItem(
         if not self.task_has_change:
             return True
 
-        save_path = Config.task_config
+        save_path = f"./run/database/{self.session_id}/{Config.task_config_name}"
+        if not os.path.exists(save_path):
+            Config.create_file_and_path(save_path)
 
         try:
             save_dir = os.path.dirname(save_path)

@@ -1,5 +1,6 @@
 import hashlib
 import copy
+import time
 from typing import Any, Dict
 
 from tool.util import log_dbg, log_info, log_err
@@ -12,14 +13,24 @@ from pydantic import BaseModel, constr
 class SessionData(BaseModel):
     chatbot: Any
     previous_api_type: str
+    active_time: int
+    cpu_id: int = 0
 
 
 class Session:
     __setting: Dict = {}
     __data: Dict[str, SessionData] = {}
+    __session_timeout: int = 600 # 10分钟
+    __cpu_id: int = 0
 
     def __init__(self, setting):
         self.__setting = setting
+
+        try:
+            self.__cpu_id = setting['cpu_id']
+        except:
+            self.__cpu_id = 0
+            setting['cpu_id'] = 0
 
     @property
     def setting(self):
@@ -36,10 +47,29 @@ class Session:
 
     def has_session(self, session_id: str) -> bool:
         return session_id in self.__data
+    
+    def session_id_in_cpu(self, cpu_id = 0):
+        return self.__cpu_id == cpu_id
+    
+    def clear_timeout_session(self):
+        now_time = int(time.time())
+        # 每个线程只能占用一个session_id 就不会出问题.
+        timeout_session = []
+        for session_id, session_data in self.__data.copy().items():
+            if not self.session_id_in_cpu(session_data.cpu_id):
+                continue
+            if session_data.active_time + self.__session_timeout < now_time:
+                timeout_session.append(session_id)
 
-    def __create_chabot(self, setting: Dict) -> ChatBot:
+        # 不在遍历原始字典的时候删除, 防止出问题.
+        for timeout_id in timeout_session:
+            log_dbg(f"clear timeout session_id: {timeout_id}")
+            del self.__data[timeout_id]
+
+    def __create_chabot(self, sesion_id: str, setting: Dict) -> ChatBot:
         chatbot = ChatBot(setting)
         task_setting = setting["task"] if "task" in setting else {}
+        task_setting['session_id'] = sesion_id
         task = Task(chatbot=chatbot, setting=task_setting)
         chatbot.append(ChatBotType.Task, task)
         return chatbot
@@ -51,10 +81,16 @@ class Session:
             return session_id
 
         try:
-            chatbot = self.__create_chabot(setting)
+            chatbot = self.__create_chabot(session_id, setting)
             previous_api_type = ""
+            now_time = int(time.time())
+            cpu_id = setting['cpu_id']
+
             self.__data[session_id] = SessionData(
-                chatbot=chatbot, previous_api_type=previous_api_type
+                chatbot=chatbot, 
+                previous_api_type=previous_api_type, 
+                active_time=now_time,
+                cpu_id=cpu_id
             )
             log_info(f"create session_id: {session_id}")
             return session_id
@@ -98,6 +134,9 @@ class Session:
         if not self.has_session(session_id):
             log_dbg(f"no has session_id: {session_id}")
             return None
+
+        # 更新会话活跃时间
+        self.__data[session_id].active_time = int(time.time())
 
         return self.__data[session_id].chatbot
 

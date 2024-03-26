@@ -55,13 +55,38 @@ class Config:
     setting_config: str = "./run/setting.yml"
     memory_config: str = "./run/memory.yml"
     memory_model_file: str = "./run/memory.pt"
-    task_config: str = "./run/task.yml"
+    task_config_name: str = "task.yml"
     setting: dict = {}
     meme: Meme
     max_requestion: int = 1024
 
     def __init__(self) -> None:
         self.meme = Meme()
+    
+    @classmethod
+    def create_file_and_path(cls, file) -> dict:
+        try:
+            if not file or not len(file):
+                raise Exception("fail name is empty")
+                        
+            file_path = file
+            # 检查文件夹是否存在，如果不存在则创建文件夹和文件
+            if not os.path.exists(os.path.dirname(file_path)):
+                os.makedirs(os.path.dirname(file_path))
+                with open(file_path, 'w'):
+                    pass
+                log_dbg(f"file '{file_path}' create done")
+            else:
+                # 文件夹已存在，检查文件是否存在
+                if not os.path.exists(file_path):
+                    # 文件不存在，创建新文件
+                    with open(file_path, 'w'):
+                        pass
+                    log_dbg(f"file '{file_path}' create done")
+                else:
+                    log_dbg(f"file '{file_path}' exist")
+        except Exception as e:
+            log_dbg(f"fail to create: {e}")
 
     @classmethod
     def load_memory(cls) -> dict:
@@ -95,9 +120,10 @@ class Config:
             return {}
 
     @classmethod
-    def load_task(cls) -> dict:
+    def load_task(cls, session_id = 'default') -> dict:
         try:
-            obj = read_yaml(Config.task_config)
+            task_config_file = f"./run/database/{session_id}/{Config.task_config_name}"
+            obj = read_yaml(task_config_file)
             task = {}
 
             task["tasks"] = obj.get("tasks", {})

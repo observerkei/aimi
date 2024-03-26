@@ -408,10 +408,10 @@ class Aimi:
         api_key: str = "",
         owned_by: str = "Aimi",
         context_messages: Any = None,
+        preset: str = "",
     ) -> Generator[dict, None, None]:
         try:
 
-            preset = context_messages[0]["content"]
             api_type = owned_by
 
             if api_type == self.aimi_name and ChatBotType.Task in model:
@@ -583,9 +583,9 @@ class Aimi:
             log_err(f"fail to load aimi: {e}")
             self.task_setting = {}
         
-        
         try:
             self.web_setting = Config.load_setting("web")
+            self.web_setting['cpu_id'] = 0
         except Exception as e:
             log_err(f"fail to load aimi: {e}")
             self.web_setting = {}
@@ -633,6 +633,7 @@ class Aimi:
             self.__session_setting = ChatBot.load_bot_setting(self.bot_path)
             self.__session_setting[ChatBotType.Task] = self.task_setting
             self.__session_setting['bot_path'] = self.bot_path
+            self.__session_setting['cpu_id'] = 0
         except Exception as e:
             log_err(f"fail to load default chatbot settings: {str(e)}")
             self.__session_setting = {}

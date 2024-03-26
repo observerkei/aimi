@@ -90,11 +90,12 @@ class AppWEB:
     session: Session
     get_all_models_hook: Any
     setting: Dict = {}
+    __cpu_id: int = 0
 
     def __init__(self, setting, session, ask, get_all_models):
+        self.session = session
         self.__load_setting(setting)
         
-        self.session = session
         self.ask_hook = ask
         self.get_all_models_hook = get_all_models
         self.__listen_init()
@@ -102,6 +103,11 @@ class AppWEB:
 
     def __load_setting(self, setting):
         self.setting = setting
+
+        try:
+            self.__cpu_id = self.session.setting['cpu_id']
+        except Exception as e:
+            self.__cpu_id = 0
         
         try:
             self.host = setting['host']
@@ -221,7 +227,7 @@ class AppWEB:
                 return resp
 
             if need_update_cookie:
-                log_dbg(f"Update Browser cookie of session_id.")
+                log_dbg(f"Refreshing Browser cookie of session_id to {session_id}")
                 resp.set_cookie("session_id", session_id, samesite='None', secure=True)
 
             session_api_key = self.session.get_chatbot_setting_api_key(session_id)
@@ -229,7 +235,7 @@ class AppWEB:
                 # 如果 key 发生了变更, 需要更新 key, 但是不替换 sesion id.
                 done = self.session.update_session_by_api_key(session_id, api_key)
                 if not done:
-                    err = "Cannot update session data."
+                    err = f"Cannot update session data. session_id: {session_id}"
                     log_err(f"Error: {err}")
                     resp.set_data(err)
                     return resp
@@ -283,6 +289,7 @@ class AppWEB:
                 api_key: str,
                 owned_by: str,
                 context_messages: List[Dict],
+                preset: str,
             ):
                 log_dbg(f"wait ask stream.")
                 index = 0
@@ -304,6 +311,7 @@ class AppWEB:
                     api_key,
                     owned_by,
                     context_messages,
+                    preset,
                 ):
                     message = answer["message"][len(prev_text) :]
                     yield self.__make_stream_reply(message, index)
@@ -380,8 +388,9 @@ class AppWEB:
                 model = "auto"
                 owned_by = "Aimi"
 
+            preset = context_messages[0]["content"]
             session_id, need_update_cookie = self.cul_session_id(
-                broswer_session_id=broswer_session_id, api_key=api_key
+                broswer_session_id=broswer_session_id, api_key=api_key, preset=preset
             )
             if not session_id:
                 err = "Cannot create session."
@@ -393,9 +402,10 @@ class AppWEB:
                 # 如果 key 发生了变更, 需要更新 key, 但是不替换 sesion id.
                 done = self.session.update_session_by_api_key(session_id, api_key)
                 if not done:
-                    err = "Cannot update session data."
+                    err = f"Cannot update session data. session_id: {session_id}"
                     log_err(f"Error: {err}")
                     return make_response(err)
+
 
             resp = Response(
                 event_stream(
@@ -405,38 +415,36 @@ class AppWEB:
                     api_key=api_key,
                     owned_by=owned_by,
                     context_messages=context_messages,
+                    preset=preset,
                 ),
                 mimetype="text/event-stream",
             )
 
             if need_update_cookie:
-                log_dbg(f"Update Browser cookie of session_id.")
+                log_dbg(f"Refreshing Browser cookie of session_id to {session_id}")
                 resp.set_cookie("session_id", session_id, samesite='None', secure=True)
 
             return resp
 
-    def cul_session_id(self, broswer_session_id, api_key):
-        session_id = broswer_session_id
-        need_update_cookie = True
-        # 浏览器传过来的 session_id
-        if (
-            not broswer_session_id
-            or not len(broswer_session_id)
-            or not self.session.has_session(broswer_session_id)
-        ):
-            # 浏览器提供的 session_id 不可用
+    def cul_session_id(self, broswer_session_id, api_key, preset = ""):
+        need_update_cookie = False
+
+        # 每次计算当前会话id, 这样的话使用不同预设的时候, 可以使用不同的私有数据
+        session_key = api_key + preset
+        session_id = self.session.create_session_id(session_key)
+
+        # 浏览器提供的 session_id 现在不可用
+        if not broswer_session_id or broswer_session_id != session_id:
             need_update_cookie = True
-            log_dbg(f"Browser session_id ivalid: {broswer_session_id}")
+        
+        # 检查是否存在会话, 不存在则新建私有数据
+        if not self.session.has_session(session_id):
+            new_setting = self.session.dup_setting(api_key)
+            new_setting['cpu_id'] = self.__cpu_id
+            session_id = self.session.new_session(session_key, new_setting)
 
-            # 重新计算 session_id
-            session_id = self.session.create_session_id(api_key)
-            if not self.session.has_session(session_id):
-                # 重新计算的 session_id 还是不存在对应会话, 尝试新建一个会话
-                new_setting = self.session.dup_setting(api_key)
-                session_id = self.session.new_session(api_key, new_setting)
-
-        else:
-            need_update_cookie = False
+            # 清理掉多余的会话, 为新会话释放资源.
+            self.session.clear_timeout_session()
 
         return session_id, need_update_cookie
 
