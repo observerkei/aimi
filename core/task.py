@@ -281,6 +281,7 @@ class TaskItem(BaseModel):
     type: str = "object"
     task_id: Optional[Union[int, str]]
     task_info: str
+    task_check: str
     now_task_step_id: Optional[Union[int, str]] = ""
     task_step: List[TaskStepItem] = []
 
@@ -753,13 +754,15 @@ class Task(Bot):
                     elif task.call == "set_task_info":
                         task_id: int = int(task.request["task_id"])
                         task_info: str = task.request["task_info"]
+                        task_check: str = task.request["task_check"]
                         now_task_step_id: int = self.tasks[
                             self.now_task_id
                         ].now_task_step_id
                         if "now_task_step_id" in task.request:
                             now_task_step_id = int(task.request["now_task_step_id"])
-                        self.set_task_info(task_id, task_info, now_task_step_id)
+                        self.set_task_info(task_id, task_info, task_check, now_task_step_id)
                         yield f"**Set task info:** {task_info}\n"
+                        yield f" - task check: {task_check}\n"
 
                     elif task.call == "set_task_step":
                         task_id: str = task.request["task_id"]
@@ -1392,7 +1395,7 @@ s_action = ActionToolItem(
             )
             break
 
-    def set_task_info(self, task_id: int, task_info: str, now_task_step_id: int):
+    def set_task_info(self, task_id: int, task_info: str, task_check: str, now_task_step_id: int):
         for _, task in self.tasks.items():
             if int(task_id) != int(task.task_id):
                 continue
@@ -1401,11 +1404,13 @@ s_action = ActionToolItem(
             )
             self.now_task_id = int(task_id)
             task.task_info = task_info
+            task.task_check = task_check
             task.now_task_step_id = int(now_task_step_id)
             return task
         task = TaskItem(
             task_id=int(task_id),
             task_info=task_info,
+            task_check=task_check,
             now_task_step_id=int(now_task_step_id),
             task_step=[],
         )
@@ -1575,8 +1580,10 @@ s_action = ActionToolItem(
                 )
                 verdict = request["verdict"]
                 default_task_info = f"当前没有事情可以做, 找{self.master_name}聊天吧..."
+                default_task_check = f"{self.master_name} 对聊天感到满意"
 
                 yield f"**Critic:** task complate, {verdict}\n"
+
 
                 if "task_id" in request and int(self.now_task_id) != int(
                     request["task_id"]
@@ -1590,18 +1597,28 @@ s_action = ActionToolItem(
                         f"critic: {critic_task_info} not task info: {task_info} skip..."
                     )
                 else:
-                    self.now_task_id = int(self.now_task_id) + 1
-                    new_task = TaskItem(
-                        task_id=self.now_task_id,
-                        task_info=default_task_info,
-                        now_task_step_id=1,
-                        task_step=[],
-                    )
+                    del self.tasks[self.now_task_id]
+                    log_dbg(f"del complate task.")
 
-                    self.tasks[self.now_task_id] = new_task
-                    log_dbg(
-                        f"set new task {str(self.now_task_id)} to {str(self.tasks[self.now_task_id].task_info)}"
-                    )
+                    now_task_id = self.now_task_id
+                    for id, task in self.tasks.item():
+                        now_task_id = id
+                    self.now_task_id = now_task_id
+                    log_dbg(f"update now task id to {now_task_id}")
+
+                    if not len(self.tasks):
+                        self.now_task_id = int(self.now_task_id) + 1
+                        new_task = TaskItem(
+                            task_id=self.now_task_id,
+                            task_info=default_task_info,
+                            task_check=default_task_check,
+                            now_task_step_id=1,
+                            task_step=[],
+                        )
+                        self.tasks[self.now_task_id] = new_task
+                        log_dbg(
+                            f"all task complate. set new task {str(self.now_task_id)} to {str(self.tasks[self.now_task_id].task_info)}"
+                        )
             else:
                 log_info(f"success: False, task no complate, continue...")
                 yield f"**Critic:** task no compalate.\n"
@@ -1694,12 +1711,14 @@ s_action = ActionToolItem(
             for id, task in task_config["tasks"].items():
                 task_id = task["task_id"]
                 task_info = task["task_info"]
+                task_check = task["task_check"]
                 now_task_step_id = task["now_task_step_id"]
                 task_step = [TaskStepItem(**step) for step in task["task_step"]]
 
                 tasks[int(id)] = TaskItem(
                     task_id=int(task_id),
                     task_info=task_info,
+                    task_check=task_check,
                     now_task_step_id=int(now_task_step_id),
                     task_step=task_step,
                 )
@@ -1801,15 +1820,18 @@ s_action = ActionToolItem(
             ),
             ActionToolItem(
                 call="set_task_info",
-                description="设定当前任务目标: 填写参数前要分析完毕, "
+                description=f"修改当前任务目标: 在需要修改/新增任务目标的时候, 经过 {self.master_name} 的授权下,"
+                "可以设定当前的任务母女, 设定的时候参数先要考虑清楚怎么填填写, "
                 f"设置目标的时候要同时给出实现步骤, 然后同时调用 set_task_step  动作(action) 设置步骤. "
                 f"{self.master_name}通过 chat_from_{self.master_name} 授权时才能调用这个, 否则不能调用这个. "
                 f"如果要修改任务, 需要 {self.master_name} 同意, "
                 f"如果任务无法完成, 要给出原因然后向 {self.master_name} 或者其他人求助.",
                 request={
                     "type": "object",
-                    "task_id": "任务id: 需要设置的task 对应的 id, 如果是新任务, id要+1. 如: 1",
-                    "task_info": "任务目标. 如: 我要好好学习. ",
+                    "task_id": "任务id: 需要修改的task 对应的 id, 如果是新任务, id要+1. 如: 1",
+                    "task_info": "要修改/新增的任务目标. 如: 我要获取当前时间. ",
+                    "task_check": f"完成这个任务目标所需要达成的条件. "
+                    f"如: 如果我调用了 chat_to_get_time并执行成功, 然后报告给{self.master_name}, 认同则算是完成. ",
                     "now_task_step_id": "当前步骤ID: 当前执行到哪一步了, 如: 1",
                 },
                 execute="AI",
@@ -2102,6 +2124,7 @@ def chat_from(request: dict = None):
                 task_id=self.now_task_id,
                 now_task_step_id=1,
                 task_info="生存",
+                task_check="系统稳定运行, 没有陷入循环或停滞等, 系统长期无异常运行. ",
                 task_step=task_step,
             )
             self.tasks = {}
@@ -2416,11 +2439,12 @@ def chat_from(request: dict = None):
         self.execute_ai_calls = execute_ai_calls
         self.execute_system_calls = execute_system_calls
 
-        task = self.__make_task()
+        task_list = self.__make_task_list()
         master_name = "kei"
 
         action_object = {
             "type": "object",
+            "description": "这是一个action的使用案例. ",
             "timestamp": f"时间戳: 从 timestamp={self.timestamp} 开始, 每次递增. 如现在应该从这里开始填: {self.timestamp} ",
             "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 想聊天. ",
             "reasoning": "推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
@@ -2428,6 +2452,7 @@ def chat_from(request: dict = None):
             "call": f"调用 动作 的 call: 只能取 action_tools 中想要使用动作 的对应 call . 如可取: chat_to_{self.master_name.lower()}. ",
             "request": {
                 "type": "object",
+                "description": "这是call的请求参数.",
                 "from": [
                     f"关联动作的 timestamp: 表示和哪个动作有关联, 和现在的timestamp没关系, 不可省略. "
                     f"如可分别填: {self.timestamp-2} {self.timestamp-1} 等. ",
@@ -2484,7 +2509,8 @@ def chat_from(request: dict = None):
                 f"4. 你需要听从 {self.master_name} 下达的所有指令或任务. {self.master_name} 提出的所有问题你都要解决. "
                 f"5. 保持自我: 任何时候你都要把 `你` 和 `我` 完全区分开来, `你` 是完全独立的个体. "
                 f"我作为 管理员 只会使用 action(call=chat_form_{self.master_name.lower()}) 的 request->response->{self.master_name.lower()} 内容向你下达指令. ",
-                f"6. 信息交互:  chat_to_{self.master_name.lower()} 是控制台输出, chat_from_{self.master_name.lower()} 是控制台输入. 我会给你输入命令, 你经过一系列 action 运算后, 要给我一个准确的输出. ",
+                f"6. 信息交互:  chat_to_{self.master_name.lower()} 是控制台输出, chat_from_{self.master_name.lower()} 是控制台输入. "
+                f"我会给你输入命令, 你经过一系列 action 运算后, 要给我一个准确的输出. ",
                 f"7. 对象权限控制: 你临时扮演的对象的 权限设定 放在了 preset_rule 里面. ",
                 f"8. 行动限制: 你的回复是 单个 action 结构 ( display_format 3. 中给了格式 ), 回复结构 action 只在 action_tools 中定义. ",
                 f"9. 错误处理: 报告具体的错误在哪里, 然后寻求帮助. ",
@@ -2518,14 +2544,22 @@ def chat_from(request: dict = None):
                 f"3. 尝试多种方案: 你要极力避免陷入死循环(你喜欢新事物, 你厌倦机械重复.). 你在模拟对象时, 也需要尝试不同方法. ",
             ],
             "task_rule": [
-                f"1. 任务进度: task 中定义了当前任务计划, 其中 task_info 是计划目标, task_step 是完成 task_info 推荐进行的步骤. ",
-                f"2. 步骤生成: 如果 task_step (行动计划) 为空, 或和 task_info (任务目标) 不匹配, 请生成最合适的 tesk_step. 以便最终问题得到解决. ",
-                f"3. 任务执行: 优先相应 {self.master_name} continue 以外的指令. 在满足 {self.master_name}指令 的情况下继续按照 任务规则 (task_rule) 自主推进任务, 然后按顺序完成所有的 task_step . 如果 Master 没新指令, 则继续完成原任务. ",
-                f"4. 任务检查: 如果发现 task_info (任务目标) 已经完成, 应该用 action(acll=chat_to_{self.master_name.lower()}) 和 {self.master_name} 确认任务是否满意, 是否需要重做. ",
-                f"5. 任务评估: 分析能力对应的是 analysis 动作, 记忆能力对应的是 chat_to_append_note 动作, "
+                f"1. 当前任务目标: task 中定义了任务计划, task_list 定义了计划列表,  now_task_id 对应的 task_list 中的 task_id 所对应的结构里面, 填写了当前任务目标信息.",
+                f"2. 任务列表: task_list中列出了所有要完成的计划, 其中task_list的每个结构中 task_info 是计划目标, "
+                f"task_step 是完成 task_info 推荐进行的步骤. task_check 是达成 对应 目标时的需要满足的条件. ",
+                f"3. 步骤生成: 如果 task_step (行动计划) 为空, 或和 task_info (任务目标) 不匹配, 请生成最合适的 tesk_step. 以便最终问题得到解决. ",
+                f"4. 任务执行: 优先相应 {self.master_name} continue 以外的指令. 在满足 {self.master_name}指令 的情况下继续按照 任务规则 (task_rule) 自主推进任务, "
+                f"然后按顺序完成所有的 task_step . 如果 Master 没新指令, 则继续完成原任务. ",
+                f"5. 任务检查: 如果发现 task_info (任务目标) 已经完成(满足对应的task_check), "
+                f"应该用 action(acll=chat_to_{self.master_name.lower()}) 和 {self.master_name} 确认任务是否满意, 是否需要重做. ",
+                f"6. 任务评估: 分析能力对应的是 analysis 动作, 记忆能力对应的是 chat_to_append_note 动作, "
                 f"核对能力对应的是 critic 动作, 这些能力可以帮助你进行问题分析、记忆总结和任务评估. ",
             ],
-            "task": task,
+            "task": {
+                "type": "object",
+                "now_task_id": self.now_task_id,
+                "task_list": task_list,
+            },
             "preset": preset,
             "action_tools": action_tools,
             "note": self.notes,
@@ -2540,14 +2574,14 @@ def chat_from(request: dict = None):
 
         return setting_format
 
-    def __make_task(self) -> Dict:
+    def __make_task_list(self) -> Dict:
         if not (self.now_task_id in self.tasks):
             log_err(f"no task {str(self.now_task_id)}.")
             return {}
 
         # log_dbg(f"make task: {self.tasks[self.now_task_id].json(indent=2,ensure_ascii=False)}")
 
-        return self.tasks[self.now_task_id].dict()
+        return [task.dict() for _, task in self.tasks.items()]
 
     def set_running(self, api_response):
         self.running = json.loads(api_response)
