@@ -1,5 +1,6 @@
 from typing import Any, List, Generator, Dict, Optional, Union
 import shutil
+import os
 
 from tool.util import log_info, log_err, log_dbg, load_module
 from tool.config import Config
@@ -9,11 +10,14 @@ from aimi_plugin.bot.type import BotAskData as BotAskDataBase
 from aimi_plugin.action.type import ActionToolItem as ActionToolItemBase
 from pydantic import BaseModel, constr
 
+
 class ChatBotType(ChatBotTypeBase):
     pass
 
+
 class BotAskData(BotAskDataBase):
     pass
+
 
 # call bot_ plugin example
 class Bot(BotBase):
@@ -23,7 +27,7 @@ class Bot(BotBase):
     bot: BotBase
     # no need define plugin_prefix
     plugin_prefix = "bot_"
-    chatbot: Any 
+    chatbot: Any
 
     def __init__(self):
         self.bot = None
@@ -47,7 +51,9 @@ class Bot(BotBase):
         yield caller.bot_set_response(code=0, message="ok.")
         # if error, then: yield caller.bot_set_response(code=-1, message="err")
 
-    def bot_ask(self, caller: BotBase, bot_type: str, ask_data: BotAskData) -> Generator[dict, None, None]:
+    def bot_ask(
+        self, caller: BotBase, bot_type: str, ask_data: BotAskData
+    ) -> Generator[dict, None, None]:
         if self.chatbot and self.chatbot.ask:
             yield from self.chatbot.ask(bot_type, ask_data)
 
@@ -84,14 +90,17 @@ class ChatBot:
 
     def __init__(self, setting):
         self.setting = setting
-        self.bot_path = setting['bot_path'] if "bot_path" in setting else "./aimi_plugin/bot"
+        self.bot_path = (
+            setting["bot_path"] if "bot_path" in setting else "./aimi_plugin/bot"
+        )
         self.bot_caller.chatbot = self
         self.__load_bots()
         self.__when_init(setting)
-    
+
     @classmethod
     def load_bot_setting(cls, module_path: str):
         import os
+
         if not module_path.endswith("/"):
             module_path += "/"
 
@@ -111,18 +120,18 @@ class ChatBot:
                 bot: Bot = module.Bot()
                 bot_type = bot.type
                 setting[bot_type] = Config.load_setting(bot_type)
- 
+
                 log_dbg(f"load bot_type:{bot_type} setting from: {filename}")
             except Exception as e:
                 log_err(f"fail to load bot setting: {e} file: {filename}")
 
         return setting
-    
+
     def get_bot_setting(self, type) -> Dict:
         if type in self.setting:
             return self.setting[type]
         return {}
-    
+
     def reload_bot(self, type, bot_setting) -> Bot:
         # 遍历目录中的文件
         for filename, module in load_module(
@@ -144,10 +153,11 @@ class ChatBot:
                 return bot
             except Exception as e:
                 log_err(f"fail to reload bot bot: {e} file: {filename}")
-            
+
             break
-    
+
         return None
+
     def __load_bots(self):
         # 遍历目录中的文件
         for filename, module in load_module(
@@ -164,7 +174,7 @@ class ChatBot:
                 bot_type = bot.type
 
                 self.append(bot_type, bot)
-                
+
                 log_dbg(f"add bot bot_type:{bot_type}  from: {filename}")
             except Exception as e:
                 log_err(f"fail to add bot bot: {e} file: {filename}")
@@ -175,7 +185,7 @@ class ChatBot:
         old_bot: Bot = None
         if type in self.bots:
             old_bot = self.bots[type]
-            
+
         self.bots[type] = bot
 
         try:
@@ -183,7 +193,7 @@ class ChatBot:
                 old_bot.when_exit(self.bot_caller)
         except Exception as e:
             log_err(f"fail to exit old bot: {type}: {e}")
-    
+
     def ask(self, type: str, ask_data: BotAskData) -> Generator[dict, None, None]:
         if self.has_type(type):
             try:
@@ -233,14 +243,14 @@ class ChatBot:
 
         for bot_type, bot in self.bots.items():
             try:
-               if bot_type in setting:
-                   # 存在自定义配置则覆盖.
-                   self.setting[bot_type] = setting[bot_type]
-               else:
-                   # 不存在自定义配置使用默认配置.
-                   self.setting[bot_type] = self.bot_caller.bot_load_setting(bot_type)
+                if bot_type in setting:
+                    # 存在自定义配置则覆盖.
+                    self.setting[bot_type] = setting[bot_type]
+                else:
+                    # 不存在自定义配置使用默认配置.
+                    self.setting[bot_type] = self.bot_caller.bot_load_setting(bot_type)
 
-               bot.when_init(self.bot_caller, self.setting[bot_type])
+                bot.when_init(self.bot_caller, self.setting[bot_type])
             except Exception as e:
                 log_err(f"fail to init bot: {bot_type} err: {e}")
 
@@ -265,9 +275,17 @@ class ExternAction:
     action_offset: int = 0
     actions: Dict[str, ActionCall] = {}
 
-    def __init__(self, action_path: str):
-        self.action_path = action_path
+    def __init__(self, default_action_path: str, database_path: str):
+        self.__setup_action_data(default_action_path, database_path)
         self.__load_extern_action()
+
+    def __setup_action_data(self, default_action_path, database_path):
+        # 创建运行时文件夹
+        run_action_path = f"{database_path}/action"
+        if not os.path.exists(run_action_path):
+            shutil.copytree(default_action_path, run_action_path)
+
+        self.action_path = run_action_path
 
     def brief(self) -> List[ActionToolItem]:
         cnt = 0
@@ -386,4 +404,3 @@ class ExternAction:
             response = f"fail to save {action.call} : {str(e)}"
             log_err(response)
         return False, response
-

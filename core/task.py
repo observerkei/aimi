@@ -301,7 +301,7 @@ class Task(Bot):
     running: List[TaskRunningItem] = []
     max_running_size: int = 5 * 1000
     max_notes_size: int = 15
-    session_id: str = "default"
+    database_path: str = f"{Config.database_path}/default"
     append_note_str_limit: int = 128
     timestamp: int = 1
     chatbot: ChatBot
@@ -760,7 +760,9 @@ class Task(Bot):
                         ].now_task_step_id
                         if "now_task_step_id" in task.request:
                             now_task_step_id = int(task.request["now_task_step_id"])
-                        self.set_task_info(task_id, task_info, task_check, now_task_step_id)
+                        self.set_task_info(
+                            task_id, task_info, task_check, now_task_step_id
+                        )
                         yield f"**Set task info:** {task_info}\n"
                         yield f" - task check: {task_check}\n"
 
@@ -1395,7 +1397,9 @@ s_action = ActionToolItem(
             )
             break
 
-    def set_task_info(self, task_id: int, task_info: str, task_check: str, now_task_step_id: int):
+    def set_task_info(
+        self, task_id: int, task_info: str, task_check: str, now_task_step_id: int
+    ):
         for _, task in self.tasks.items():
             if int(task_id) != int(task.task_id):
                 continue
@@ -1584,7 +1588,6 @@ s_action = ActionToolItem(
 
                 yield f"**Critic:** task complate, {verdict}\n"
 
-
                 if "task_id" in request and int(self.now_task_id) != int(
                     request["task_id"]
                 ):
@@ -1647,7 +1650,9 @@ s_action = ActionToolItem(
             self.chatbot = chatbot
 
             self.__init_task()
-            self.extern_action = ExternAction(self.extern_action_path)
+            self.extern_action = ExternAction(
+                self.extern_action_path, self.database_path
+            )
 
         except Exception as e:
             log_err(f"fait to init: {str(e)}")
@@ -1682,16 +1687,17 @@ s_action = ActionToolItem(
             self.extern_action_path = "./aimi_plugin/action"
 
         try:
-            self.session_id = setting["session_id"]
+            session_id = setting["session_id"]
+            self.database_path = f"{Config.database_path}/{session_id}"
         except Exception as e:
             log_err(f"fail to load task: {e}")
-            self.session_id = "./default"
+            self.database_path = f"{Config.database_path}/default"
 
     def __load_task_data(self):
         has_err = False
         task_config = {}
         try:
-            task_config = Config.load_task(self.session_id)
+            task_config = Config.load_task(self.database_path)
             if not task_config or not len(task_config):
                 log_dbg(f"no task config.")
                 return False
@@ -1762,7 +1768,7 @@ s_action = ActionToolItem(
         if not self.task_has_change:
             return True
 
-        save_path = f"./run/database/{self.session_id}/{Config.task_config_name}"
+        save_path = f"{self.database_path}/{Config.task_config_name}"
         if not os.path.exists(save_path):
             Config.create_file_and_path(save_path)
 
