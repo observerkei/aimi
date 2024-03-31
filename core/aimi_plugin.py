@@ -211,7 +211,7 @@ class ChatBot:
     def has_type(self, type: str) -> bool:
         if type in self.bots and self.bots[type]:
             return True
-        return None
+        return False
 
     def has_bot_init(self, type: str) -> bool:
         if not self.has_type(type):
@@ -252,7 +252,8 @@ class ChatBot:
 
                 bot.when_init(self.bot_caller, self.setting[bot_type])
             except Exception as e:
-                log_err(f"fail to init bot: {bot_type} err: {e}")
+                log_err(f"fail to init bot: {bot_type} err: {e}, del bot. ")
+                del self.bots[bot_type]
 
 
 class ActionToolItem(ActionToolItemBase):
