@@ -209,7 +209,7 @@ class ChatBot:
         return None
 
     def has_type(self, type: str) -> bool:
-        if type in self.bots:
+        if type in self.bots and self.bots[type]:
             return True
         return None
 
