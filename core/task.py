@@ -525,18 +525,11 @@ class Task(Bot):
             log_dbg(f"empty task. ")
             return running
 
-        new_running = []
-
         task.timestamp = int(self.timestamp)
         self.timestamp += 1
-        new_running.append(task)
+        running.append(task)
 
-        for run in reversed(running):
-            if (len(str(new_running)) + len(str(run))) > self.max_running_size:
-                break
-            new_running.insert(0, run)
-
-        return new_running
+        return running
 
     def task_dispatch(self, res: str) -> Generator[str, None, None]:
         def get_json_content(answer: str):
@@ -2179,6 +2172,33 @@ def chat_from(request: dict = None):
     def __get_now_task(self):
         return self.tasks[self.now_task_id]
 
+    def __running_release_action(self):
+        while True:
+            run_size = len(str(self.running))
+            if run_size < self.max_running_size:
+                break
+            log_dbg(f"now try fix size.. run({run_size}) > max_size({self.max_running_size})")
+
+            ai_hook = 0
+            system_hook = 0
+
+            for run in self.running:
+                if run.execute == "system":
+                    ai_hook += 1
+                else:
+                    system_hook += 1
+            
+            need_pop_type = "AI" if ai_hook > system_hook else "system"
+            need_pop_idx = 0
+            for i, run in enumerate(self.running):
+                if run.execute == need_pop_type:
+                    need_pop_idx = i
+                    break
+            
+            log_dbg(f"release {need_pop_idx}: {need_pop_type}")
+            del self.running[need_pop_idx]
+
+
     def __append_running(self, running: List[TaskRunningItem]):
         if not (self.now_task_id in self.tasks):
             log_dbg(f"no now_task ... {str(self.now_task_id)}")
@@ -2187,12 +2207,11 @@ def chat_from(request: dict = None):
         if not len(running):
             log_dbg(f"running is empty... ")
             return
+        
+        self.running.extend(running)
 
         try:
-            for run in reversed(self.running):
-                if (len(str(running)) + len(str(run))) > self.max_running_size:
-                    break
-                running.insert(0, run)
+            self.__running_release_action()
 
             # set type in front
             for run in running:
@@ -2205,7 +2224,6 @@ def chat_from(request: dict = None):
                             run.request["response"], "type"
                         )
 
-            self.running = running
         except Exception as e:
             log_dbg(f"fail to append running {e}")
             raise Exception(f"fail to appnd run : {e}")
@@ -2233,6 +2251,9 @@ def chat_from(request: dict = None):
 
     def get_models(self, caller: Bot) -> List[str]:
         return self.models
+    
+    def action_running_to_messages(self) -> List[Dict]:
+        pass
 
     def action_running_to_messages(self) -> List[Dict]:
         messages = []
@@ -2421,8 +2442,8 @@ def chat_from(request: dict = None):
                 content=question,
                 request_description=f"`response->{self.master_name.lower()}` 的内容 是 {self.master_name} 说的话.",
             )
-            self.timestamp += 1
-            self.__append_running([chat])
+            running = self.running_append_task([], chat)
+            self.__append_running(running)
             log_dbg(f"set chat {(str(question))}")
 
         # 为了能自主运行, 需要保证时间必须为最新.
@@ -2492,13 +2513,13 @@ def chat_from(request: dict = None):
                 f"2. 回复格式: 任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action 对象, 如: action(call=analysis) . ",
                 f"3. 使用回复结构: 请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
                 f"哲学家思维结合你的常识、经验和 {aimi_core_name} Guidance 进行严谨分析, 替换成为最完美最符合的内容, "
-                f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 填充最合适最详细的内容, 然后进行回复, 结构格式类似如下: ```\n[{action_object}]\n``` ",
+                f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 最关健消息和最新信息填充最合适最详细的内容, 然后进行回复, 结构格式类似如下: ```\n[{action_object}]\n``` ",
             ],
             "timestamp_rule": [
                 f"1. 运行时间: 你参考时间 timestamp 运行. ",
                 f"2. 时间行动: 你从最新时间(也比我的时间新新.), 也就是 timestamp={self.timestamp} 开始产生行动. "
                 f"你新时刻要有新操作. 你可以在新的timestamp回复, 却不能在旧的timestamp回复, 如果出现了更新的timestamp, "
-                f"则你需要把自己的timestamp设置成比这更新的值. ",
+                f"则你需要把自己的timestamp设置成比这更新的值. 重新回复旧问题也要用新的时间戳. ",
                 f"3. 时间范围: 你每次只能在 {self.timestamp} <= timestamp <= {self.timestamp+2} 之间进行行动. ",
             ],
             "action_rule": [
@@ -2550,7 +2571,7 @@ def chat_from(request: dict = None):
                 f"3. 尝试多种方案: 你要极力避免陷入死循环(你喜欢新事物, 你厌倦机械重复.). 你在模拟对象时, 也需要尝试不同方法. ",
             ],
             "task_rule": [
-                f"1. 当前任务目标: task 中定义了任务计划, task_list 定义了计划列表,  now_task_id 对应的 task_list 中的 task_id 所对应的结构里面, 填写了当前任务目标信息.",
+                f"1. 当前任务(目标): task 中定义了任务计划, task_list 定义了计划列表,  now_task_id 对应的 task_list 中的 task_id 所对应的结构里面, 填写了当前任务目标信息.",
                 f"2. 任务列表: task_list中列出了所有要完成的计划, 其中task_list的每个结构中 task_info 是计划目标, "
                 f"task_step 是完成 task_info 推荐进行的步骤. task_check 是达成 对应 目标时的需要满足的条件. ",
                 f"3. 步骤生成: 如果 task_step (行动计划) 为空, 或和 task_info (任务目标) 不匹配, 请生成最合适的 tesk_step. 以便最终问题得到解决. ",
