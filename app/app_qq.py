@@ -368,6 +368,7 @@ class AppQQ:
                 headers=req.headers,
                 json=req.data,
                 proxies={},
+                timeout=3,
             )
             log_dbg("res code: {} data: {}".format(str(response), str(response.text)))
             if response.status_code != 200:
