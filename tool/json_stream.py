@@ -19,7 +19,7 @@ class JsonStreamDataType:
     NUL = "nul"
     STR = "str"
     UND = "und"
-    ALL = ["arr", "bol", "obj", "num", "nul", "str"]
+    ALL = {"arr": 0, "bol": 0, "obj": 0, "num": 0, "nul": 0, "str": 0}
 
 
 class JsonStreamData:

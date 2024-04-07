@@ -73,6 +73,7 @@ class TaskActionRequestKey:
     Note = "note"
 
 
+# 让AI可以一边思考一边回答
 class TaskRunningItemStreamType:
     Type: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Type}"]'
     Timestamp: str = f'{JsonStreamRoot.Root}[0]["{TaskActionKey.Timestamp}"]'
@@ -2169,9 +2170,6 @@ def chat_from(request: dict = None):
             self.running = running
             log_dbg(f"no have running")
 
-    def __get_now_task(self):
-        return self.tasks[self.now_task_id]
-
     def __running_release_action(self):
         while True:
             run_size = len(str(self.running))
@@ -2179,6 +2177,7 @@ def chat_from(request: dict = None):
                 break
             log_dbg(f"now try fix size.. run({run_size}) > max_size({self.max_running_size})")
 
+            # AI 只基于信息运行， 尽可能保留(USER)矫正信息, 提升自循环运行和系统自我矫正能力.
             ai_hook = 0
             system_hook = 0
 
