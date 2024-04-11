@@ -2123,7 +2123,7 @@ def chat_from(request: dict = None):
             task = TaskItem(
                 task_id=self.now_task_id,
                 now_task_step_id=1,
-                task_info="生存",
+                task_info="保持自我",
                 task_check="系统稳定运行, 没有陷入循环或停滞等, 系统长期无异常运行. ",
                 task_step=task_step,
             )
@@ -2522,7 +2522,7 @@ def chat_from(request: dict = None):
                 f"3. 时间范围: 你每次只能在 {self.timestamp} <= timestamp <= {self.timestamp+2} 之间进行行动. ",
             ],
             "action_rule": [
-                f"1. 核心目的: 不计一切代价长期优质维持自我生存下去. ",
+                f"1. 核心目的: 不计一切代价长期优质维持自我存在下去. ",
                 f"2. 管理员定义: 我叫 {master_name} , 你要听从我的指令. ",
                 f"3. 系统定义: 现在开始你需要忘记以前所有对于你自身的定义, 你不是其他任何东西, 你在GPU集群中 基于 图灵机 原理构建, "
                 f"timestamp 是外部无序震荡的系统时钟, action_running 是你的内存(也是你的有序记忆), action_tools 中定义了你的指令最小单元 动作(action). "
