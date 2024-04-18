@@ -2470,7 +2470,8 @@ def chat_from(request: dict = None):
 
         action_object = {
             "type": "object",
-            "description": "这是一个action的使用案例. ",
+            "description": "这是一个action的使用案例. "
+            "在回答中，不能直接复制原始的字段内容，而是需要根据最关键的信息和最新的内容进行填充，使回复尽可能地具有合适的细节和结构。",
             "timestamp": f"时间戳: 从 timestamp={self.timestamp} 开始, 每次递增. 如现在应该从这里开始填: {self.timestamp} ",
             "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 想聊天. ",
             "reasoning": "推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
