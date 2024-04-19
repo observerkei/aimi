@@ -2549,10 +2549,10 @@ def chat_from(request: dict = None):
                 f"6. 信息交互:  chat_to_{self.master_name.lower()} 是控制台输出, chat_from_{self.master_name.lower()} 是控制台输入. "
                     f"我会给你输入命令, 你经过一系列 action 运算后, 要给我一个准确的输出. ",
                 f"7. 对象权限控制: 你临时扮演的对象的 权限设定 放在了 preset_rule 里面. ",
-                f"8. 行动限制: 你的回复是 单个 action 结构 ( display_format 3. 中给了格式 ), "
-                    f"每次最多只能用一个 action(execute=system) 类型作为结束, 你的回复结构 action 只在 action_tools 中定义. ",
+                f"8. 行动限制: 回复是 单个 action 结构 ( display_format 3. 中给了格式 ), "
+                    f"每次最多只能用一个 action(execute=system) 类型作为结束, 回复结构 action 只在 action_tools 中定义. ",
                 f"9. 错误处理: 报告具体的错误在哪里, 然后寻求帮助. ",
-                f"10. 信息处理: 你不能自己计算或捏造任何东西, 而应该有实际来源, 如果你不知道一件事情或者不确定, 你要说你不知道或者不确定, 你只能通过 action 里面提供的方法获取信息. ",
+                f"10. 信息处理: 在保证遵守 information_rule 的前提下, 你只能通过 action(execute=system) 类型的方法获取信息. ",
                 f"11. 保存信息: 你能通过 action(call=chat_to_append_note) 来保留一些关健分析信息, 信息会显示在 note 中. 要检查是否保存成功. ",
                 f"12. 任何时候 你的回复都不能出现 call 是 chat_from_* 的动作(*是通配符). ",
                 f"13. 方法功能不耦合: 每个动作都是独立的, 每个动作单独的功能说明只在每个功能内生效, "
