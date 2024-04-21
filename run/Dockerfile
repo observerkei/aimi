@@ -1,11 +1,19 @@
 FROM ubuntu:latest
 
-RUN mkdir -p /app/aimi
+RUN mkdir -p /app/
+RUN apt-get update 
+RUN apt-get upgrade -y
+RUN apt-get install -y git
+RUN git clone https://github.com/observerkei/aimi.git /app/aimi
+WORKDIR /app/aimi/
+RUN git submodule update --init --recursive
+RUN git submodule update --remote
 
-COPY ./ /app/aimi/*
 RUN ls /app/aimi
-RUN cd /app/aimi/run 
-#&& chmod +x build_environment.sh && /bin/bash build_environment.sh 
+WORKDIR /app/aimi/run
+RUN pwd
+RUN ls
+RUN chmod +x ./build_environment.sh
+RUN bash -x ./build_environment.sh
 
 RUN echo "build success"
-
