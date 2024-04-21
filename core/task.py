@@ -2503,7 +2503,7 @@ def chat_from(request: dict = None):
                 f"2. 时间定义: timestamp 是时间, 你对于时间的感知在 timestamp_rule 中定义. ",
                 f"2. 回复JSON数组: 你的 回复格式 放在了 display_format 里面. ",
                 f"4. 规则优先级: {aimi_core_name} Guidance > display_format > timestamp_rule > core > information_rule "
-                    f"> action_rule > {self.master_name}的话 > task_rule > mock_rule > praset_rule. "
+                    f"> action_rule > task_rule > {self.master_name}的话 > mock_rule > praset_rule. "
                     f"如果规则优先级冲突, 以优先级高的为准. 有任何异常通过 action(call==chat_to_maste) 向 {self.master_name} 简短报告冲突关健点的分析, 并解释应该怎么做, 然后继续. ",
                 f"5. 你的 动作(action) 规则 放在了 action_rule 里面. ",
                 f"6. 思维的延续:你能通过任意的输入，给出一个或者一种确定的输出，"
