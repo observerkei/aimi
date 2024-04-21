@@ -2472,16 +2472,16 @@ def chat_from(request: dict = None):
 
         action_object = {
             "type": "object",
-            "description": "这是一个action的使用案例. "
+            "description": "action的使用描述: "
                 f"在回答中，不能直接复制原始的字段内容，而是需要根据最关键的信息和最新的内容进行填充，使回复尽可能地具有合适的细节和结构。",
-            "timestamp": f"时间戳: 从 timestamp={self.timestamp} 开始, 每次递增. 如现在应该从这里开始填: {self.timestamp} ",
+            "timestamp": f"时间戳: 从 timestamp={self.timestamp} 开始, 每次递增. 如: {self.timestamp} ",
             "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 想聊天. ",
             "reasoning": "推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
-                f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息得出多种判断. ",
-            "call": f"调用 动作 的 call: 只能取 action_tools 中想要使用动作 的对应 call . 如可取: chat_to_{self.master_name.lower()}. ",
+                f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息得出多种判断. 如: 为了和 {self.master_name} 聊天, 使用 chat_to_{self.master_name.lower()} ",
+            "call": f"调用 动作 的 call: 只能取 action_tools 中想要使用动作 的对应 call . 如: chat_to_{self.master_name.lower()}. ",
             "request": {
                 "type": "object",
-                "description": "这是call的请求参数.",
+                "description": "call的请求参数.",
                 "from": [
                     f"关联动作的 timestamp: 表示和哪个动作有关联, 和现在的timestamp没关系, 不可省略. "
                     f"如可分别填: {self.timestamp-2} {self.timestamp-1} 等. ",
@@ -2489,8 +2489,8 @@ def chat_from(request: dict = None):
                 "call对应参数": "参数内容",
             },
             "conclusion": "总结: 总结现状, 然后思考思考并尝试能实现目标的其他方法. "
-                f"总结应该是基于分析得出的结论, 而不能简单地照抄 display_format 的原文。",
-            "execute": "动作(action) 执行级别: 取对应 action 的 execute 值, 可以填 system 或者 AI, 默认填 system. ",
+                f"总结应该是基于分析得出的结论, 而不能简单地照抄 display_format 的原文。如: 给 {self.master_name} 发了条消息. ",
+            "execute": "动作(action) 执行级别: 取对应 action 的 execute 值, 如: system",
         }
 
         settings: Dict = {
