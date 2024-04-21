@@ -283,8 +283,9 @@ class ExternAction:
     def __setup_action_data(self, default_action_path, database_path):
         # 创建运行时文件夹
         run_action_path = f"{database_path}/action"
-        if not os.path.exists(run_action_path):
-            shutil.copytree(default_action_path, run_action_path)
+        # if not os.path.exists(run_action_path):
+        # 直接覆盖, 方便代码更新
+        shutil.copytree(default_action_path, run_action_path, dirs_exist_ok=True)
 
         self.action_path = run_action_path
 
