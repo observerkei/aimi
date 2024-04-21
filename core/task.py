@@ -1267,7 +1267,7 @@ s_action = ActionToolItem(
             reasoning=reasoning,
             call=f"chat_from_{from_name}",
             request=request,
-            conclusion=f"任何时候禁止生成任何 chat_from_{from_name} 的动作 . 请直接给出符合 {self.aimi_name}Core Guidance 全部规则的回复. ",
+            conclusion=f"任何时候禁止生成任何 chat_from_{from_name} 的动作 . 请遵循 {self.aimi_name}Core Guidance 进行回复. ",
             execute="system",
         )
         return chat
