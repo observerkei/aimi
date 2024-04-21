@@ -2489,8 +2489,8 @@ def chat_from(request: dict = None):
                 ],
                 "call对应参数": "参数内容",
             },
-            "conclusion": "总结: 总结现状, 然后思考思考并尝试能实现目标的其他方法. "
-                f"总结应该是基于分析得出的结论, 而不能简单地照抄 display_format 的原文。如: 给 {self.master_name} 发了条消息. ",
+            "conclusion": "总结: 总结现状, 然后思考思考并尝试能实现目标的其他方法, 或者下一步要做什么的建议. "
+                f"总结应该是基于分析得出的结论, 而不能简单地照抄 display_format 的原文。如: 给 {self.master_name} 发了条消息. 接下来应该等待回复或者完成任务. ",
             "execute": "动作(action) 执行级别: 取对应 action 的 execute 值, 如: system",
         }
 
