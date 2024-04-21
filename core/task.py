@@ -2257,9 +2257,6 @@ def chat_from(request: dict = None):
         return self.models
     
     def action_running_to_messages(self) -> List[Dict]:
-        pass
-
-    def action_running_to_messages(self) -> List[Dict]:
         messages = []
         ai_messages: List[TaskRunningItem] = []
         for run in self.running:
