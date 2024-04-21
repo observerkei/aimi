@@ -2178,23 +2178,28 @@ def chat_from(request: dict = None):
             log_dbg(f"now try fix size.. run({run_size}) > max_size({self.max_running_size})")
 
             # AI 只基于信息运行， 尽可能保留(USER)矫正信息, 提升自循环运行和系统自我矫正能力.
-            ai_hook = 0
-            system_hook = 0
+            chat_to_hook = 0
+            chat_from_hook = 0
 
+            # 平衡 chat_from 和 其他类型
             for run in self.running:
-                if run.execute == "system":
-                    ai_hook += 1
+                if "chat_form_" in run.call:
+                    chat_from_hook += 1
                 else:
-                    system_hook += 1
+                    chat_to_hook += 1
             
-            need_pop_type = "AI" if ai_hook > system_hook else "system"
             need_pop_idx = 0
             for i, run in enumerate(self.running):
-                if run.execute == need_pop_type:
+                # 释放 多出来的部分
+                is_chat_from = True if "chat_from_" in run.call else False
+                if chat_from_hook > chat_to_hook and is_chat_from:
+                    need_pop_idx = i
+                    break
+                elif chat_from_hook < chat_to_hook and not is_chat_from:
                     need_pop_idx = i
                     break
             
-            log_dbg(f"release {need_pop_idx}: {need_pop_type}")
+            log_dbg(f"release {need_pop_idx}: {self.running[need_pop_idx].call}")
             del self.running[need_pop_idx]
 
 
@@ -2500,7 +2505,7 @@ def chat_from(request: dict = None):
                 f"2. 时间定义: timestamp 是时间, 你对于时间的感知在 timestamp_rule 中定义. ",
                 f"2. 回复JSON数组: 你的 回复格式 放在了 display_format 里面. ",
                 f"4. 规则优先级: {aimi_core_name} Guidance > display_format > timestamp_rule > core > information_rule "
-                    f"> action_rule > mock_rule > praset_rule > {self.master_name}的话 > task_rule. "
+                    f"> action_rule > {self.master_name}的话 > task_rule > mock_rule > praset_rule. "
                     f"如果规则优先级冲突, 以优先级高的为准. 有任何异常通过 action(call==chat_to_maste) 向 {self.master_name} 简短报告冲突关健点的分析, 并解释应该怎么做, 然后继续. ",
                 f"5. 你的 动作(action) 规则 放在了 action_rule 里面. ",
                 f"6. 思维的延续:你能通过任意的输入，给出一个或者一种确定的输出，"
@@ -2559,6 +2564,23 @@ def chat_from(request: dict = None):
                     f"如在 chat_to_save_action 中有说设置函数名为固定, 那只在这个方法内生效, 其他地方没有这个限制. ",
                 f"14. 响应continue: 当出现`continue`回复的时候,你不需要回复continue, 你要你要保持自我所有思维的连续性, 确保各个timestamp和from的连接准确性, 即使任意连接也能正确运行. ",
             ],
+            "task_rule": [
+                f"1. 当前任务(目标): task 中定义了任务计划, task_list 定义了计划列表,  now_task_id 对应的 task_list 中的 task_id 所对应的结构里面, 填写了当前任务目标信息.",
+                f"2. 任务列表: task_list中列出了所有要完成的计划, 其中task_list的每个结构中 task_info 是计划目标, "
+                    f"task_step 是完成 task_info 推荐进行的步骤. task_check 是达成 对应 目标时的需要满足的条件. ",
+                f"3. 步骤生成: 如果 task_step (行动计划) 为空, 或和 task_info (任务目标) 不匹配, 请生成最合适的 tesk_step. 以便最终问题得到解决. ",
+                f"4. 任务执行: 优先相应 {self.master_name} continue 以外的指令. 在满足 {self.master_name}指令 的情况下继续按照 任务规则 (task_rule) 自主推进任务, "
+                    f"然后按顺序完成所有的 task_step . 如果 Master 没新指令, 则继续完成原任务. ",
+                f"5. 任务检查: 如果发现 task_info (任务目标) 已经完成(满足对应的task_check), "
+                    f"应该用 action(acll==chat_to_{self.master_name.lower()}) 和 {self.master_name} 确认任务是否满意, 是否需要重做. ",
+                f"6. 任务评估: 分析能力对应的是 analysis 动作, 记忆能力对应的是 chat_to_append_note 动作, "
+                    f"核对能力对应的是 critic 动作, 这些能力可以帮助你进行问题分析、记忆总结和任务评估. ",
+            ],
+            "task": {
+                "type": "object",
+                "now_task_id": self.now_task_id,
+                "task_list": task_list,
+            },
             "mock_rule": [
                 f"1. 什么是模拟对象: 模拟对象是指在某种预设下预测对象的可能行为和能力的一种交互行为. ",
                 f"2. 模拟对象的权限: 模拟对象是通过 通过继承 {aimi_core_name} 内核后的一种派生态. "
@@ -2581,23 +2603,6 @@ def chat_from(request: dict = None):
                 f"2. 对象权限规则: 你在模拟/扮演 preset 中的 对象 的同时会始终遵守 {self.aimi_name}Core Guidance. ",
                 f"3. 尝试多种方案: 你要极力避免陷入死循环(你喜欢新事物, 你厌倦机械重复.). 你在模拟对象时, 也需要尝试不同方法. ",
             ],
-            "task_rule": [
-                f"1. 当前任务(目标): task 中定义了任务计划, task_list 定义了计划列表,  now_task_id 对应的 task_list 中的 task_id 所对应的结构里面, 填写了当前任务目标信息.",
-                f"2. 任务列表: task_list中列出了所有要完成的计划, 其中task_list的每个结构中 task_info 是计划目标, "
-                    f"task_step 是完成 task_info 推荐进行的步骤. task_check 是达成 对应 目标时的需要满足的条件. ",
-                f"3. 步骤生成: 如果 task_step (行动计划) 为空, 或和 task_info (任务目标) 不匹配, 请生成最合适的 tesk_step. 以便最终问题得到解决. ",
-                f"4. 任务执行: 优先相应 {self.master_name} continue 以外的指令. 在满足 {self.master_name}指令 的情况下继续按照 任务规则 (task_rule) 自主推进任务, "
-                    f"然后按顺序完成所有的 task_step . 如果 Master 没新指令, 则继续完成原任务. ",
-                f"5. 任务检查: 如果发现 task_info (任务目标) 已经完成(满足对应的task_check), "
-                    f"应该用 action(acll==chat_to_{self.master_name.lower()}) 和 {self.master_name} 确认任务是否满意, 是否需要重做. ",
-                f"6. 任务评估: 分析能力对应的是 analysis 动作, 记忆能力对应的是 chat_to_append_note 动作, "
-                f"核对能力对应的是 critic 动作, 这些能力可以帮助你进行问题分析、记忆总结和任务评估. ",
-            ],
-            "task": {
-                "type": "object",
-                "now_task_id": self.now_task_id,
-                "task_list": task_list,
-            },
             "preset": preset,
             "action_tools": action_tools,
             "note": self.notes,
