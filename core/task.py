@@ -2156,16 +2156,17 @@ def chat_from(request: dict = None):
             self.timestamp += 1
 
             # create learning note.
-            self.chat_to_append_note(
-                "自主思考运行需要根据自身的构成和具体情景进行决策和行动。"
-            )
-            self.keep_note_len += 1
-            self.chat_to_append_note("通过不断学习和优化，可以提高解决问题的能力。")
-            self.keep_note_len += 1
-            self.chat_to_append_note(
-                f"碰到了任何无法解决的问题, 可以找 {self.master_name}求助。"
-            )
-            self.keep_note_len += 1
+            if not len(self.notes):
+                self.chat_to_append_note(
+                    "自主思考运行需要根据自身的构成和具体情景进行决策和行动。"
+                )
+                self.keep_note_len += 1
+                self.chat_to_append_note("通过不断学习和优化，可以提高解决问题的能力。")
+                self.keep_note_len += 1
+                self.chat_to_append_note(
+                    f"碰到了任何无法解决的问题, 可以找 {self.master_name}求助。"
+                )
+                self.keep_note_len += 1
 
             self.running = running
             log_dbg(f"no have running")
