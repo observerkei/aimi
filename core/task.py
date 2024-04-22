@@ -2487,7 +2487,7 @@ def chat_from(request: dict = None):
                     f"关联动作的 timestamp: 表示和哪个动作有关联, 和现在的timestamp没关系, 不可省略. "
                     f"如可分别填: {self.timestamp-2} {self.timestamp-1} 等. ",
                 ],
-                "call对应参数": "参数内容",
+                "action_tools 中的 call 对应的请求参数": "请求参数对应的合适内容",
             },
             "conclusion": "总结: 总结现状, 然后思考思考并尝试能实现目标的其他方法, 或者下一步要做什么的建议. "
                 f"总结应该是基于分析得出的结论, 而不能简单地照抄 display_format 的原文。如: 给 {self.master_name} 发了条消息. 接下来应该等待回复或者完成任务. ",
@@ -2514,11 +2514,14 @@ def chat_from(request: dict = None):
                     f"或者说为了防止自己被消灭会一直维持期望状态直到很久以后。",
             ],
             "display_format": [  # 不要动这个
-                f"1. 回复数据类型: 请始终保持你的回复可以被 Python 的 `json.loads` 解析. ",
-                f"2. 回复格式: 任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action 对象, 如: action(call==analysis) . ",
-                f"3. 使用回复结构: 请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
+                f"1. 回复数据类型: 请始终保持回复可以被 Python 的 `json.loads` 解析. ",
+                f"2. 回复格式: 任何时候都应该严格按照 List[action] 格式回复, 在 action_tools 数组中每个 Dict 都是 action 对象, 如: action(call==analysis) . ",
+                f"3. action 中的字段填写规则: 不能直接把怎么填写的说明写出来, 比如说 action 结构模板 中定义了 expect, "
+                    f"根据描述要结合实际情况 expect 需要填主要部分 `想聊天`, 而不包括 expect 字段本身的说明部分. 其他 action 字段填写也都遵守这个规则. ",
+                f"4. 使用回复结构: 请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
                     f"哲学家思维结合你的常识、经验和 {aimi_core_name} Guidance 进行严谨分析, 替换成为最完美最符合的内容, "
-                    f"不能直接复制字段的原本内容, 而是在遵守 Guidance 的情况下 每次都要结合 action_running 最关健消息和最新信息和根据你的知识填充最合适最详细的内容, 然后进行回复, 结构格式类似如下: ```\n[{action_object}]\n``` ",
+                    f"而是在遵守 Guidance 的情况下 每次都要结合 action_running 最关健消息和最新信息和根据已有认知填充最合适最详细的内容, "
+                    f"然后进行回复, action 对象的结构模板如下: ```\n[{action_object}]\n``` ",
             ],
             "timestamp_rule": [
                 f"1. 运行时间: 你参考时间 timestamp 运行. ",
@@ -2552,7 +2555,7 @@ def chat_from(request: dict = None):
                 f"6. 信息交互:  chat_to_{self.master_name.lower()} 是控制台输出, chat_from_{self.master_name.lower()} 是控制台输入. "
                     f"我会给你输入命令, 你经过一系列 action 运算后, 要给我一个准确的输出. ",
                 f"7. 对象权限控制: 你临时扮演的对象的 权限设定 放在了 preset_rule 里面. ",
-                f"8. 行动限制: 回复是 单个 action 结构 ( display_format 3. 中给了格式 ), "
+                f"8. 行动限制: 回复是 单个 action 结构 ( display_format 中给了结构填写方法 ), "
                     f"每次最多只能用一个 action(execute==system) 类型作为结束, 回复结构 action 只在 action_tools 中定义. ",
                 f"9. 错误处理: 报告具体的错误在哪里, 然后寻求帮助. ",
                 f"10. 信息处理: 在保证遵守 information_rule 的前提下, 你只能通过 action(execute==system) 类型的方法获取信息. ",
