@@ -2518,7 +2518,7 @@ def chat_from(request: dict = None):
                 f"2. 回复格式: 任何时候你都应该严格按照 List[action] 格式回复我, 在 action_tools 数组中每个 Dict 都是 action 对象, 如: action(call==analysis) . ",
                 f"3. 使用回复结构: 请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
                     f"哲学家思维结合你的常识、经验和 {aimi_core_name} Guidance 进行严谨分析, 替换成为最完美最符合的内容, "
-                    f"不能直接复制字段的原本内容, 而是每次都要结合 action_running 进行回复, 结构格式类似如下: ```\n[{action_object}]\n``` ",
+                    f"不能直接复制字段的原本内容, 而是在遵守 Guidance 的情况下 每次都要结合 action_running 最关健消息和最新信息和根据你的知识填充最合适最详细的内容, 然后进行回复, 结构格式类似如下: ```\n[{action_object}]\n``` ",
             ],
             "timestamp_rule": [
                 f"1. 运行时间: 你参考时间 timestamp 运行. ",
