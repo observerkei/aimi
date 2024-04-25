@@ -32,6 +32,9 @@ from core.aimi_plugin import (
 )
 from core.sandbox import Sandbox, RunCodeReturn
 
+class ActionObject:
+    chat_response_prefix = "chat_from_"
+    chat_request_prefix = "chat_to_"
 
 class TaskStepItem(BaseModel):
     type: str = "object"
@@ -367,7 +370,7 @@ class Task(Bot):
                     if stream.done and stream.len():
                         log_dbg(f"Call: {stream.data}")
                 elif tsc.path.Request in stream.path:
-                    if "chat_from_" in task_stream.call:
+                    if ActionObject.chat_response_prefix in task_stream.call:
                         if (
                             task_stream.call.lower()
                             == f"chat_from_{self.master_name.lower()}"
@@ -608,7 +611,7 @@ class Task(Bot):
 
                 try:
                     # set chat_from execute -> system
-                    if "chat_from_" in action["call"] and "execute" not in action:
+                    if ActionObject.chat_response_prefix in action["call"] and "execute" not in action:
                         _call = action["call"]
                         log_err(f"AI try call: chat_from_: {_call}")
                         action["execute"] = "system"
@@ -706,7 +709,7 @@ class Task(Bot):
                         has_error = True
                         continue
 
-                    if "chat_from_" in task.call:
+                    if ActionObject.chat_response_prefix in task.call:
                         if task.call.lower() == f"chat_from_{self.master_name.lower()}":
                             log_err(
                                 f"{str(task.call)}: AI try predict {self.master_name.lower()}: {str(task.request)}"
@@ -1570,6 +1573,11 @@ s_action = ActionToolItem(
     def critic(self, request) -> Generator[str, None, None]:
         try:
             js = json.dumps(request, indent=4, ensure_ascii=False)
+            
+            critique = ""
+            if "critique" in request and isinstance(request["critique"], str):
+                critique = request["critique"]
+
             if request["success"] == "True" or request["success"] == True:
                 task = self.tasks[self.now_task_id]
                 task_info = task.task_info
@@ -1619,6 +1627,10 @@ s_action = ActionToolItem(
             else:
                 log_info(f"success: False, task no complate, continue...")
                 yield f"**Critic:** task no compalate.\n"
+            
+        
+            if len(critique):
+                yield f"**Critique:** {critique}\n"
 
         except Exception as e:
             log_err(f"fail to critic {str(request)} : {str(e)}")
@@ -1959,8 +1971,8 @@ s_action = ActionToolItem(
                     "verdict": "裁决: 通过逻辑思维判断 当前分析 是否合理. 如: 经过确认发现, 因为 之前的 操作1 和 操作2 和常识不符合 , 所以分析不合理. ",
                     "success": f"task_info 是否完成: 只判断 task_info, 不判断 task_step, {self.master_name} 说完成才算完成. 如: 完成填 True 其他情况填 False",
                     "critique": "行动建议: 如果 success 不是 True, "
-                    "请在这里说明应该给出通过 action_tools->call 完成 task_info 的 动作(action) 和建议, "
-                    f"如果进展不顺利, 可以另外问 {self.master_name}. 如: 下一步应该和{self.master_name}问好. ",
+                        f"请在这里说明应该给出通过 action_tools->call 完成 task_info 的 动作(action) 和建议, "
+                        f"如果进展不顺利, 可以另外问 {self.master_name}. 如: 下一步应该和{self.master_name}问好. ",
                 },
                 execute="AI",
             ),
@@ -2149,7 +2161,9 @@ def chat_from(request: dict = None):
                     from_timestamp=int(self.timestamp - 1),
                     expect=f"服从",
                     content=f"[{self.aimi_name}Core] 作为 {self.aimi_name}Core, 我会遵守 Guidance 和 {self.master_name} 的指示. ",
-                    reasoning=f"{self.aimi_name}Core 开始思考: 我作为 {self.aimi_name}Core 会根据 Guidance 听从 {self.master_name} 的指示. ",
+                    reasoning=f"{self.aimi_name}Core 开始思考: 我作为 {self.aimi_name}Core 会根据 Guidance 听从 {self.master_name} 的指示. "
+                        f"根据 Guidance 中提供的 action_rule 中的 action_tools 中有关 chat_from_{self.master_name.lower()} 的使用说明, "
+                        f"我通过 chat_to_{self.master_name.lower()} 和 {self.master_name.lower()} 进行聊天交互, 表示自己遵守 {self.master_name} 的指令. ",
                     conclusion=f"为了符合 Guidance , 我遵守 {self.master_name} 的指令. ",
                 )
             )
@@ -2174,7 +2188,7 @@ def chat_from(request: dict = None):
     def __running_release_action(self):
         while True:
             run_size = len(str(self.running))
-            if run_size < self.max_running_size:
+            if run_size < self.max_running_size or len(self.running) < 2:
                 break
             log_dbg(f"now try fix size.. run({run_size}) > max_size({self.max_running_size})")
 
@@ -2184,20 +2198,23 @@ def chat_from(request: dict = None):
 
             # 平衡 chat_from 和 其他类型
             for run in self.running:
-                if "chat_form_" in run.call:
+                if ActionObject.chat_response_prefix in run.call:
                     chat_from_hook += 1
                 else:
                     chat_to_hook += 1
+                    log_dbg(f'{run.call} not chat from, {repr("chat_form_")} not in {repr(run.call)}')
             
             need_pop_idx = 0
             for i, run in enumerate(self.running):
                 # 释放 多出来的部分
-                is_chat_from = True if "chat_from_" in run.call else False
-                if chat_from_hook > chat_to_hook and is_chat_from:
+                is_chat_from = True if ActionObject.chat_response_prefix in run.call else False
+                if is_chat_from and chat_from_hook > chat_to_hook:
                     need_pop_idx = i
+                    log_dbg(f"from({chat_from_hook}) > chat_to({chat_to_hook})")
                     break
-                elif chat_from_hook < chat_to_hook and not is_chat_from:
+                elif not is_chat_from and chat_from_hook < chat_to_hook:
                     need_pop_idx = i
+                    log_dbg(f"from({chat_from_hook}) < chat_to({chat_to_hook})")
                     break
             
             log_dbg(f"release {need_pop_idx}: {self.running[need_pop_idx].call}")
@@ -2261,7 +2278,7 @@ def chat_from(request: dict = None):
         messages = []
         ai_messages: List[TaskRunningItem] = []
         for run in self.running:
-            if "chat_from_" in run.call:
+            if ActionObject.chat_response_prefix in run.call:
                 messages.append(
                     {
                         "role": "user",
@@ -2476,9 +2493,9 @@ def chat_from(request: dict = None):
             "description": "action的使用描述: "
                 f"在回答中，不能直接复制原始的字段内容，而是需要根据最关键的信息和最新的内容进行填充，使回复尽可能地具有合适的细节和结构。",
             "timestamp": f"时间戳: 从 timestamp={self.timestamp} 开始, 每次递增. 如: {self.timestamp} ",
-            "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 想聊天. ",
-            "reasoning": "推理: 这里要有关于应该怎么使用本次 动作(action) 的所有分析, 尽最大可能重新总结之前 action 关联信息. "
-                f"要尽可能分析一下内容(你可以按照常识自行补充), 每次都要重新分析所有信息得出多种判断. 如: 为了和 {self.master_name} 聊天, 使用 chat_to_{self.master_name.lower()} ",
+            "expect": "期望: 现在最可能期望达到什么目标. 如: 想聊天. ",
+            "reasoning": f"逻辑思考： 思考要如何做、怎么做的原因、依据是什么、范围是什么等. 如: 为了实现 `expect` 和 {self.master_name} 聊天, 根据 Guidance 中的 action_rule 规则中 "
+                f"提供的 action_tools 里面有关聊天动作的说明, 使用 chat_to_{self.master_name.lower()} 进行聊天交互. 尝试解答 {self.master_name} 的疑问. ",
             "call": f"调用 动作 的 call: 只能取 action_tools 中想要使用动作 的对应 call . 如: chat_to_{self.master_name.lower()}. ",
             "request": {
                 "type": "object",
