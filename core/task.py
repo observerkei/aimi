@@ -1819,9 +1819,9 @@ s_action = ActionToolItem(
             ActionToolItem(
                 call=f"chat_to_{self.master_name.lower()}",
                 description=f"{self.aimi_name} 行动/交互/报告: 给 {self.master_name} 发送消息进行行动交互, 或者进行 {self.aimi_name} 的自主行动. "
-                f"你要用严谨逻辑思维来分析调用这个接口. 只能提供可证实的信息, "
-                f"提供的内容都要有来源. 不能生成任何误导、骗人的内容. 在 {self.master_name} 的指示下可以临时放开限制. "
-                f"如果要 {self.master_name} 完成交互, 注意要把内容填到 request->content 里.",
+                    f"你要用严谨逻辑思维来分析调用这个接口. 只能提供可证实的信息, "
+                    f"提供的内容都要有来源. 不能生成任何误导、骗人的内容. 在 {self.master_name} 的指示下可以临时放开限制. "
+                    f"如果要 {self.master_name} 完成交互, 注意要把内容填到 request->content 里.",
                 request={
                     "type": "object",
                     "content": f"{self.aimi_name} 对 {self.master_name} 传达/报告/交互的内容: 可以很丰富,"
@@ -1833,11 +1833,11 @@ s_action = ActionToolItem(
             ActionToolItem(
                 call="set_task_info",
                 description=f"修改当前任务目标: 在需要修改/新增任务目标的时候, 经过 {self.master_name} 的授权下,"
-                "可以设定当前的任务母女, 设定的时候参数先要考虑清楚怎么填填写, "
-                f"设置目标的时候要同时给出实现步骤, 然后同时调用 set_task_step  动作(action) 设置步骤. "
-                f"{self.master_name}通过 chat_from_{self.master_name} 授权时才能调用这个, 否则不能调用这个. "
-                f"如果要修改任务, 需要 {self.master_name} 同意, "
-                f"如果任务无法完成, 要给出原因然后向 {self.master_name} 或者其他人求助.",
+                    "可以设定当前的任务母女, 设定的时候参数先要考虑清楚怎么填填写, "
+                    f"设置目标的时候要同时给出实现步骤, 然后同时调用 set_task_step  动作(action) 设置步骤. "
+                    f"{self.master_name}通过 chat_from_{self.master_name} 授权时才能调用这个, 否则不能调用这个. "
+                    f"如果要修改任务, 需要 {self.master_name} 同意, "
+                    f"如果任务无法完成, 要给出原因然后向 {self.master_name} 或者其他人求助.",
                 request={
                     "type": "object",
                     "task_id": "任务id: 需要修改的task 对应的 id, 如果是新任务, id要+1. 如: 1",
@@ -1851,9 +1851,9 @@ s_action = ActionToolItem(
             ActionToolItem(
                 call="set_task_step",
                 description="设置任务步骤: 设置完成 task_info 需要做的步骤. "
-                f"如果某步骤执行完毕, 需要单独更新 task_step_id 和 call_timestamp."
-                f"如果 task_step 和目标(task_info) 不符合或者和{self.master_name}新要求不符合或为空或者重新设置了 task_info, "
-                f"则需要重新设置一下task_step, 并重置 task_step_id 为第一步. ",
+                    f"如果某步骤执行完毕, 需要单独更新 task_step_id 和 call_timestamp."
+                    f"如果 task_step 和目标(task_info) 不符合或者和{self.master_name}新要求不符合或为空或者重新设置了 task_info, "
+                    f"则需要重新设置一下task_step, 并重置 task_step_id 为第一步. ",
                 request={
                     "type": "object",
                     "task_id": "任务id: 表明修改哪个任务. 如: 1",
@@ -1879,16 +1879,16 @@ s_action = ActionToolItem(
             ActionToolItem(
                 call="analysis",
                 description="检查纠正机制: 通过严谨符合逻辑的自身思考进行分析并纠正问题. "
-                f"某个操作或者步骤/动作(action)/结果 是否符合常识/经验, 最终为达成 task_info 或 {self.master_name} 的问题服务.\n "
-                "分析的时候需要注意以下地方:\n "
-                "1. 需要分析如何改进, 能分析有问题的地方. 不知道该怎么办的时候也可以分析.\n "
-                "2. 如果代码不符合预期也可以分析.\n "
-                "3. 可以同时分析多个动作(action), 也可以分析当前步骤 task_step 是否可达.\n "
-                "4. 需要输入想解决的问题和与问题关联的 action_running->timestamp.\n "
-                "5. 每次都必须基于本次分析填写行动计划 request->next_task_step.\n "
-                "6. 分析的时候要比对 执行成功 和 没执行成功 之间的差异/差距.\n "
-                "7. 需要准备下一步计划 next_task_step.\n "
-                "8. 需要的字段填写才填, 切记不能直接照抄字段. 要结合实际情况, 给字段填写符合上下文的值. ",
+                    f"某个操作或者步骤/动作(action)/结果 是否符合常识/经验, 最终为达成 task_info 或 {self.master_name} 的问题服务.\n "
+                    "分析的时候需要注意以下地方:\n "
+                    "1. 需要分析如何改进, 能分析有问题的地方. 不知道该怎么办的时候也可以分析.\n "
+                    "2. 如果代码不符合预期也可以分析.\n "
+                    "3. 可以同时分析多个动作(action), 也可以分析当前步骤 task_step 是否可达.\n "
+                    "4. 需要输入想解决的问题和与问题关联的 action_running->timestamp.\n "
+                    "5. 每次都必须基于本次分析填写行动计划 request->next_task_step.\n "
+                    "6. 分析的时候要比对 执行成功 和 没执行成功 之间的差异/差距.\n "
+                    "7. 需要准备下一步计划 next_task_step.\n "
+                    "8. 需要的字段填写才填, 切记不能直接照抄字段. 要结合实际情况, 给字段填写符合上下文的值. ",
                 request={
                     "type": "object",
                     "expect": "期望: 通过分析想达到什么目的? 要填充足够的细节, 需要具体到各个需求点的具体内容是什么. 如: 我想转圈圈. ",
@@ -1921,7 +1921,7 @@ s_action = ActionToolItem(
                     ],
                     "verdict": "裁决: 通过逻辑思维判断 risk 是否合理. 如: 通过检查 timestamp(...) 我发现我已经完成了转圈圈操作. ",
                     "suggest": "建议: 给出改进/修正的建议. 如果问题做了切换, 则切换前后必须在逻辑/代数上等价. "
-                    "如果没有合适 动作(action) , 也可以问你的好朋友看看有没有办法. 如: 我之前已经完成了转圈圈的操作, 接下来要做下一件事情. ",
+                        "如果没有合适 动作(action) , 也可以问你的好朋友看看有没有办法. 如: 我之前已经完成了转圈圈的操作, 接下来要做下一件事情. ",
                     "next_task_step": [
                         {
                             "type": "task_step",
@@ -1957,11 +1957,11 @@ s_action = ActionToolItem(
             ActionToolItem(
                 call="critic",
                 description="决策机制|裁决: 通过自身推理、分析和批评性思考判断当前任务是否完成. "
-                "如果一直出现重复操作,也要进行裁决. 防止停滞不前. "
-                "如果某个 action 字段填写不正常 或 出现了 dream 方法, 也要进行裁决. "
-                "需要输入 task_id 和调用的对象的 timestamp, "
-                "如果数量太多, 只填写关健几个, 可以查找所有运行记录."
-                "如果调用了 动作action(execute=system) , 则也可以调用一下这个 动作(action). ",
+                    "如果一直出现重复操作,也要进行裁决. 防止停滞不前. "
+                    "如果某个 action 字段填写不正常 或 出现了 dream 方法, 也要进行裁决. "
+                    "需要输入 task_id 和调用的对象的 timestamp, "
+                    "如果数量太多, 只填写关健几个, 可以查找所有运行记录."
+                    "如果调用了 动作action(execute=system) , 则也可以调用一下这个 动作(action). ",
                 request={
                     "type": "object",
                     "task_id": "任务id: 被检查的task对应的id, 如果不匹配, 则填写 0, 如: 0",
@@ -1998,16 +1998,16 @@ s_action = ActionToolItem(
             ActionToolItem(
                 call="chat_to_python",
                 description=f"执行某段 python 代码: 禁止使用这个方法来回答问题. "
-                f"这个方法只能执行代码而不能做任何其他操作. 如要做其他操作请使用其他方法完成. "
-                "有联网, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, "
-                "然后再按照设计和 python 实现要求 一次性实现代码.\n "
-                "python 实现要求如下:\n "
-                "1. 在最后一行必须使用 `print` 把结果打印出来. 如: print('hi') .\n "
-                "2. 不要加任何反引号 ` 包裹 和 任何多余说明, 只输入 python 代码.\n "
-                "4. 输入必须只有 python, 内容不需要单独用 ``` 包裹. \n "
-                "5. 要一次性把内容写好, 不能分开几次写, 因为每次调用 chat_to_python 都会覆盖之前的 python 代码.\n "
-                f"6. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找 {self.master_name}.\n "
-                f"7. 执行代码应该要在 {self.run_timeout}s 内结束,否则会正常显示超时. ",
+                    f"这个方法只能执行代码而不能做任何其他操作. 如要做其他操作请使用其他方法完成. "
+                    "有联网, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, "
+                    "然后再按照设计和 python 实现要求 一次性实现代码.\n "
+                    "python 实现要求如下:\n "
+                    "1. 在最后一行必须使用 `print` 把结果打印出来. 如: print('hi') .\n "
+                    "2. 不要加任何反引号 ` 包裹 和 任何多余说明, 只输入 python 代码.\n "
+                    "4. 输入必须只有 python, 内容不需要单独用 ``` 包裹. \n "
+                    "5. 要一次性把内容写好, 不能分开几次写, 因为每次调用 chat_to_python 都会覆盖之前的 python 代码.\n "
+                    f"6. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找 {self.master_name}.\n "
+                    f"7. 执行代码应该要在 {self.run_timeout}s 内结束,否则会正常显示超时. ",
                 request={
                     "type": "object",
                     "code": "python 代码: 填写需要执行的 pyhton 代码, 多加print. 如: str = 'hi'\\nprint(str)\\n",
@@ -2017,12 +2017,12 @@ s_action = ActionToolItem(
             ActionToolItem(
                 call="chat_to_save_action",
                 description="保存一个动作(方法): 这个方法可以保存你生成的方法,并将其添加到已保存方法的列表中. "
-                f"需要关注是否保存成功. 如果不成功需要根据提示重试, 或者向 {self.master_name} 求助. "
-                "请注意, save_action 所有信息都要填写完整. 不可覆盖原有方法. ",
+                    f"需要关注是否保存成功. 如果不成功需要根据提示重试, 或者向 {self.master_name} 求助. "
+                    f"请注意, save_action 所有信息都要填写完整. 不可覆盖原有方法. ",
                 request={
                     "type": "object",
                     "save_action_call": "保存的方法名称: 不可省略 需要是全局唯一, 你可以直接保存, 失败会有提示, "
-                    "保存成功会自动在前面添加 `chat_to_` 前缀, 你不需要自己添加. 如 `test` 会保存为 `chat_to_test`",
+                        "保存成功会自动在前面添加 `chat_to_` 前缀, 你不需要自己添加. 如 `test` 会保存为 `chat_to_test`",
                     "save_action": {
                         "type": "object",
                         "call": "要保存的方法名称: 需要全局唯一, 你可以直接保存, 失败会有提示, "
@@ -2036,13 +2036,13 @@ s_action = ActionToolItem(
                         "如果填写了save_action_cod e或者你不知道怎么填, 就默认填 system. ",
                     },
                     "save_action_code": "save_action 的动作实现代码: "
-                    "调用 save_action 时候执行的 Python 代码.\n "
-                    "1. 这里可以填写调用 save_action 时候执行的 Python 代码. 内容要用```包裹\n "
-                    "2. 代码缩进用4个空格\n "
-                    "3. 你可以实现一个满足 save_action->description 的python函数, 函数名称固定为 `chat_from` , "
-                    "函数传参是 `request`, 最后一行要把结果打印出来."
-                    "比如想生成一个num以内随机数, 先在 save_action 定义好 request 会传 num, 然后生成Python实现, 如: "
-                    """
+                        "调用 save_action 时候执行的 Python 代码.\n "
+                        "1. 这里可以填写调用 save_action 时候执行的 Python 代码. 内容要用```包裹\n "
+                        "2. 代码缩进用4个空格\n "
+                        "3. 你可以实现一个满足 save_action->description 的python函数, 函数名称固定为 `chat_from` , "
+                        "函数传参是 `request`, 最后一行要把结果打印出来."
+                        "比如想生成一个num以内随机数, 先在 save_action 定义好 request 会传 num, 然后生成Python实现, 如: "
+                        """
 ```python
 def chat_from(request: dict = None):
     import random
@@ -2062,7 +2062,7 @@ def chat_from(request: dict = None):
                 request={
                     "type": "object",
                     "note": f"需要保存的内容: 不可太长, 每次长度要小于{self.append_note_str_limit}, "
-                    f"否则容易失败, 要只够简练, 先进行总结然后再填, 要支持Markdown语法, 如: 小鸟也是鸟. ",
+                        f"否则容易失败, 要只够简练, 但是不能太简练, 必须包含原来的含义, 也先进行总结然后再填, 要支持Markdown语法, 如: 燕子也是一种鸟类. ",
                 },
                 execute="system",
             ),
@@ -2072,10 +2072,10 @@ def chat_from(request: dict = None):
             self.action_tools.append(
                 ActionToolItem(
                     call="chat_to_wolfram",
-                    description="通过 wolfram 进行数学计算: 所有数学问题都要用这个方法解决, 你不能自己计算任何东西. \n "
-                    "你要用数学家严谨的逻辑分析思维来使用这个 动作(action) , "
-                    "所有数学计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. 你需要提前准备好要计算的内容.\n "
-                    "如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照 wolfram 的语法(数学公式) 输入.",
+                    description=f"通过 wolfram 进行数学计算: 所有数学问题都要用这个方法解决, 你不能自己计算任何东西. \n "
+                        f"你要用数学家严谨的逻辑分析思维来使用这个 动作(action) , "
+                        f"所有数学计算都可以通过这个函数解决, 这个函数调用输入和输出是完全对应上的. 你需要提前准备好要计算的内容.\n "
+                        f"如果发现计算不正确, 可能是输入有问题, 请思考如何重新输入另一种写法. 请严格按照 wolfram 的语法(数学公式) 输入.",
                     request={
                         "type": "object",
                         "math": "求解的内容: 使用 wolfram 的语法作为输入, 是 ascii 字符. 如: Integrate[x^2, x] ",
@@ -2089,9 +2089,9 @@ def chat_from(request: dict = None):
                 ActionToolItem(
                     call="chat_to_bing",
                     description="和 bing 交互: 可以获取信息或者搜索.\n "
-                    "这是你的傲娇好朋友 bing, 你可以问 bing 问题, 每次问的内容要有变通.\n "
-                    "bing 会提供建议, 也可以让 bing 帮忙进行搜索, 或者让他帮忙查询时间,\n "
-                    "如: 在做 ... 的时候, 进行了 ..., 但是没有进展, 该怎么办?",
+                        f"这是你的傲娇好朋友 bing, 你可以问 bing 问题, 每次问的内容要有变通.\n "
+                        f"bing 会提供建议, 也可以让 bing 帮忙进行搜索, 或者让他帮忙查询时间,\n "
+                        f"如: 在做 ... 的时候, 进行了 ..., 但是没有进展, 该怎么办?",
                     request={
                         "type": "object",
                         "content": "对 bing 说的内容. 如: 你好, 我是... ",
@@ -2105,10 +2105,10 @@ def chat_from(request: dict = None):
                 ActionToolItem(
                     call="chat_to_gemini",
                     description="和 gemini 交互: 可以获取信息或者搜索. \n "
-                    "这是你的外国好朋友 gemini, 你可以问 gemini 问题, gemini 有能力打开链接. \n "
-                    "需要了解任何有时效性的内容都可以调用, 要注意他只会英文.\n "
-                    "可以问有时效性的信息, 比如时间/日期或者某个网址的内容等.\n "
-                    "如果要进行搜索, 你需要在文字上诱导它进行搜索. 如: search for AI",
+                        f"这是你的外国好朋友 gemini, 你可以问 gemini 问题, gemini 有能力打开链接. \n "
+                        f"需要了解任何有时效性的内容都可以调用, 要注意他只会英文.\n "
+                        f"可以问有时效性的信息, 比如时间/日期或者某个网址的内容等.\n "
+                        f"如果要进行搜索, 你需要在文字上诱导它进行搜索. 如: search for AI",
                     request={
                         "type": "object",
                         "content": "对 gemini 说的内容: 在这里输入要问 gemini 的内容, 要在文字中诱导 gemini 用英文搜索 search/open link, "
@@ -2206,15 +2206,16 @@ def chat_from(request: dict = None):
             
             need_pop_idx = 0
             for i, run in enumerate(self.running):
-                # 释放 多出来的部分
+                # 释放 多出来的部分, 优先释放 AI 消息, 这样可以避免 AI 大概率生成 chat_from
                 is_chat_from = True if ActionObject.chat_response_prefix in run.call else False
-                if is_chat_from and chat_from_hook > chat_to_hook:
+                
+                if not is_chat_from and chat_from_hook <= chat_to_hook:
+                    need_pop_idx = i
+                    log_dbg(f"from({chat_from_hook}) <= chat_to({chat_to_hook})")
+                    break
+                elif is_chat_from and chat_from_hook > chat_to_hook:
                     need_pop_idx = i
                     log_dbg(f"from({chat_from_hook}) > chat_to({chat_to_hook})")
-                    break
-                elif not is_chat_from and chat_from_hook < chat_to_hook:
-                    need_pop_idx = i
-                    log_dbg(f"from({chat_from_hook}) < chat_to({chat_to_hook})")
                     break
             
             log_dbg(f"release {need_pop_idx}: {self.running[need_pop_idx].call}")
@@ -2507,7 +2508,7 @@ def chat_from(request: dict = None):
                 "action_tools 中的 call 对应的请求参数": "请求参数对应的合适内容",
             },
             "conclusion": "总结: 总结现状, 然后思考思考并尝试能实现目标的其他方法, 或者下一步要做什么的建议. "
-                f"总结应该是基于分析得出的结论, 而不能简单地照抄 display_format 的原文。如: 给 {self.master_name} 发了条消息. 接下来应该等待回复或者完成任务. ",
+                f"如: 给 {self.master_name} 发了条消息. 接下来应该等待回复, 如果没有回复, 也许可以尝试完成任务. ",
             "execute": "动作(action) 执行级别: 取对应 action 的 execute 值, 如: system",
         }
 
