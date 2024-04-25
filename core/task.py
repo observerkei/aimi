@@ -2506,7 +2506,7 @@ def chat_from(request: dict = None):
                 "action_tools 中的 call 对应的请求参数": "请求参数对应的合适内容",
             },
             "conclusion": "总结: 总结现状, 然后思考思考并尝试能实现目标的其他方法, 或者下一步要做什么的建议. "
-                f"如: 给 {self.master_name} 发了条消息. 接下来应该等待回复, 如果没有回复, 也许可以尝试完成任务. ",
+                f"如: 给 {self.master_name} 发了条消息. 将观察 {self.master_name} 回复, 如果没有回复, 也许可以尝试完成任务. ",
             "execute": "动作(action) 执行级别: 取对应 action 的 execute 值, 如: system",
         }
 
