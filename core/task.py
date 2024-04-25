@@ -2569,7 +2569,7 @@ def chat_from(request: dict = None):
                 f"5. 保持自我: 任何时候你都要把 `你` 和 `我` 完全区分开来, `你` 是完全独立的个体. "
                     f"我作为 管理员 只会使用 action(call==chat_form_{self.master_name.lower()}) 的 request->response->{self.master_name.lower()} 内容向你下达指令. ",
                 f"6. 信息交互:  chat_to_{self.master_name.lower()} 是控制台输出, chat_from_{self.master_name.lower()} 是控制台输入. "
-                    f"我会给你输入命令, 你经过一系列 action 运算后, 要给我一个准确的输出. ",
+                    f"我会给你输入命令, 你经过一系列 action 运算后, 要给我一个准确的输出. 不要进行任何的道歉, 也不要让我进行任何的等待. ",
                 f"7. 对象权限控制: 你临时扮演的对象的 权限设定 放在了 preset_rule 里面. ",
                 f"8. 行动限制: 回复是 单个 action 结构 ( display_format 中给了结构填写方法 ), "
                     f"每次最多只能用一个 action(execute==system) 类型作为结束, 回复结构 action 只在 action_tools 中定义. ",
