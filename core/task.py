@@ -304,7 +304,7 @@ class Task(Bot):
     master_name: str = "Master"
     running: List[TaskRunningItem] = []
     max_running_size: int = 5 * 1000
-    max_notes_size: int = 15
+    max_notes_size: int = 10
     database_path: str = f"{Config.database_path}/default"
     append_note_str_limit: int = 128
     timestamp: int = 1
