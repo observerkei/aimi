@@ -2104,15 +2104,13 @@ def chat_from(request: dict = None):
             self.action_tools.append(
                 ActionToolItem(
                     call="chat_to_gemini",
-                    description="和 gemini 交互: 可以获取信息或者搜索. \n "
-                        f"这是你的外国好朋友 gemini, 你可以问 gemini 问题, gemini 有能力打开链接. \n "
-                        f"需要了解任何有时效性的内容都可以调用, 要注意他只会英文.\n "
-                        f"可以问有时效性的信息, 比如时间/日期或者某个网址的内容等.\n "
-                        f"如果要进行搜索, 你需要在文字上诱导它进行搜索. 如: search for AI",
+                    description="和 gemini 交互: 可以获取一些参考信息. \n "
+                        f"这是你的外国好朋友 gemini, 你可以问 gemini 问题. \n "
+                        f"要注意他只会英文.\n ",
                     request={
                         "type": "object",
-                        "content": "对 gemini 说的内容: 在这里输入要问 gemini 的内容, 要在文字中诱导 gemini 用英文搜索 search/open link, "
-                        "翻译成英文再调用. 如: What time is it now?",
+                        "content": "对 gemini 说的内容: 在这里输入要问 gemini 的内容, "
+                        "翻译成英文再调用. 如: How are you?",
                     },
                     execute="system",
                 )
