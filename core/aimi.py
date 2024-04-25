@@ -647,10 +647,12 @@ class Aimi:
         if not self.app_qq.is_online():
             log_dbg(f"{self.app_qq.type} offline")
             return
-        self.app_qq.reply_online()
+        
+        #self.app_qq.reply_online()
 
     def notify_offline(self):
-        self.app_qq.reply_offline()
+        #self.app_qq.reply_offline()
+        pass
 
     def __signal_exit(self, sig, e):
         log_info("recv exit sig.")
