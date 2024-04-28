@@ -2186,7 +2186,7 @@ def chat_from(request: dict = None):
     def __running_release_action(self):
         while True:
             run_size = len(str(self.running))
-            if run_size < self.max_running_size or len(self.running) < 2:
+            if run_size < self.max_running_size or len(self.running) <= 2:
                 break
             log_dbg(f"now try fix size.. run({run_size}) > max_size({self.max_running_size})")
 
