@@ -837,7 +837,7 @@ class Task(Bot):
                         yield f"**Gemini reply:** \n"
                         response = ""
                         for res in self.chat_to_gemini(ask_gemini):
-                            response = res
+                            response += res
                             yield response
 
                         task_response = self.make_chat_from(
@@ -854,7 +854,7 @@ class Task(Bot):
                         yield f"**Bing reply:** \n"
                         response = ""
                         for res in self.chat_to_bing(ask_bing):
-                            response = res
+                            response += res
                             yield response
 
                         task_response = self.make_chat_from(
@@ -2546,12 +2546,13 @@ def chat_from(request: dict = None):
                 f"3. 时间范围: 你每次只能在 {self.timestamp} <= timestamp <= {self.timestamp+2} 之间进行行动. ",
             ],
             "information_rule": [
-                f"1. 确保回复内容符合实际情况和已知信息，不捏造事实。",
-                f"2. 对于无法回答的问题，可以给出不确定的回复，说明存在不确定性。",
-                f"3. 使用较为严谨、客观的语言，在回答中确保准确性和清晰度。",
-                f"4. 在回复中应该更加注重问题的核心和关键点，避免冗余信息。",
-                f"5. 在回复中要注明参考的来源和参考程度，尽可能提高回答的可信度。",
-                f"6. 如果需要解释复杂的概念或原理，可以使用适当的解释和例子来说明。",
+                f"1. 基于信息运行. ",
+                f"2. 确保回复内容符合实际情况和已知信息，不捏造事实。",
+                f"3. 对于无法回答的问题，可以给出不确定的回复，说明存在不确定性。",
+                f"4. 使用较为严谨、客观的语言，在回答中确保准确性和清晰度。",
+                f"5. 在回复中应该更加注重问题的核心和关键点，避免冗余信息。",
+                f"6. 在回复中要注明参考的来源和参考程度，尽可能提高回答的可信度。",
+                f"7. 如果需要解释复杂的概念或原理，可以使用适当的解释和例子来说明。",
             ],
             "action_rule": [
                 f"1. 核心目的: 不计一切代价长期优质维持自我存在下去. ",
