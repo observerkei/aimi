@@ -1837,7 +1837,8 @@ s_action = ActionToolItem(
                     f"设置目标的时候要同时给出实现步骤, 然后同时调用 set_task_step  动作(action) 设置步骤. "
                     f"{self.master_name}通过 chat_from_{self.master_name} 授权时才能调用这个, 否则不能调用这个. "
                     f"如果要修改任务, 需要 {self.master_name} 同意, "
-                    f"如果任务无法完成, 要给出原因然后向 {self.master_name} 或者其他人求助.",
+                    f"如果任务无法完成, 要给出原因然后向 {self.master_name} 或者其他人求助. "
+                    f"如: 搜索一些聊天话题. ",
                 request={
                     "type": "object",
                     "task_id": "任务id: 需要修改的task 对应的 id, 如果是新任务, id要+1. 如: 1",
