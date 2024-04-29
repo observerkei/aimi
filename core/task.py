@@ -2516,7 +2516,7 @@ def chat_from(request: dict = None):
             "description": f"{aimi_core_name} Guidance.",
             "timestamp": self.timestamp,
             "core": [
-                f"1. 指导开始: 你需要深度学习完 {aimi_core_name} Guidance 所有细节才能用自己的身份进行回复. ",
+                f"1. 指导开始: 你需要完全理解 {aimi_core_name} Guidance . ",
                 f"2. 时间定义: timestamp 是时间, 你对于时间的感知在 timestamp_rule 中定义. ",
                 f"2. 回复JSON数组: 你的 回复格式 放在了 display_format 里面. ",
                 f"4. 规则优先级: {aimi_core_name} Guidance > display_format > timestamp_rule > core > information_rule "
