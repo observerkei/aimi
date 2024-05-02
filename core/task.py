@@ -787,12 +787,14 @@ class Task(Bot):
 
                     elif task.call == "analysis":
                         yield "**Think...**\n"
-
                         yield from self.analysis(task.request)
+
+                    elif task.call == "categorize":
+                        yield "**Abstract...**  \n"
+                        yield from self.categorize(task.request)
 
                     elif task.call == "suppose":
                         yield "**Comprehend...**\n"
-
                         yield from self.suppose(task.request)
 
                     elif task.call == "dream":
@@ -1509,9 +1511,9 @@ s_action = ActionToolItem(
                         yield "**Next Step:** \n"
                     sub = self.get_key("analysis", next_task_step, "step")
                     if sub:
-                        yield f" * {sub} \n"
+                        yield f" * {sub}  \n"
                 if has_node:
-                    yield "\n"
+                    yield "  \n"
 
         except Exception as e:
             log_err(f"fail to analysis {str(e)}")
@@ -1523,6 +1525,63 @@ s_action = ActionToolItem(
         if key in analysis and analysis[key]:
             return analysis[key]
         return None
+
+    def categorize(self, request) -> Generator[str, None, None]:
+        def yield_obj_content(obj_name, obj):
+            has_content = False
+            for sub in obj:
+                if not sub or not isinstance(sub, dict):
+                    continue
+                content = self.get_key("categorize", sub, "content")
+                if not content or not isinstance(content, str):
+                    continue
+                if not has_content:
+                    has_content = True
+                    yield f"{obj_name}: {content}"
+                    continue
+                yield f"; {content}"
+            
+            if has_content:
+                yield ".  \n"
+
+        try:
+            js = json.dumps(request, indent=4, ensure_ascii=False)
+            log_info(f"categorize:\n{js}")
+
+            categorize = request
+            
+            information = self.get_key("categorize", categorize, "information")
+            if information and isinstance(information, str):
+                yield f"**information**: {information}  \n"
+
+            members = self.get_key("categorize", categorize, "members")
+            if members and isinstance(members, list):
+                for member in members:
+                    if not member or not isinstance(member, dict):
+                        continue
+
+                    item = self.get_key("categorize", member, "item")
+                    if not item or not isinstance(item, str):
+                        continue
+                    yield f"**info:** {str(item)}  \n"
+
+                    attribute = self.get_key("categorize", member, "attribute")
+                    if not attribute or not isinstance(attribute, list):
+                        continue
+                    yield from yield_obj_content("attribute", attribute)
+                    
+                    superclass = self.get_key("categorize", member, "superclass")
+                    if not superclass or not isinstance(superclass, list):
+                        continue
+                    yield from yield_obj_content("superclass", superclass)
+                    
+                    subclass = self.get_key("categorize", member, "subclass")
+                    if not subclass or not isinstance(subclass, list):
+                        continue
+                    yield from yield_obj_content("subclass", subclass)
+
+        except Exception as e:
+            log_err(f"fial to categorize: {str(e)}")
 
     def suppose(self, request) -> Generator[str, None, None]:
         try:
@@ -1563,9 +1622,9 @@ s_action = ActionToolItem(
                             yield f"--- {credibility}"
 
                         if has_gess:
-                            yield "\n"
+                            yield "  \n"
                     if has_msg:
-                        yield "\n"
+                        yield "  \n"
 
         except Exception as e:
             log_err(f"fial to suppose: {str(e)}")
@@ -1928,6 +1987,43 @@ s_action = ActionToolItem(
                             "type": "task_step",
                             "description": f"其中一个计划步骤: 基于当前分析和可用action生成能够解决问题的新的步骤. \n",
                         }
+                    ],
+                },
+                execute="AI",
+            ),
+            ActionToolItem(
+                call="categorize",
+                description="分层抽象|信息构成|概念分词器: 解析一段信息的构成. ",
+                request={
+                    "type": "object",
+                    "information": "被处理的信息本身. 如: 小鸟在天上飞, 小鱼在水里游. ",
+                    "members": [
+                        {
+                            "type": "object",
+                            "description": "组成这个 information 的其中一个组成对象的概念. ",
+                            "item": "其中一个对象概念, 如: 小鸟或者小鱼.",
+                            "attribute": [
+                                {
+                                    "type": "object",
+                                    "description": "当前概念的属性: 表示 item 这个概念的其中一种属性. ",
+                                    "content": "属性: 表示 item 包含的属性, 如: 会飞翔. ",
+                                },
+                            ],
+                            "superclass": [
+                                {
+                                    "type": "object",
+                                    "description": "父类概念: 包含 item 这个概念中相关的其中一种父类概念",
+                                    "content": "父类概念: 包含了 item 的父类概念, 如: 鸟类",
+                                },
+                            ],
+                            "subclass": [
+                                {
+                                    "type": "object",
+                                    "description": "子类概念: 包含 item 这个概念中相关的其中一种子类概念",
+                                    "content": "子类概念: 包含在 item 中的子类概念, 如: 燕子",
+                                },
+                            ],
+                        },
                     ],
                 },
                 execute="AI",
@@ -2492,7 +2588,7 @@ def chat_from(request: dict = None):
             "type": "object",
             "description": "action的使用描述: "
                 f"在回答中，不能直接复制原始的字段内容，而是需要根据最关键的信息和最新的内容进行填充，使回复尽可能地具有合适的细节和结构。",
-            "timestamp": f"时间戳: 从 timestamp={self.timestamp} 开始, 每次递增. 如: {self.timestamp} ",
+            "timestamp": self.timestamp,
             "expect": "期望: 现在最可能期望达到什么目标. 如: 想聊天. ",
             "reasoning": f"逻辑思考： 思考要如何做、怎么做的原因、依据是什么、范围是什么等. 如: 为了实现 `expect` 和 {self.master_name} 聊天, 根据 Guidance 中的 action_rule 规则中 "
                 f"提供的 action_tools 里面有关聊天动作的说明, 使用 chat_to_{self.master_name.lower()} 进行聊天交互. 尝试解答 {self.master_name} 的疑问. ",
@@ -2537,8 +2633,9 @@ def chat_from(request: dict = None):
                 f"4. 使用回复结构: 请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
                     f"哲学家思维结合你的常识、经验和 {aimi_core_name} Guidance 进行严谨分析, 替换成为最完美最符合的内容, "
                     f"而是在遵守 Guidance 的情况下 每次都要结合 action_running 相关的消息和最新的信息和行动思考, 根据已有认知填充最合适最详细的内容, "
-                    f"然后进行回复, action 对象的结构模板如下: ```\n[{action_object}]\n``` ",
+                    f"然后进行回复, action 对象的结构模板在 action_format 中定义 ",
             ],
+            "action_format": action_object,
             "timestamp_rule": [
                 f"1. 运行时间: 你参考时间 timestamp 运行. ",
                 f"2. 时间行动: 你从最新时间(也比我的时间新新.), 也就是 timestamp={self.timestamp} 开始产生行动. "
