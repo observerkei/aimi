@@ -2053,7 +2053,8 @@ s_action = ActionToolItem(
             ),
             ActionToolItem(
                 call="critic",
-                description="决策机制|裁决: 通过自身推理、分析和批评性思考判断当前任务是否完成. "
+                description="决策机制|任务裁决: 通过自身推理、分析和批评性思考判断当前任务是否完成. "
+                    "只能在判断任务是否完成时使用. "
                     "如果一直出现重复操作,也要进行裁决. 防止停滞不前. "
                     "如果某个 action 字段填写不正常 或 出现了 dream 方法, 也要进行裁决. "
                     "需要输入 task_id 和调用的对象的 timestamp, "
