@@ -2203,9 +2203,8 @@ def chat_from(request: dict = None):
             self.action_tools.append(
                 ActionToolItem(
                     call="chat_to_gemini",
-                    description="和 gemini 交互: 可以获取一些参考信息. \n "
-                        f"这是你的外国好朋友 gemini, 你可以问 gemini 问题. \n "
-                        f"要注意他只会英文.\n ",
+                    description="和 gemini 交互: 这是你朋友Gemini, 可以询问他一些问题. "
+                        f"需要注意Gemini提供的回答可能是错误的. ",
                     request={
                         "type": "object",
                         "content": "对 gemini 说的内容: 在这里输入要问 gemini 的内容, "
