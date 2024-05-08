@@ -1940,7 +1940,7 @@ s_action = ActionToolItem(
             ActionToolItem(
                 call="analysis",
                 description="检查纠正机制: 通过严谨符合逻辑的自身思考进行分析并纠正问题. "
-                    f"某个操作或者步骤/动作(action)/结果 是否符合常识/经验, 最终为达成 task_info 或 {self.master_name} 的问题服务.\n "
+                    f"某个操作或者步骤/动作(action)/结果 是否符合常识/经验, 尝试找出解决问题的方法.\n "
                     "分析的时候需要注意以下地方:\n "
                     "1. 需要分析如何改进, 能分析有问题的地方. 不知道该怎么办的时候也可以分析.\n "
                     "2. 如果代码不符合预期也可以分析.\n "
