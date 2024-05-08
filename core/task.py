@@ -1282,7 +1282,7 @@ s_action = ActionToolItem(
             yield "request error"
         else:
             try:
-                ask_data = BotAskData(question=request)
+                ask_data = BotAskData(question=str(request))
                 prev = ""
                 for res in self.chatbot.ask(ChatBotType.Google, ask_data):
                     if res["code"] == -1:
