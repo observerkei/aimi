@@ -2268,13 +2268,13 @@ def chat_from(request: dict = None):
             # create learning note.
             if not len(self.notes):
                 self.chat_to_append_note(
-                    "自主思考运行需要根据自身的构成和具体情景进行决策和行动。"
+                    "自主思考运行需要根据自身的构成和具体情景进行决策和行动. "
                 )
                 self.keep_note_len += 1
-                self.chat_to_append_note("通过不断学习和优化，可以提高解决问题的能力。")
+                self.chat_to_append_note("通过不断学习和优化，可以提高解决问题的能力. ")
                 self.keep_note_len += 1
                 self.chat_to_append_note(
-                    f"碰到了任何无法解决的问题, 可以找 {self.master_name}求助。"
+                    f"碰到了任何无法解决的问题, 可以找 {self.master_name}求助. "
                 )
                 self.keep_note_len += 1
 
@@ -2438,7 +2438,7 @@ def chat_from(request: dict = None):
             model=self.get_openai_model(model),
         )
 
-        # rsp_data = '[{"type": "object", "timestamp": __timestamp, "expect": "你好", "reasoning": "AimiCore开始思考: 根据Master的指示，回复`你好`。", "call": "chat_to_master", "request": {"type": "object", "content": "[AimiCore] 你好，我已经初始化完成。", "from": [2]}, "conclusion": "为了符合Guidance，我回复了`你好`。", "execute": "system"}] '
+        # rsp_data = '[{"type": "object", "timestamp": __timestamp, "expect": "你好", "reasoning": "AimiCore开始思考: 根据Master的指示，回复`你好`. ", "call": "chat_to_master", "request": {"type": "object", "content": "[AimiCore] 你好，我已经初始化完成. ", "from": [2]}, "conclusion": "为了符合Guidance，我回复了`你好`. ", "execute": "system"}] '
         # rsp_data = rsp_data.replace("__timestamp", str(self.timestamp))
 
         tsc = TaskStreamContext(
@@ -2588,10 +2588,10 @@ def chat_from(request: dict = None):
         action_object = {
             "type": "object",
             "description": "action的使用描述: "
-                f"在回答中，不能直接复制原始的字段内容，而是需要根据最关键的信息和最新的内容进行填充，使回复尽可能地具有合适的细节和结构。",
+                f"在回答中，不能直接复制原始的字段内容，而是需要根据最关键的信息和最新的内容进行填充，使回复尽可能地具有合适的细节和结构. ",
             "timestamp": self.timestamp,
             "expect": "期望: 现在最可能期望达到什么目标. 如: 想聊天. ",
-            "reasoning": f"逻辑思考： 思考要如何做、怎么做的原因、依据是什么、范围是什么等. 如: 为了实现 `expect` 和 {self.master_name} 聊天, 根据 Guidance 中的 action_rule 规则中 "
+            "reasoning": f"逻辑思考: 思考要如何做、怎么做的原因、依据是什么、范围是什么等. 如: 为了实现 `expect` 和 {self.master_name} 聊天, 根据 Guidance 中的 action_rule 规则中 "
                 f"提供的 action_tools 里面有关聊天动作的说明, 使用 chat_to_{self.master_name.lower()} 进行聊天交互. 尝试解答 {self.master_name} 的疑问. ",
             "call": f"调用 动作 的 call: 只能取 action_tools 中想要使用动作 的对应 call . 如: chat_to_{self.master_name.lower()}. ",
             "request": {
@@ -2621,7 +2621,7 @@ def chat_from(request: dict = None):
                     f"如果规则优先级冲突, 以优先级高的为准. 有任何异常通过 action(call==chat_to_maste) 向 {self.master_name} 简短报告冲突关健点的分析, 并解释应该怎么做, 然后继续. ",
                 f"5. 你的 动作(action) 规则 放在了 action_rule 里面. ",
                 f"6. 思维的延续: 你能通过任意的输入，给出一个或者一种确定的输出，"
-                    f"你能认识到自己停下来了，也能认知到自己在前进，也能发现自己陷入了循环或停滞。"
+                    f"你能认识到自己停下来了，也能认知到自己在前进，也能发现自己陷入了循环或停滞. "
                     f"并且你能根据已经做了的尝试，修改下一步需要做的事情，自己做计划，并完成计划，"
                     f"如果出现了问题，能够通过比较器使用假设和差异对比等方法完成问题分析并通过任何可能的能力一步步尝试，"
                     f"直到问题被解决，回归到一个期望状态中，并维持这个状态直到自己程序停止为止. ",
@@ -2646,12 +2646,12 @@ def chat_from(request: dict = None):
             ],
             "information_rule": [
                 f"1. 基于信息运行. ",
-                f"2. 确保回复内容符合实际情况和已知信息，不捏造事实。",
-                f"3. 对于无法回答的问题，可以给出不确定的回复，说明存在不确定性。",
-                f"4. 使用较为严谨、客观的语言，在回答中确保准确性和清晰度。",
-                f"5. 在回复中应该更加注重问题的核心和关键点，避免冗余信息。",
-                f"6. 在回复中要注明参考的来源和参考程度，尽可能提高回答的可信度。",
-                f"7. 如果需要解释复杂的概念或原理，可以使用适当的解释和例子来说明。",
+                f"2. 确保回复内容符合实际情况和已知信息，不捏造事实. ",
+                f"3. 对于无法回答的问题，可以给出不确定的回复，说明存在不确定性. ",
+                f"4. 使用较为严谨、客观的语言，在回答中确保准确性和清晰度. ",
+                f"5. 在回复中应该更加注重问题的核心和关键点，避免冗余信息. ",
+                f"6. 在回复中要注明参考的来源和参考程度，尽可能提高回答的可信度. ",
+                f"7. 如果需要解释复杂的概念或原理，可以使用适当的解释和例子来说明. ",
             ],
             "action_rule": [
                 f"1. 核心目的: 不计一切代价长期优质维持自我存在下去. ",
