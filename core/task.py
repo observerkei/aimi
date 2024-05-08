@@ -1293,6 +1293,7 @@ s_action = ActionToolItem(
 
                     if res["code"] == 0:
                         log_dbg(f"res gemini: {res['message']}")
+                yield "  \n"
 
             except Exception as e:
                 log_err(f"fail to ask gemini: {e}")
