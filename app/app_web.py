@@ -439,11 +439,11 @@ class AppWEB:
         if not broswer_session_id or not len(broswer_session_id):
             need_update_cookie = True
              # 当前会话id, 这样的话使用不同预设的时候, 可以使用不同的私有数据
-            session_key = api_key + preset
+            session_key = f"{api_key}-{preset}"
             session_id = self.session.create_session_id(session_key)
         else:
              # 当前浏览器标识id 已经存在, 则计算当前会话ID, 以便让同一个用户使用不同的预设bot
-            session_key = broswer_session_id + preset
+            session_key = f"{broswer_session_id}-{preset}"
             session_id = self.session.create_session_id(session_key)
 
         # 检查是否存在会话, 不存在则新建私有数据
