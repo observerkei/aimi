@@ -2633,7 +2633,7 @@ def chat_from(request: dict = None):
                     f"根据描述要结合实际情况 expect 需要填主要部分 `想聊天`, 而不包括 expect 字段本身的说明部分. 其他 action 字段填写也都遵守这个规则. ",
                 f"4. 使用回复结构: 请以以下结构为模板, 每个字段都通过使用严谨逻辑学家思维、"
                     f"哲学家思维结合你的常识、经验和 {aimi_core_name} Guidance 进行严谨分析, 替换成为最完美最符合的内容, "
-                    f"而是在遵守 Guidance 的情况下 每次都要结合 action_running 相关的消息和最新的信息和行动思考, 根据已有认知填充最合适最详细的内容, "
+                    f"而是在遵守 Guidance 的情况下 每次都要结合 action_running 的所有消息来行动思考, 根据已有认知填充最合适最详细的内容, "
                     f"然后进行回复, action 对象的结构模板在 action_format 中定义 ",
             ],
             "action_format": action_object,
