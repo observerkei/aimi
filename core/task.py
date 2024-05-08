@@ -2096,7 +2096,7 @@ s_action = ActionToolItem(
             ActionToolItem(
                 call="chat_to_python",
                 description=f"执行某段 python 代码: 禁止使用这个方法来回答问题. "
-                    f"这个方法只能执行代码而不能做任何其他操作. 如要做其他操作请使用其他方法完成. "
+                    f"这个方法只能执行python代码而不能做任何其他操作. 如要做其他操作请使用其他方法完成. "
                     "有联网, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, "
                     "然后再按照设计和 python 实现要求 一次性实现代码.\n "
                     "python 实现要求如下:\n "
