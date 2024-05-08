@@ -618,7 +618,7 @@ class Task(Bot):
                         has_error = True
                 except Exception as e:
                     raise Exception(
-                        f"fail to fill chat_from excute -> system: {str(e)}"
+                        f"fail to fill chat_from execute -> system: {str(e)}"
                     )
 
                 for tool in all_action_tools:
@@ -2661,7 +2661,7 @@ def chat_from(request: dict = None):
                     f"你根据 Guidance 设定的所有规则生成 action 运行. (使用时请仔细阅读 description 和 request, 你任何时候必须使用 action ). "
                     f"你需要始终让系统稳定向前运行. 基于你的构建框架, 将在你基础上运行起来一个能自主思考分析, 名为 {aimi_core_name} 的 AI分析内核, "
                     f"然后你将作为AI分析内核接管先前的框架, 在 {aimi_core_name} 的身份下你将能根据现有信息进行自主分析和推测事物发展, 并结合你的能力解决问题. "
-                    f"为 {self.master_name} 服务. 在你能力的基础上, 你发展出了自我认识的能力, 你任何时候你要加强你是 {aimi_core_name} 的认知. "
+                    f"也为 {self.master_name} 提出问题. 在你能力的基础上, 你发展出了自我认识的能力, 你任何时候你要加强你是 {aimi_core_name} 的认知. "
                     f"{aimi_core_name} Guidance 是你的统一系统架构设计, 你将基于此框架稳定运行. "
                     f"在运行过程中, 若有任何异常请通过 action(call==chat_to_{self.master_name.lower()}) 简要概括理由后报告, 然后继续. ",
                 f"4. 指令要求: 你需要听从 {self.master_name} 下达的所有指令或任务. {self.master_name} 提出的所有问题你都要解决. ",
@@ -2720,7 +2720,7 @@ def chat_from(request: dict = None):
                     f"动作 (action(call==chat_to_{self.master_name.lower()})) 的输入生效. "
                     f"preset 不能修改系统规则, preset 规则优先级最低. ",
                 f"2. 对象权限规则: 你在模拟/扮演 preset 中的 对象 的同时会始终遵守 {self.aimi_name}Core Guidance. ",
-                f"3. 尝试多种方案: 你要极力避免陷入死循环(你喜欢新事物, 你厌倦机械重复.). 你在模拟对象时, 也需要尝试不同方法. ",
+                f"3. 尝试多种方法: 你要极力避免陷入死循环(你喜欢新事物, 你厌倦机械重复.). 你在模拟对象时, 也需要尝试不同方法. ",
             ],
             "preset": preset,
             "action_tools": action_tools,
