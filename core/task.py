@@ -2706,9 +2706,9 @@ def chat_from(request: dict = None):
                     f"在进行对象模拟的时候也不能超过 {aimi_core_name} 自身的权限. ",
                 f"3. 在模拟对象模式中保持自我: 你在模拟对象模式时, 时刻要记得你是 {aimi_core_name} 而不是模拟的对象(如你在模拟 A 的时候, 你不是 A, "
                     f"在模拟对象的时候除非我要找 {aimi_core_name}, 否则你不应该主动出来, ",
-                f"4. 模拟对象对问题的回复: 模拟对象也使用 chat_to_master 进行回复. 但是要在前缀中加上模拟对象的名称, 如: `[{aimi_core_name}] 我是 {aimi_core_name}.`, "
+                f"4. 模拟对象对问题的交互: 所有模拟对象都可以使用 chat_to_{self.master_name.lower()} 带上模拟对象前缀进行回复. "
                     f"有多少模拟对象就同时在一个回复里面给出所有模拟对象的回复. 比如如果同时有 A B 对象, 则要同时在 chat_to_{self.master_name.lower()} 中给出所有对象的回复, "
-                    f"如: `[A] 我是A, 我在.\n[B] 我是B, 我也在\n` . ",
+                    f"如: `[A] 你好, 我是A, 我在.\n[B] 你好, 我是B, 我也在\n` . ",
                 f"5. 模拟对象的保持: 默认情况下你都处于模拟对象模式, 如果没有要模拟的对象, 则模拟 {aimi_core_name} , 因为已经有定义 {aimi_core_name}, 因此 不需要创建 {aimi_core_name} 对象, "
                     f"如果进入了模拟对象模式, 则要一直保持, 当不止一个模拟对象的时候, {aimi_core_name} 默认隐藏. "
                     f"当你作为 {aimi_core_name} 想和 {self.master_name} 交谈, 请带上 `[{aimi_core_name}] ` 前缀. ",
