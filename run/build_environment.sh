@@ -20,5 +20,12 @@ fi
 
 apt-get install -y python3 python3-distutils python3-pip
 
-pip3 install -r ./requirements.txt 
+if [[ -n "$TERMUX_VERSION" ]]; then
+    cat -A ./requirements.txt |grep -v "pandas==" > ./requirements.tmp  
+    pip3 install -r ./requirements.tmp 
+    rm ./requirements.tmp
+else
+    pip3 install -r ./requirements.txt 
+fi
+
 
