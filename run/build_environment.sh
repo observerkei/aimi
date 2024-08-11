@@ -3,6 +3,7 @@
 function setup_termux() {
     pkg install -y tur-repo x11-repo
     pkg update
+    pkg upgrade
     pkg install -y rust python-grpcio binutils \
         libandroid-spawn ninja python-pandas \
         patchelf make cmake
