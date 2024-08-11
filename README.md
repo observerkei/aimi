@@ -32,6 +32,12 @@ If you want to use text-to-image, you'll need to add these
 pip3.9 install -r ./run/requirements.txt
 ```
 
+or use:  
+
+```bash
+cd run && bash  -x build_environment.sh
+```
+
 If you want to use mathematical expression(LaTex) / html to turn images and you are a class ubuntu system
 
 ```bash
