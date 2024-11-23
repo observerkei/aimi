@@ -2,7 +2,7 @@ from typing import Any, List, Generator, Dict, Optional, Union
 import shutil
 import os
 
-from tool.util import log_info, log_err, log_dbg, load_module
+from tool.util import log_info, log_err, log_dbg, load_module, make_history
 from tool.config import Config
 from aimi_plugin.bot.type import Bot as BotBase
 from aimi_plugin.bot.type import BotType as ChatBotTypeBase
@@ -71,6 +71,9 @@ class Bot(BotBase):
 
     def bot_load_setting(self, type: str):
         return Config.load_setting(type)
+    
+    def bot_make_history(self, talk_history: List) -> str:
+        return make_history(talk_history)
 
     def bot_log_dbg(self, msg: str):
         return log_dbg(msg, is_plugin=True)

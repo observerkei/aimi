@@ -8,7 +8,7 @@ from typing import Generator, List, Dict, Any, Tuple
 from contextlib import suppress
 
 from tool.config import Config
-from tool.util import log_dbg, log_err, log_info, make_context_messages
+from tool.util import log_dbg, log_err, log_info, make_context_messages, make_history
 from core.aimi_plugin import Bot, ChatBot, ChatBotType, BotAskData
 from app.app_qq import AppQQ
 from app.app_web import AppWEB
@@ -435,7 +435,7 @@ class Aimi:
                 yield from self.ask(session_id, ask_data)
             else:
                 talk_history = context_messages[1:-1]
-                ask_data.history = self.memory.make_history(talk_history)
+                ask_data.history = make_history(talk_history)
                 yield from self.__post_question(
                     session_id=session_id,
                     api_type=api_type,
@@ -463,7 +463,7 @@ class Aimi:
             talk_history = self.memory.search(question, self.max_link_think)
             ask_data.messages = make_context_messages(question, preset, talk_history)
 
-            history = self.memory.make_history(talk_history)
+            history = make_history(talk_history)
             ask_data.history = history
 
             for message in self.__post_question(

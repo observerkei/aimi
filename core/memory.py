@@ -215,26 +215,6 @@ class Memory:
 
         return talk_history
 
-    def make_history(self, talk_history: List[Dict]) -> str:
-        history = ""
-
-        talk_count = 0
-        for talk in talk_history:
-            content = ""
-            it = ""
-            for k, v in talk.items():
-                if k == "role" and v == "user":
-                    talk_count += 1
-                    it = "我说:"
-                    continue
-                if k == "role" and v == "assistant":
-                    it = "你说:"
-                if k != "content":
-                    continue
-                content = v
-            history += f"{talk_count} {it} {content}\n"
-        return history
-
     def __model_enable(self) -> bool:
         return len(self.memory_model_type)
 
