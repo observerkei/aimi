@@ -53,9 +53,9 @@ class Bot(BotBase):
     # ask bot
     def ask(self, caller: BotBase, ask_data: BotAskData) -> Generator[dict, None, None]:
         question = ask_data.question
-        yield caller.bot_set_response(code=1, message="o")
-        yield caller.bot_set_response(code=0, message="ok.")
-        # if error, then: yield caller.bot_set_response(code=-1, message="err")
+        yield  {"code": 1, "message": "o"}
+        yield  {"code": 0, "message": "ok."}
+        #  if error, then:  yield  {"code": -1, "message": "err"}
 
     def bot_ask(
         self, caller: BotBase, bot_type: str, ask_data: BotAskData
@@ -70,10 +70,6 @@ class Bot(BotBase):
     # init bot
     def __when_init(self, caller: BotBase):
         pass
-
-    # no need define bot_set_response
-    def bot_set_response(self, code: int, message: str) -> Any:
-        return {"code": code, "message": message}
     
     def bot_log_dbg(self, msg: str):
         return log_dbg(msg, is_plugin=True)
