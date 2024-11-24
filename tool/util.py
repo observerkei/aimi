@@ -158,25 +158,6 @@ def is_json(data):
         return False
     return True
 
-def make_history(talk_history: List[Dict]) -> str:
-    history = ""
-
-    talk_count = 0
-    for talk in talk_history:
-        content = ""
-        it = ""
-        for k, v in talk.items():
-            if k == "role" and v == "user":
-                talk_count += 1
-                it = "我说:"
-                continue
-            elif k == "role" and v == "assistant":
-                it = "你说:"
-            if k != "content":
-                continue
-            content = v
-        history += f"{talk_count} {it} {content}\n"
-    return history
 
 def load_module(
     module_path: str, load_name: List[str], file_start: str = "", file_end: str = ".py"

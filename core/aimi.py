@@ -8,8 +8,8 @@ from typing import Generator, List, Dict, Any, Tuple
 from contextlib import suppress
 
 from tool.config import Config
-from tool.util import log_dbg, log_err, log_info, make_context_messages, make_history
-from core.aimi_plugin import Bot, ChatBot, ChatBotType, BotAskData
+from tool.util import log_dbg, log_err, log_info, make_context_messages
+from core.aimi_plugin import Bot, ChatBot, ChatBotType, BotAskData, make_history
 from app.app_qq import AppQQ
 from app.app_web import AppWEB
 

@@ -2,13 +2,19 @@ from typing import Any, List, Generator, Dict, Optional, Union
 import shutil
 import os
 
-from tool.util import log_info, log_err, log_dbg, load_module, make_history
+from tool.util import log_info, log_err, log_dbg, load_module
 from tool.config import Config
 from aimi_plugin.bot.type import Bot as BotBase
 from aimi_plugin.bot.type import BotType as ChatBotTypeBase
 from aimi_plugin.bot.type import BotAskData as BotAskDataBase
+from aimi_plugin.bot.type import make_history as bot_make_history
 from aimi_plugin.action.type import ActionToolItem as ActionToolItemBase
 from pydantic import BaseModel, constr
+
+
+
+def make_history(talk_history: List[Dict]) -> str:
+    return bot_make_history(talk_history)
 
 
 class ChatBotType(ChatBotTypeBase):
@@ -68,13 +74,7 @@ class Bot(BotBase):
     # no need define bot_set_response
     def bot_set_response(self, code: int, message: str) -> Any:
         return {"code": code, "message": message}
-
-    def bot_load_setting(self, type: str):
-        return Config.load_setting(type)
     
-    def bot_make_history(self, talk_history: List) -> str:
-        return make_history(talk_history)
-
     def bot_log_dbg(self, msg: str):
         return log_dbg(msg, is_plugin=True)
 
@@ -251,7 +251,7 @@ class ChatBot:
                     self.setting[bot_type] = setting[bot_type]
                 else:
                     # 不存在自定义配置使用默认配置.
-                    self.setting[bot_type] = self.bot_caller.bot_load_setting(bot_type)
+                    self.setting[bot_type] = Config.load_setting(bot_type)
 
                 bot.when_init(self.bot_caller, self.setting[bot_type])
             except Exception as e:
