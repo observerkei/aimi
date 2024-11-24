@@ -11,6 +11,7 @@ import json
 from typing import Any, List, Dict
 from pydantic import BaseModel
 
+
 from tool.util import log_info, log_err, log_dbg
 from core.session import Session
 
@@ -457,8 +458,19 @@ class AppWEB:
 
         return session_id, need_update_cookie
 
+    def server_forever(self):
+        self.http_server.start_accepting()
+        self.http_server._stop_event.wait()
+
     def server(self):
         from gevent import pywsgi
+        from multiprocessing import cpu_count, Process
+
+        
+        cpu_cnt = cpu_count()
+        web_cpu = cpu_cnt
+        if cpu_cnt > 2:
+            web_cpu = web_cpu - 2
 
         self.http_server = pywsgi.WSGIServer(
             listener=(self.host, self.port), application=self.app, log=None
@@ -466,4 +478,9 @@ class AppWEB:
 
         log_info("web start")
 
-        self.http_server.serve_forever()
+        self.http_server.start()
+
+        # 多进程 + 协程
+        for i in range(web_cpu):
+            p = Process(target=self.server_forever)
+            p.start()
