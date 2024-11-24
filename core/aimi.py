@@ -658,13 +658,14 @@ class Aimi:
         log_info("recv exit sig.")
         self.running = False
         self.app_qq.stop()
+        self.app_web.stop()
 
     def __when_exit(self):
         self.running = False
 
         log_info("now exit aimi.")
         self.notify_offline()
-
+        
         if self.memory.save_memory():
             log_info("exit: save self.memory done.")
         else:
@@ -674,3 +675,4 @@ class Aimi:
             self.session.when_exit()
         except Exception as e:
             log_err(f"fail to exit aimi chatbot: {e}")
+

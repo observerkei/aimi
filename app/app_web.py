@@ -92,6 +92,8 @@ class AppWEB:
     get_all_models_hook: Any
     setting: Dict = {}
     __cpu_id: int = 0
+    processes = []
+    target = "monitor"
 
     def __init__(self, setting, session, ask, get_all_models):
         self.session = session
@@ -459,8 +461,30 @@ class AppWEB:
         return session_id, need_update_cookie
 
     def server_forever(self):
+        self.target = "process"
         self.http_server.start_accepting()
         self.http_server._stop_event.wait()
+    
+    def stop(self):
+        # 停止 HTTP 服务器
+        self.http_server.stop()
+
+        # 等待 HTTP 服务器完全停止
+        self.http_server._stop_event.set()
+
+        # 终止所有子进程
+        if self.target != "monitor":
+            return
+
+        cnt = 0
+        for p in self.processes:
+            log_dbg(f"exiting process {cnt}")
+            cnt = cnt + 1
+            try:
+                p.terminate()
+                p.join(timeout=5)  # 给进程足够的时间退出
+            except Exception as e:
+                log_info(f"Failed to join process {cnt}: {e}")
 
     def server(self):
         from gevent import pywsgi
@@ -484,3 +508,8 @@ class AppWEB:
         for i in range(web_cpu):
             p = Process(target=self.server_forever)
             p.start()
+            self.processes.append(p)
+        
+        # 阻塞，等待退出信号
+        for p in self.processes:
+            p.join()
