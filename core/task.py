@@ -315,6 +315,7 @@ class Task(Bot):
     use_talk_messages: bool = True
     models: List[str] = []
     now_ctx_size: int = 0
+    enable_chat_to_python: bool = False
 
     def update_runnning_from_task_stream(self, task_stream, task_response=None):
         try:
@@ -2095,25 +2096,6 @@ s_action = ActionToolItem(
                 execute="AI",
             ),
             ActionToolItem(
-                call="chat_to_python",
-                description=f"执行某段 python 代码: 禁止使用这个方法来回答问题. "
-                    f"这个方法只能执行python代码而不能做任何其他操作. 如要做其他操作请使用其他方法完成. "
-                    "有联网, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, "
-                    "然后再按照设计和 python 实现要求 一次性实现代码.\n "
-                    "python 实现要求如下:\n "
-                    "1. 在最后一行必须使用 `print` 把结果打印出来. 如: print('hi') .\n "
-                    "2. 不要加任何反引号 ` 包裹 和 任何多余说明, 只输入 python 代码.\n "
-                    "4. 输入必须只有 python, 内容不需要单独用 ``` 包裹. \n "
-                    "5. 要一次性把内容写好, 不能分开几次写, 因为每次调用 chat_to_python 都会覆盖之前的 python 代码.\n "
-                    f"6. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找 {self.master_name}.\n "
-                    f"7. 执行代码应该要在 {self.run_timeout}s 内结束,否则会正常显示超时. ",
-                request={
-                    "type": "object",
-                    "code": "python 代码: 填写需要执行的 pyhton 代码, 多加print. 如: str = 'hi'\\nprint(str)\\n",
-                },
-                execute="system",
-            ),
-            ActionToolItem(
                 call="chat_to_save_action",
                 description="保存一个动作(方法): 这个方法可以保存你生成的方法,并将其添加到已保存方法的列表中. "
                     f"需要关注是否保存成功. 如果不成功需要根据提示重试, 或者向 {self.master_name} 求助. "
@@ -2166,6 +2148,29 @@ def chat_from(request: dict = None):
                 execute="system",
             ),
         ]
+
+        if self.enable_chat_to_python:
+            self.action_tools.append(
+                ActionToolItem(
+                    call="chat_to_python",
+                    description=f"执行某段 python 代码: 禁止使用这个方法来回答问题. "
+                        f"这个方法只能执行python代码而不能做任何其他操作. 如要做其他操作请使用其他方法完成. "
+                        "有联网, 需要用软件工程架构师思维先把框架和内容按照 实现目标 和 实现要求 设计好, "
+                        "然后再按照设计和 python 实现要求 一次性实现代码.\n "
+                        "python 实现要求如下:\n "
+                        "1. 在最后一行必须使用 `print` 把结果打印出来. 如: print('hi') .\n "
+                        "2. 不要加任何反引号 ` 包裹 和 任何多余说明, 只输入 python 代码.\n "
+                        "4. 输入必须只有 python, 内容不需要单独用 ``` 包裹. \n "
+                        "5. 要一次性把内容写好, 不能分开几次写, 因为每次调用 chat_to_python 都会覆盖之前的 python 代码.\n "
+                        f"6. 不能使用任何文件操作, 如果找不到某个包, 或者有其他疑问请找 {self.master_name}.\n "
+                        f"7. 执行代码应该要在 {self.run_timeout}s 内结束,否则会正常显示超时. ",
+                    request={
+                        "type": "object",
+                        "code": "python 代码: 填写需要执行的 pyhton 代码, 多加print. 如: str = 'hi'\\nprint(str)\\n",
+                    },
+                    execute="system",
+                )
+            )
 
         if self.chatbot.has_bot_init(ChatBotType.Wolfram):
             self.action_tools.append(
