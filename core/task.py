@@ -1887,7 +1887,7 @@ s_action = ActionToolItem(
                     "type": "object",
                     "content": f"{self.aimi_name} 对 {self.master_name} 传达/报告/交互的内容: 可以很丰富,"
                     f" 包含多句话, 每次都要 优化 内容层次 和 使用 优雅 Markdown 排版, "
-                    f"如果有数学公式, 则要用 latex 显示, 每个公式都要单独包裹在单独行的 $$ 中, 如: $$ \int e^{{x}} dx du $$ ",
+                    f"如果有数学公式, 则要用 latex 显示, 每个公式都要单独包裹在单独行的 $$ 中, 如: $$ \\int e^{{x}} dx du $$ ",
                 },
                 execute="system",
             ),
