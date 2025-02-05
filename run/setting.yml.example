@@ -18,9 +18,12 @@ llama:
   max_requestion: 608
   max_repeat_times: 2
   reply_time_limit_s: 30
-  model: 'alpaca-2-7b-16k'
-  trigger:
-    - '#llama'
+  models:
+    default:
+      model: ''
+      trigger:
+        - '#llama'
+
 
 bing:
   cookie_path: './run/bing_cookies_a.json'
