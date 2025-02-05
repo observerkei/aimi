@@ -188,6 +188,17 @@ task:
   sandbox_run_model: "system"
   sandbox_run_timeout: 10
   max_running_size: 5000
+  models:
+    default:
+      model: 'gpt-3.5-turbo-16k'
+      type: 'openai'
+    16k:
+      model: 'gpt-3.5-turbo-16k'
+      type: 'openai'
+    4k:
+      model: 'gpt-3.5-turbo'
+      type: 'openai'
+
 
 aimi:
   name: Aimi

@@ -1703,10 +1703,14 @@ s_action = ActionToolItem(
         if not self.chatbot.has_bot_init(ChatBotType.OpenAI):
             return False
         openai_models = self.chatbot.get_bot_models(ChatBotType.OpenAI)
-        for model in self.models:
-            op_model = self.get_openai_model(model)
-            if op_model in openai_models:
+        llama_models = self.chatbot.get_bot_models(ChatBotType.LLaMA)
+        for k, v in self.models.items():
+            model = v['model']
+            if model in openai_models:
                 return True
+            if model in llama_models:
+                return True
+
         return False
 
     def __init__(self, chatbot: ChatBot, setting={}):
@@ -1726,7 +1730,17 @@ s_action = ActionToolItem(
 
     def __load_setting(self, setting):
 
-        self.models = ["task", "task-4k", "task-16k"]
+        try:
+            for k, v in setting['models'].items():
+                if 'model' in v:
+                    self.models[k]['model'] = v['model']
+                if 'type' in v:
+                    self.models[k]['type'] = v['type']
+
+        except Exception as e:
+            log_err(f"fail to load task: {e}")
+            self.models = {}
+
 
         if not len(setting):
             return
@@ -2366,15 +2380,22 @@ def chat_from(request: dict = None):
 
         return False
 
-    def get_openai_model(self, select: str) -> str:
-        if "16k" in select.lower():
-            return "gpt-3.5-turbo-16k"
-        if "4k" in select.lower():
-            return "gpt-3.5-turbo"
-        return "gpt-3.5-turbo-16k"
+    def target_to_model(self, select: str) -> str:
+        if select in self.models:
+            return self.models[select]['model']
+        
+        return self.models['defalut']['model']
 
     def get_models(self, caller: Bot) -> List[str]:
-        return self.models
+        models = []
+
+        for k, v in self.models.items():
+            model = v['model']
+            if model == 'default':
+                model = 'auto'
+            models.append(model)
+
+        return models
     
     def action_running_to_messages(self) -> List[Dict]:
         messages = []
@@ -2440,7 +2461,7 @@ def chat_from(request: dict = None):
         ask_data = BotAskData(
             question=link_think,
             messages=context_messages,
-            model=self.get_openai_model(model),
+            model=self.target_to_model(model),
         )
 
         # rsp_data = '[{"type": "object", "timestamp": __timestamp, "expect": "你好", "reasoning": "AimiCore开始思考: 根据Master的指示，回复`你好`. ", "call": "chat_to_master", "request": {"type": "object", "content": "[AimiCore] 你好，我已经初始化完成. ", "from": [2]}, "conclusion": "为了符合Guidance，我回复了`你好`. ", "execute": "system"}] '
