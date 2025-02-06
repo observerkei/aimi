@@ -313,7 +313,7 @@ class Task(Bot):
     run_model = Sandbox.RunModel.system
     run_timeout: int = 15
     use_talk_messages: bool = True
-    models: List[str] = []
+    models: Dict[str, Dict[str, str]] = {}
     now_ctx_size: int = 0
     enable_chat_to_python: bool = False
 
@@ -1700,8 +1700,11 @@ s_action = ActionToolItem(
 
     @property
     def init(self):
-        if not self.chatbot.has_bot_init(ChatBotType.OpenAI):
+        if not self.chatbot.has_bot_init(ChatBotType.OpenAI) and (
+            not self.chatbot.has_bot_init(ChatBotType.LLaMA)
+        ):
             return False
+        
         openai_models = self.chatbot.get_bot_models(ChatBotType.OpenAI)
         llama_models = self.chatbot.get_bot_models(ChatBotType.LLaMA)
         for k, v in self.models.items():
@@ -1731,16 +1734,22 @@ s_action = ActionToolItem(
     def __load_setting(self, setting):
 
         try:
+            self.models = {}
             for k, v in setting['models'].items():
+
+                self.models[k] = {}
                 if 'model' in v:
                     self.models[k]['model'] = v['model']
                 if 'type' in v:
                     self.models[k]['type'] = v['type']
+                
+
 
         except Exception as e:
-            log_err(f"fail to load task: {e}")
+            log_err(f"fail to load task: {str(e)}")
             self.models = {}
 
+        log_dbg(f'all models: {str(self.models)}')
 
         if not len(setting):
             return
@@ -2380,20 +2389,23 @@ def chat_from(request: dict = None):
 
         return False
 
-    def target_to_model(self, select: str) -> str:
-        if select in self.models:
-            return self.models[select]['model']
+    def target_to_model_info(self, select: str) -> str:
+
+        for k, v in self.models.items():
+            if k in select:
+                return self.models[k]
         
-        return self.models['defalut']['model']
+        return self.models['defalut']
 
     def get_models(self, caller: Bot) -> List[str]:
         models = []
 
-        for k, v in self.models.items():
-            model = v['model']
-            if model == 'default':
-                model = 'auto'
-            models.append(model)
+        for name, info in self.models.items():
+            if not self.chatbot.has_bot_init(info['type']):
+                continue
+            if name == 'default':
+                name = 'auto'
+            models.append(f"task-{name}")
 
         return models
     
@@ -2457,11 +2469,14 @@ def chat_from(request: dict = None):
                 link_think,
             )
             self.now_ctx_size = len(str(link_think))
+        
+        model_info = self.target_to_model_info(model)
+
 
         ask_data = BotAskData(
             question=link_think,
             messages=context_messages,
-            model=self.target_to_model(model),
+            model=model_info['model'],
         )
 
         # rsp_data = '[{"type": "object", "timestamp": __timestamp, "expect": "你好", "reasoning": "AimiCore开始思考: 根据Master的指示，回复`你好`. ", "call": "chat_to_master", "request": {"type": "object", "content": "[AimiCore] 你好，我已经初始化完成. ", "from": [2]}, "conclusion": "为了符合Guidance，我回复了`你好`. ", "execute": "system"}] '
@@ -2481,7 +2496,7 @@ def chat_from(request: dict = None):
         talk_cache = ""
         talk_stream_cache = ""
 
-        for res in self.chatbot.ask(ChatBotType.OpenAI, ask_data):
+        for res in self.chatbot.ask(model_info['type'], ask_data):
             if res["code"] == -1:
                 talk_stream_cache = ""
                 prev_text = ""

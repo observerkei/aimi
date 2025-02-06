@@ -17,6 +17,7 @@ llama:
   api_base: "http://localhost:8080/v1"
   max_requestion: 608
   max_repeat_times: 2
+  max_messages: 4096
   reply_time_limit_s: 30
   models:
     default:
