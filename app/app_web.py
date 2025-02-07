@@ -319,6 +319,12 @@ class AppWEB:
                     context_messages,
                     preset,
                 ):
+                    if not answer or (
+                        "code" not in answer
+                        or "message" not in answer
+                    ):
+                        continue
+
                     message = answer["message"][len(prev_text) :]
                     yield self.__make_stream_reply(message, index)
                     index += 1

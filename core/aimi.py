@@ -443,7 +443,11 @@ class Aimi:
                 )
         except Exception as e:
             log_err(f"fail to ask: {e}")
-            yield f"Error: {e}"
+            
+            yield {
+                "code": -1,
+                "message": f"Error: {e}" 
+            }
 
     def ask(
         self, session_id: str, ask_data: BotAskData
