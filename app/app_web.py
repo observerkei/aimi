@@ -256,7 +256,7 @@ class AppWEB:
                 for owned_by, models in all_models.items():
                     for model in models:
                         model_info = self.__make_model_info(
-                            f"{owned_by}--{model}", owned_by
+                            f"{owned_by}:{model}", owned_by
                         )
                         model_infos.append(model_info)
                         # log_dbg(f"mod: {str(model)} owned_by: {str(owned_by)}")
@@ -380,18 +380,24 @@ class AppWEB:
                 log_dbg(f"get question: {question}")
 
                 # get model
-                model = web_request["model"]
-                owned_by = ""
-                if "owned_by" in web_request:
-                    owned_by = web_request["owned_by"]
+                owned_by_and_model = web_request["model"]
 
-                model_info = model.split("--")
-                if len(model_info) == 2:
-                    owned_by = model_info[0]
-                    model = model_info[1]
+                log_dbg(f'clinet model: {owned_by_and_model}')
 
-                log_dbg(f"use model: {model}")
-                log_dbg(f"model owned_by: {owned_by}")
+                def extract_owned_by_and_model(owned_by_and_model):
+                    parts = owned_by_and_model.split(':', 1)  # 只分割第一个 ':'
+                    if len(parts) == 2:
+                        owned_by, model = parts[0], parts[1]
+                    else:
+                        owned_by, model = "openai", owned_by_and_model
+                        log_dbg(f"client model no support, try set owned_by=openai ")
+                    
+                    return owned_by, model
+
+                owned_by, model = extract_owned_by_and_model(owned_by_and_model)
+
+                log_dbg(f"client owned_by: {owned_by}")
+                log_dbg(f"client model: {model}")
             except Exception as e:
                 log_err(f"fail to get requestion: {e}")
                 model = "auto"
@@ -500,7 +506,7 @@ class AppWEB:
             listener=(self.host, self.port), application=self.app, log=None
         )
 
-        log_info("web start")
+        log_info(f"web start http://{self.host}:{self.port}")
 
         self.http_server.start()
 
