@@ -291,7 +291,7 @@ class TaskItem(BaseModel):
 
 
 class Task(Bot):
-    type: str = "task"
+    type: str = ChatBotType.Task
     tasks: Dict[int, TaskItem] = {}
     action_tools: List[ActionToolItem] = []
     extern_action: ExternAction
@@ -828,7 +828,7 @@ class Task(Bot):
 
                         task_response = self.make_chat_from(
                             from_timestamp=self.timestamp,
-                            from_name="wolfram",
+                            from_name=ChatBotType.Wolfram,
                             content=response,
                             request_description="`response->wolfram` 的内容是 云端 wolfram 返回内容.",
                         )
@@ -862,7 +862,7 @@ class Task(Bot):
 
                         task_response = self.make_chat_from(
                             from_timestamp=self.timestamp,
-                            from_name="bing",
+                            from_name=ChatBotType.Bing,
                             content=response,
                             request_description="`response->bing` 的内容是 bing 回复的话.",
                         )

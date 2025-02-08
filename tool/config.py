@@ -141,7 +141,7 @@ class Config:
             return {}
 
     @classmethod
-    def load_setting(cls, type) -> dict:
+    def load_setting(cls, type: str) -> dict:
         try:
             obj = read_yaml(Config.setting_config)
         except Exception as e:
@@ -150,9 +150,9 @@ class Config:
 
         setting = {}
         try:
-            setting = obj.get(type, {})
+            setting = obj.get(type.lower(), {})
         except Exception as e:
-            log_err(f"fail to load setting[{type}]: {e}")
+            log_err(f"fail to load setting[{type.lower()}]: {e}")
             setting = {}
 
         return setting

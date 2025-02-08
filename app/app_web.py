@@ -10,6 +10,7 @@ from flask_cors import CORS
 import json
 from typing import Any, List, Dict
 from pydantic import BaseModel
+from core.aimi_plugin import ChatBotType
 
 
 from tool.util import log_info, log_err, log_dbg
@@ -395,7 +396,7 @@ class AppWEB:
                     if len(parts) == 2:
                         owned_by, model = parts[0], parts[1]
                     else:
-                        owned_by, model = "openai", owned_by_and_model
+                        owned_by, model = ChatBotType.OpenAI, owned_by_and_model
                         log_dbg(f"client model no support, try set owned_by=openai ")
                     
                     return owned_by, model

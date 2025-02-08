@@ -68,7 +68,7 @@ class Session:
 
     def __create_chabot(self, sesion_id: str, setting: Dict) -> ChatBot:
         chatbot = ChatBot(setting)
-        task_setting = setting["task"] if "task" in setting else {}
+        task_setting = setting[ChatBotType.Task] if ChatBotType.Task in setting else {}
         task_setting['session_id'] = sesion_id
         task = Task(chatbot=chatbot, setting=task_setting)
         chatbot.append(ChatBotType.Task, task)
