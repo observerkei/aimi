@@ -227,17 +227,40 @@ class Aimi:
         previous_api_type = self.session.get_previous_api_type(session_id)
         if previous_api_type and len(previous_api_type):
             return previous_api_type
-        
+
         # 之前没有, 随机取一个, 优先取 task
         if chatbot.has_bot_init(ChatBotType.Task):
-            return ChatBotType.Task
+            task_models = chatbot.get_bot_models(ChatBotType.Task)
+            if len(task_models) == 1 and task_models[0] == "task-test":
+                # 跳过测试模型
+                pass
+            else:
+                return ChatBotType.Task
         
+        use_bot_type = ""
+        llama_model = ""
+
         for bot_type, bot in chatbot.each_bot():
             if not bot.init:
                 continue
-            return bot_type
 
-        return ""
+            if ChatBotType.Task == bot_type:
+                # 跳过测试模型
+                task_models = chatbot.get_bot_models(ChatBotType.Task)
+                if len(task_models) == 1 and task_models[0] == "task-test":
+                    continue
+
+            # 优先跳过本地模型
+            if ChatBotType.LLaMA == bot_type:
+                llama_model = ChatBotType.LLaMA
+                continue
+
+            use_bot_type = bot_type
+            break
+
+        if len(use_bot_type) == 0:
+            return llama_model
+        return use_bot_type
 
     @property
     def __busy_reply(self) -> str:
