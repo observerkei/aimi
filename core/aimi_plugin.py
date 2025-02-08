@@ -196,7 +196,7 @@ class ChatBot:
             try:
                 yield from self.bots[type].ask(self.bot_caller, ask_data)
             except Exception as e:
-                log_err(f"fail to ask bot: {e}: {type}: {ask_data}")
+                log_err(f"fail to ask bot: type:{type}, err:{e} , ask_data:{ask_data}")
         else:
             log_err(f"no model to ask of type: {type}")
 

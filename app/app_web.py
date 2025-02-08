@@ -61,6 +61,7 @@ class BotTypeOwnedBy:
     LLaMA = "LLaMA"
     XAI = "XAI"
     Poe = "Poe"
+    Aimi = "Aimi"
 
 def bot_type_to_owned_by(bot_type: str):
     owned_by = {
@@ -73,6 +74,7 @@ def bot_type_to_owned_by(bot_type: str):
         ChatBotType.LLaMA: BotTypeOwnedBy.LLaMA,
         ChatBotType.XAI: BotTypeOwnedBy.XAI,
         ChatBotType.Poe: BotTypeOwnedBy.Poe,
+        BotTypeOwnedBy.Aimi: BotTypeOwnedBy.Aimi,
     }
     if bot_type in owned_by:
         return owned_by[bot_type]
@@ -90,6 +92,7 @@ def owned_by_to_bot_type(owned_by: str):
         BotTypeOwnedBy.LLaMA: ChatBotType.LLaMA,
         BotTypeOwnedBy.XAI: ChatBotType.XAI,
         BotTypeOwnedBy.Poe: ChatBotType.Poe,
+        BotTypeOwnedBy.Aimi: BotTypeOwnedBy.Aimi,
     }
     if owned_by in bot_type:
         return bot_type[owned_by]

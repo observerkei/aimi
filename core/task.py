@@ -2395,7 +2395,7 @@ def chat_from(request: dict = None):
             if k in select:
                 return self.models[k]
         
-        return self.models['defalut']
+        return self.models['default']
 
     def get_models(self, caller: Bot) -> List[str]:
         models = []
@@ -2406,6 +2406,11 @@ def chat_from(request: dict = None):
             if name == 'default':
                 name = 'auto'
             models.append(f"task-{name}")
+
+            # update default models
+            if not self.chatbot.has_bot_init(self.models['default']['type']):
+                self.models['default'] = info
+                log_dbg(f'update default model to {str(info)}')
 
         return models
     
@@ -2495,8 +2500,11 @@ def chat_from(request: dict = None):
         prev_text = ""
         talk_cache = ""
         talk_stream_cache = ""
+        bot_type = model_info['type']
 
-        for res in self.chatbot.ask(model_info['type'], ask_data):
+        log_dbg(f'use bot_type: {bot_type}')
+
+        for res in self.chatbot.ask(bot_type, ask_data):
             if res["code"] == -1:
                 talk_stream_cache = ""
                 prev_text = ""
