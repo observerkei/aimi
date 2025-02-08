@@ -406,13 +406,11 @@ class Aimi:
         nickname: str = None,
         model: str = "auto",
         api_key: str = "",
-        owned_by: str = "Aimi",
+        api_type: str = "Aimi",
         context_messages: Any = None,
         preset: str = "",
     ) -> Generator[dict, None, None]:
         try:
-
-            api_type = owned_by
 
             if api_type == self.aimi_name and ChatBotType.Task in model:
                 api_type = ChatBotType.Task

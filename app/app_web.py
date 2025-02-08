@@ -51,6 +51,51 @@ openai_stream_response = [
     },
 ]
 
+class BotTypeOwnedBy:
+    Bing = "Bing"
+    ChatAnywhere = "ChatAnywhere"
+    Google = "Google"
+    OpenAI = "OpenAI"
+    Wolfram = "Wolfram"
+    Task = "Task"
+    LLaMA = "LLaMA"
+    XAI = "XAI"
+    Poe = "Poe"
+
+def bot_type_to_owned_by(bot_type: str):
+    owned_by = {
+        ChatBotType.Bing: BotTypeOwnedBy.Bing,
+        ChatBotType.ChatAnywhere: BotTypeOwnedBy.ChatAnywhere,
+        ChatBotType.Google: BotTypeOwnedBy.Google,
+        ChatBotType.OpenAI: BotTypeOwnedBy.OpenAI,
+        ChatBotType.Wolfram: BotTypeOwnedBy.Wolfram,
+        ChatBotType.Task: BotTypeOwnedBy.Task,
+        ChatBotType.LLaMA: BotTypeOwnedBy.LLaMA,
+        ChatBotType.XAI: BotTypeOwnedBy.XAI,
+        ChatBotType.Poe: BotTypeOwnedBy.Poe,
+    }
+    if bot_type in owned_by:
+        return owned_by[bot_type]
+    log_dbg(f'unknown bot_type: {bot_type}')
+    return "Aimi"
+
+def owned_by_to_bot_type(owned_by: str):
+    bot_type = {
+        BotTypeOwnedBy.Bing: ChatBotType.Bing,
+        BotTypeOwnedBy.ChatAnywhere: ChatBotType.ChatAnywhere,
+        BotTypeOwnedBy.Google: ChatBotType.Google,
+        BotTypeOwnedBy.OpenAI: ChatBotType.OpenAI,
+        BotTypeOwnedBy.Wolfram: ChatBotType.Wolfram,
+        BotTypeOwnedBy.Task: ChatBotType.Task,
+        BotTypeOwnedBy.LLaMA: ChatBotType.LLaMA,
+        BotTypeOwnedBy.XAI: ChatBotType.XAI,
+        BotTypeOwnedBy.Poe: ChatBotType.Poe,
+    }
+    if owned_by in bot_type:
+        return bot_type[owned_by]
+    log_dbg(f'unknown owned_by: {owned_by}')
+    return "Aimi"
+
 
 class ModelInfoPermission(BaseModel):
     id: str
@@ -254,8 +299,9 @@ class AppWEB:
                 if not len(all_models):
                     raise Exception("Cannot get models.")
 
-                for owned_by, models in all_models.items():
+                for bot_type, models in all_models.items():
                     for model in models:
+                        owned_by = bot_type_to_owned_by(bot_type)
                         model_info = self.__make_model_info(
                             f"{owned_by}:{model}", owned_by
                         )
@@ -310,13 +356,15 @@ class AppWEB:
 
                 prev_text = ""
 
+                bot_type = owned_by_to_bot_type(owned_by)
+
                 for answer in self.ask_hook(
                     session_id,
                     question,
                     None,
                     model,
                     api_key,
-                    owned_by,
+                    bot_type,
                     context_messages,
                     preset,
                 ):

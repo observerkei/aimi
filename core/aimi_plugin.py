@@ -16,14 +16,12 @@ from pydantic import BaseModel, constr
 def make_history(talk_history: List[Dict]) -> str:
     return bot_make_history(talk_history)
 
-
 class ChatBotType(ChatBotTypeBase):
     pass
 
 
 class BotAskData(BotAskDataBase):
     pass
-
 
 # call bot_ plugin example
 class Bot(BotBase):
