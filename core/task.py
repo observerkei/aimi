@@ -2404,7 +2404,7 @@ def chat_from(request: dict = None):
             if not self.chatbot.has_bot_init(info['type']):
                 continue
             if name == 'default':
-                name = 'auto'
+                continue
             models.append(f"task-{name}")
 
             # update default models
