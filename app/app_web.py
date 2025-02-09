@@ -94,9 +94,18 @@ def owned_by_to_bot_type(owned_by: str):
         BotTypeOwnedBy.Poe: ChatBotType.Poe,
         BotTypeOwnedBy.Aimi: BotTypeOwnedBy.Aimi,
     }
+
+    # 增加小写兼容性
+    bot_type_lower = {}
+    for k, v in bot_type.items():
+        if k.lower() not in bot_type:
+            bot_type_lower[k.lower()] = v
+    for k, v in bot_type_lower.items():
+        bot_type[k] = v
+
     if owned_by in bot_type:
         return bot_type[owned_by]
-    log_dbg(f'unknown owned_by: {owned_by}')
+    log_dbg(f'unknown owned_by: {owned_by}, use default')
     return "Aimi"
 
 
@@ -440,7 +449,7 @@ class AppWEB:
                 # get model
                 owned_by_and_model = web_request["model"]
 
-                log_dbg(f'clinet model: {owned_by_and_model}')
+                log_dbg(f'clinet reqursts model: {owned_by_and_model}')
 
                 def extract_owned_by_and_model(owned_by_and_model):
                     parts = owned_by_and_model.split(':', 1)  # 只分割第一个 ':'
