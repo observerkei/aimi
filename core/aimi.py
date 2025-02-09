@@ -125,7 +125,7 @@ class ReplyStep:
 
 class Aimi:
     type: str = "Aimi"
-    timeout: int = 360
+    timeout: int = 60
     master_name: str = ""
     setting: Dict = {}
     aimi_name: str = "Aimi"
