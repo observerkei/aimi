@@ -4,7 +4,7 @@ openai:
   api_key: 
   api_base:
   max_requestion: 608
-  max_repeat_times: 2
+  max_repeat_times: 1
   reply_time_limit_s: 30
   model: 'text-davinci-002-render-sha-mobile'
   trigger:
@@ -16,7 +16,7 @@ llama:
   api_key: "sk-no-key-required"
   api_base: "http://localhost:8080/v1"
   max_requestion: 608
-  max_repeat_times: 2
+  max_repeat_times: 1
   max_messages: 4096
   reply_time_limit_s: 30
   models:
@@ -30,7 +30,7 @@ bing:
   cookie_path: './run/bing_cookies_a.json'
   wss_link: 
   max_requestion: 1024
-  max_repeat_times: 2
+  max_repeat_times: 1
   trigger:
     default: 
       - '#bing'
@@ -107,7 +107,7 @@ poe:
 
 wolfram:
   app_id: 
-  max_repeat_times: 2
+  max_repeat_times: 1
   trigger:
     - '#wolfram'
     - '@wolfram'
