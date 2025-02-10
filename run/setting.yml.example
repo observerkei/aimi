@@ -189,6 +189,7 @@ task:
   sandbox_run_model: "system"
   sandbox_run_timeout: 10
   max_running_size: 5000
+  timeout: 30
   models:
     default:
       model: 'gpt-3.5-turbo-16k'

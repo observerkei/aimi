@@ -316,6 +316,7 @@ class Task(Bot):
     models: Dict[str, Dict[str, str]] = {}
     now_ctx_size: int = 0
     enable_chat_to_python: bool = False
+    timeout: int = 30
 
     def update_runnning_from_task_stream(self, task_stream, task_response=None):
         try:
@@ -1782,6 +1783,12 @@ s_action = ActionToolItem(
         except Exception as e:
             log_err(f"fail to load task: {e}")
             self.database_path = f"{Config.database_path}/default"
+            
+        try:
+            self.timeout = int(setting["timeout"])
+        except Exception as e:
+            log_err(f"fail to load task: {e}")
+            self.timeout = 30
 
     def __load_task_data(self):
         has_err = False
@@ -2476,12 +2483,13 @@ def chat_from(request: dict = None):
             self.now_ctx_size = len(str(link_think))
         
         model_info = self.target_to_model_info(model)
-
+        timeout = ask_data.timeout if ask_data.timeout > 0 else self.timeout
 
         ask_data = BotAskData(
             question=link_think,
             messages=context_messages,
             model=model_info['model'],
+            timeout=timeout,
         )
 
         # rsp_data = '[{"type": "object", "timestamp": __timestamp, "expect": "你好", "reasoning": "AimiCore开始思考: 根据Master的指示，回复`你好`. ", "call": "chat_to_master", "request": {"type": "object", "content": "[AimiCore] 你好，我已经初始化完成. ", "from": [2]}, "conclusion": "为了符合Guidance，我回复了`你好`. ", "execute": "system"}] '
