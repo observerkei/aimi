@@ -19,6 +19,7 @@ llama:
   max_repeat_times: 1
   max_messages: 4096
   reply_time_limit_s: 30
+  timeout: 10
   models:
     default:
       model: 'test'
@@ -119,6 +120,7 @@ chatanywhere:
   max_messages: 1024
   max_repeat_times: 1
   max_request_minute_times: 2
+  timeout: 60
   models:
     default:
       model: 'gpt-3.5-turbo'
@@ -150,6 +152,7 @@ xai:
   max_messages: 1024
   max_repeat_times: 1
   max_request_minute_times: 2
+  timeout: 60
   models:
     default:
       model: 'grok-beta'
