@@ -138,6 +138,24 @@ class Models(BaseModel):
     object: str
     data: List[ModelInfo]
 
+def make_stream_reply(reply: str, index: int = 0, model: str = "gpt-3.5-turbo-0301") -> str:
+    stream = {
+        "choices": [
+            {
+                "delta": {
+                    "content": str(reply),
+                },
+                "finish_reason": None,
+                "index": index,
+            }
+        ],
+        "created": 1677825464,
+        "id": "chatcmpl-6ptKyqKOGXZT6iQnqiXAH8adNLUzD",
+        "model": model,
+        "object": "chat.completion.chunk",
+    }
+    return "event: message\ndata:" + json.dumps(stream) + "\n\n"
+
 
 class AppWEB:
     api_host: str
@@ -214,24 +232,6 @@ class AppWEB:
 
     def __make_models(self, models: List[ModelInfo]) -> Models:
         return Models(object="list", data=models)
-
-    def __make_stream_reply(self, reply: str, index: int = 0) -> str:
-        stream = {
-            "choices": [
-                {
-                    "delta": {
-                        "content": str(reply),
-                    },
-                    "finish_reason": None,
-                    "index": index,
-                }
-            ],
-            "created": 1677825464,
-            "id": "chatcmpl-6ptKyqKOGXZT6iQnqiXAH8adNLUzD",
-            "model": "gpt-3.5-turbo-0301",
-            "object": "chat.completion.chunk",
-        }
-        return "event: message\ndata:" + json.dumps(stream) + "\n\n"
 
     def __make_stream_stop(self, index: int = 0) -> str:
         stream = {
@@ -359,7 +359,7 @@ class AppWEB:
                 log_dbg(f"wait ask stream.")
                 index = 0
                 if not len(question):
-                    yield self.__make_stream_reply("question is empty.", index)
+                    yield make_stream_reply("question is empty.", index, model)
                     index += 1
                     yield self.__make_stream_stop(index)
                     index += 1
@@ -387,10 +387,10 @@ class AppWEB:
                         continue
 
                     message = answer["message"][len(prev_text) :]
-                    yield self.__make_stream_reply(message, index)
+                    yield make_stream_reply(message, index, model)
                     index += 1
                     if answer["code"] == -1:
-                        yield self.__make_stream_reply("\n\n")
+                        yield make_stream_reply("\n\n", index, model)
                         index += 1
                     prev_text = answer["message"]
 
